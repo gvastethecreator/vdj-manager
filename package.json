@@ -1,0 +1,38 @@
+{
+    "name": "vdj-db-manager",
+    "private": true,
+    "version": "0.1.0",
+    "type": "module",
+    "scripts": {
+        "dev": "vite",
+        "build": "tsc && vite build",
+        "preview": "vite preview",
+        "typecheck": "tsc --noEmit",
+        "lint": "oxlint --fix src/",
+        "format": "oxlint --fix src/",
+        "tauri": "tauri",
+        "check": "tsc --noEmit && oxlint src/"
+    },
+    "dependencies": {
+        "@tanstack/react-virtual": "^3.13.23",
+        "@tauri-apps/api": "^2.10.1",
+        "@tauri-apps/plugin-dialog": "^2.7.0",
+        "@tauri-apps/plugin-fs": "^2.5.0",
+        "@tauri-apps/plugin-shell": "^2.3.5",
+        "gsap": "^3.14.2",
+        "lucide-react": "^1.8.0",
+        "react": "^19.2.5",
+        "react-dom": "^19.2.5"
+    },
+    "devDependencies": {
+        "@tauri-apps/cli": "^2.10.1",
+        "@tailwindcss/vite": "^4.2.2",
+        "@types/react": "^19.2.14",
+        "@types/react-dom": "^19.2.3",
+        "@vitejs/plugin-react": "^6.0.1",
+        "oxlint": "^1.59.0",
+        "tailwindcss": "^4.2.2",
+        "typescript": "^5.9.3",
+        "vite": "^8.0.8"
+    }
+}

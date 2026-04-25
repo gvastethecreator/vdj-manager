@@ -1,0 +1,15 @@
+{
+    "$schema": "https://raw.githubusercontent.com/nicolo-ribaudo/oxlint-config-json-schema/main/schema.json",
+    "rules": {
+        "no-unused-vars": "warn",
+        "no-console": "warn",
+        "eqeqeq": "error",
+        "no-var": "error",
+        "prefer-const": "warn"
+    },
+    "ignorePatterns": [
+        "dist/**",
+        "node_modules/**",
+        "src-tauri/**"
+    ]
+}

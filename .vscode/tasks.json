@@ -1,0 +1,138 @@
+{
+    "version": "2.0.0",
+    "tasks": [
+        {
+            "label": "🚀 dev (Tauri)",
+            "type": "shell",
+            "command": "bun",
+            "args": [
+                "run",
+                "tauri",
+                "dev"
+            ],
+            "options": {
+                "cwd": "${workspaceFolder}"
+            },
+            "isBackground": true,
+            "problemMatcher": [],
+            "presentation": {
+                "reveal": "always",
+                "panel": "dedicated",
+                "clear": true
+            }
+        },
+        {
+            "label": "🔨 build (Tauri)",
+            "type": "shell",
+            "command": "bun",
+            "args": [
+                "run",
+                "tauri",
+                "build"
+            ],
+            "options": {
+                "cwd": "${workspaceFolder}"
+            },
+            "group": {
+                "kind": "build",
+                "isDefault": true
+            },
+            "problemMatcher": [],
+            "presentation": {
+                "reveal": "always",
+                "panel": "shared",
+                "clear": true
+            }
+        },
+        {
+            "label": "🌐 dev (Vite only)",
+            "type": "shell",
+            "command": "bun",
+            "args": [
+                "run",
+                "dev"
+            ],
+            "options": {
+                "cwd": "${workspaceFolder}"
+            },
+            "isBackground": true,
+            "problemMatcher": [],
+            "presentation": {
+                "reveal": "always",
+                "panel": "dedicated",
+                "clear": true
+            }
+        },
+        {
+            "label": "🧹 lint",
+            "type": "shell",
+            "command": "bun",
+            "args": [
+                "run",
+                "lint"
+            ],
+            "options": {
+                "cwd": "${workspaceFolder}"
+            },
+            "problemMatcher": [],
+            "presentation": {
+                "reveal": "always",
+                "panel": "shared",
+                "clear": true
+            }
+        },
+        {
+            "label": "🔍 typecheck",
+            "type": "shell",
+            "command": "bun",
+            "args": [
+                "run",
+                "typecheck"
+            ],
+            "options": {
+                "cwd": "${workspaceFolder}"
+            },
+            "problemMatcher": [],
+            "presentation": {
+                "reveal": "always",
+                "panel": "shared",
+                "clear": true
+            }
+        },
+        {
+            "label": "✅ check (types + lint)",
+            "type": "shell",
+            "command": "bun",
+            "args": [
+                "run",
+                "check"
+            ],
+            "options": {
+                "cwd": "${workspaceFolder}"
+            },
+            "problemMatcher": [],
+            "presentation": {
+                "reveal": "always",
+                "panel": "shared",
+                "clear": true
+            }
+        },
+        {
+            "label": "🦀 cargo check",
+            "type": "shell",
+            "command": "cargo",
+            "args": [
+                "check"
+            ],
+            "options": {
+                "cwd": "${workspaceFolder}\\src-tauri"
+            },
+            "problemMatcher": "$rustc",
+            "presentation": {
+                "reveal": "always",
+                "panel": "shared",
+                "clear": true
+            }
+        }
+    ]
+}

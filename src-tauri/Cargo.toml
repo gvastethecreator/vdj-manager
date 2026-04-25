@@ -1,0 +1,29 @@
+[package]
+name = "vdj-manager"
+version = "0.1.0"
+edition = "2021"
+
+[lib]
+name = "vdj_manager_lib"
+crate-type = ["lib", "cdylib", "staticlib"]
+
+[build-dependencies]
+tauri-build = { version = "2", features = [] }
+
+[dependencies]
+tauri = { version = "2", features = [] }
+tauri-plugin-dialog = "2"
+tauri-plugin-fs = "2"
+tauri-plugin-shell = "2"
+tauri-plugin-opener = "2"
+serde = { version = "1", features = ["derive"] }
+serde_json = "1"
+quick-xml = { version = "0.37", features = ["serialize"] }
+walkdir = "2"
+md-5 = "0.10"
+tokio = { version = "1", features = ["full"] }
+trash = "3"
+symphonia = { version = "0.5.4", features = ["aac", "adpcm", "alac", "flac", "isomp4", "mkv", "mp3", "ogg", "pcm", "vorbis", "wav"] }
+realfft = "3.4"
+dirs = "6"
+xmltree = "0.11"
