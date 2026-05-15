@@ -1,0 +1,13 @@
+<?xml version="1.0" encoding="UTF-8"?>
+<VirtualDJ_Database Version="8.1">
+  <Song FilePath="D:\Music\Artist - Title.mp3" FileSize="12345" Flag="1">
+    <Tags Author="Artist" Title="Title" Album="Album" Year="2026" Genre="House" Bpm="128" Key="Am" Composer="Composer" Label="Label" TrackNumber="1" Remix="Club Mix" Stars="5" Remixer="Remixer" Grouping="Set A" User1="Warmup" User2="Peak" Internal="0" Flag="2"/>
+    <Infos SongLength="245.5" Bitrate="320" Cover="1" Color="255" FirstSeen="2026/04/25" FirstPlay="2026/04/25" LastPlay="2026/04/25" PlayCount="3" Corrupted="0" Gain="-2.1" UserColor="65280"/>
+    <Scan Version="801" Flag="1" Volume="0.9" Bpm="0.46875" AltBpm="0.9375" Key="Am"/>
+    <Poi Pos="12.5" Type="cue" Point="real_cue" Name="Intro" Num="1" Bpm="0.46875" Size="0" Color="255" Slot="1"/>
+    <Comment>Main comment</Comment>
+    <CustomMix>Mix notes</CustomMix>
+    <Link Src="D:\Music\Linked.mp3"/>
+  </Song>
+  <Song FilePath="D:\Music\Second.mp3" FileSize="67890"/>
+</VirtualDJ_Database>

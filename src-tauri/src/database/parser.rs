@@ -7,6 +7,8 @@ use std::path::Path;
 use quick_xml::de::from_str;
 use quick_xml::se::to_string;
 
+use crate::safety;
+
 use super::models::*;
 
 /// Basic structural checks to catch obvious corruption before writing.
@@ -40,7 +42,7 @@ pub fn write_database(path: &Path, db: &VdjDatabase) -> Result<(), String> {
     let xml_header = r#"<?xml version="1.0" encoding="UTF-8"?>"#;
     let body = to_string(db).map_err(|e| format!("Error al serializar XML: {}", e))?;
     let output = format!("{}\n{}", xml_header, body);
-    fs::write(path, output).map_err(|e| format!("Error al escribir archivo: {}", e))
+    safety::atomic_write_string(path, &output)
 }
 
 /// Validate + write + reparse to ensure persisted XML remains healthy.

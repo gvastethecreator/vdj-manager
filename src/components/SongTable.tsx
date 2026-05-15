@@ -3,13 +3,14 @@ import { useVirtualizer } from "@tanstack/react-virtual";
 import { convertFileSrc } from "@tauri-apps/api/core";
 import type { SongSummary } from "../types/database";
 import { formatDuration, formatSize, getEffectiveColor, updateSongTags } from "../lib/api";
+import { compareDriveAwarePaths, compareSongsByDrivePath } from "../lib/pathUtils";
 import { WaveformPreview, onWaveformQueueChange } from "./WaveformPreview";
 import { useApp } from "../App";
 
 // ── Column configuration ──
 
 export type SortKey =
-    | "file_name" | "file_size" | "title" | "author" | "album" | "genre"
+    | "file_path" | "file_name" | "file_size" | "title" | "author" | "album" | "genre"
     | "bpm" | "key" | "duration_secs" | "play_count" | "year"
     | "stars" | "cue_count" | "bitrate" | "label" | "composer"
     | "remix" | "remixer" | "grouping" | "comment"
@@ -40,6 +41,7 @@ interface RenderHelpers {
     onColorClick?: (songIndex: number, e: React.MouseEvent) => void;
     onPlayClick?: (filePath: string) => void;
     playingPath?: string | null;
+    vdjFolder?: string | null;
 }
 
 /** All available columns for the song data table. Shared across views. */
@@ -60,7 +62,7 @@ export const ALL_COLUMNS: ColumnDef[] = [
         ),
     },
     { key: "file_name", label: "Archivo", width: 180, defaultVisible: true, cellClass: "overflow-hidden truncate text-text", render: (s) => <span title={s.file_path}>{s.file_name}</span> },
-    { key: "waveform", label: "Wave", width: 124, defaultVisible: true, cellClass: "py-0.5", render: (s) => <WaveformPreview filePath={s.file_path} cueMarkers={s.cue_markers} durationSecs={s.duration_secs} /> },
+    { key: "waveform", label: "Wave", width: 124, defaultVisible: true, cellClass: "py-0.5", render: (s, h) => <WaveformPreview filePath={s.file_path} fileSize={s.file_size} cueMarkers={s.cue_markers} durationSecs={s.duration_secs} vdjFolder={h.vdjFolder} /> },
     { key: "title", label: "Título", width: 150, defaultVisible: true, cellClass: "overflow-hidden truncate", editableTag: "title", render: (s, h) => <EditableCell song={s} columnKey="title" value={s.title} helpers={h} /> },
     { key: "author", label: "Artista", width: 130, defaultVisible: true, cellClass: "overflow-hidden truncate", editableTag: "author", render: (s, h) => <EditableCell song={s} columnKey="author" value={s.author} helpers={h} /> },
     { key: "album", label: "Álbum", width: 130, defaultVisible: true, cellClass: "overflow-hidden truncate", editableTag: "album", render: (s, h) => <EditableCell song={s} columnKey="album" value={s.album} helpers={h} /> },
@@ -281,7 +283,7 @@ export function SongTable({
     useEffect(() => onWaveformQueueChange((pending, active) => setWaveformQueue({ pending, active })), []);
 
     // ── Inline edit state ──
-    const { vdjFolder, patchSong } = useApp();
+    const { vdjFolder, patchSong, setError } = useApp();
     const [editState, setEditState] = useState<{ songIndex: number; columnKey: ColumnKey; value: string } | null>(null);
 
     const patchFromEditableTag = useCallback((editableTag: string, value: string): Partial<SongSummary> => {
@@ -318,11 +320,12 @@ export function SongTable({
         try {
             await updateSongTags(vdjFolder, editState.songIndex, { [col.editableTag]: editState.value });
             patchSong(editState.songIndex, patchFromEditableTag(col.editableTag, editState.value));
+            setEditState(null);
         } catch (err) {
             console.error("Error updating tag:", err);
+            setError(`No se pudo actualizar el tag: ${String(err)}`);
         }
-        setEditState(null);
-    }, [editState, vdjFolder, patchFromEditableTag, patchSong]);
+    }, [editState, vdjFolder, patchFromEditableTag, patchSong, setError]);
 
     const onEditCancel = useCallback(() => setEditState(null), []);
 
@@ -336,8 +339,9 @@ export function SongTable({
             patchSong(songIndex, { stars: stars > 0 ? String(stars) : null });
         } catch (err) {
             console.error("Error updating stars:", err);
+            setError(`No se pudo actualizar la puntuación: ${String(err)}`);
         }
-    }, [vdjFolder, patchSong, songs]);
+    }, [vdjFolder, patchSong, setError, songs]);
 
     // ── Audio playback ──
     const [playingPath, setPlayingPath] = useState<string | null>(null);
@@ -380,11 +384,12 @@ export function SongTable({
             }
             await updateSongTags(vdjFolder, colorPicker.songIndex, { color: colorValue });
             patchSong(colorPicker.songIndex, { color: colorValue || null });
+            setColorPicker(null);
         } catch (err) {
             console.error("Error updating color:", err);
+            setError(`No se pudo actualizar el color: ${String(err)}`);
         }
-        setColorPicker(null);
-    }, [colorPicker, vdjFolder, patchSong]);
+    }, [colorPicker, vdjFolder, patchSong, setError]);
 
     const persistVisibleColumns = useCallback((next: Set<ColumnKey>) => {
         try {
@@ -438,7 +443,7 @@ export function SongTable({
     );
 
     const [search, setSearch] = useState("");
-    const [sortKey, setSortKey] = useState<SortKey>("file_name");
+    const [sortKey, setSortKey] = useState<SortKey>("file_path");
     const [sortAsc, setSortAsc] = useState(true);
     const parentRef = useRef<HTMLDivElement>(null);
 
@@ -479,6 +484,15 @@ export function SongTable({
             );
         }
         return [...result].sort((a, b) => {
+            if (sortKey === "file_path") {
+                const cmp = compareSongsByDrivePath(a, b);
+                return sortAsc ? cmp : -cmp;
+            }
+            if (sortKey === "file_name") {
+                const cmp = compareDriveAwarePaths(a.file_path, b.file_path)
+                    || a.file_name.localeCompare(b.file_name, undefined, { numeric: true, sensitivity: "base" });
+                return sortAsc ? cmp : -cmp;
+            }
             const va = a[sortKey] ?? "";
             const vb = b[sortKey] ?? "";
             const cmp = typeof va === "number" && typeof vb === "number"
@@ -546,15 +560,15 @@ export function SongTable({
             {/* Virtualized Table */}
             <div
                 ref={parentRef}
-                className="max-h-[calc(100vh-220px)] overflow-auto rounded-[5px] border-2 border-border"
+                className="data-table-shell max-h-[calc(100vh-220px)] overflow-auto"
             >
                 <table className="w-full text-xs" style={{ tableLayout: "fixed", minWidth }}>
                     <colgroup>
                         {selectable && <col style={{ width: 32 }} />}
                         {columns.map((c) => <col key={c.key} style={{ width: c.width }} />)}
                     </colgroup>
-                    <thead className="sticky top-0 z-10 bg-surface">
-                        <tr className="border-b-2 border-border" onContextMenu={handleHeaderContext}>
+                    <thead className="sticky top-0 z-10">
+                        <tr onContextMenu={handleHeaderContext}>
                             {selectable && <th className="w-8 px-2.5 py-1.5" />}
                             {columns.map((c) => {
                                 const columnSortKey = getColumnSortKey(c);
@@ -590,6 +604,7 @@ export function SongTable({
                                 onColorClick,
                                 onPlayClick,
                                 playingPath,
+                                vdjFolder,
                             };
                             return (
                                 <tr
@@ -598,7 +613,7 @@ export function SongTable({
                                         height: ROW_HEIGHT,
                                         ...(rowColor && { borderLeft: `3px solid ${rowColor}` }),
                                     }}
-                                    className={`border-b border-border/30 ${activeSongIndex === song.index ? "bg-primary/12 ring-1 ring-inset ring-primary/35" : selected?.has(song.index) ? "bg-primary/8" : "hover:bg-surface-hover"} ${onRowSelect ? "cursor-pointer" : ""}`}
+                                    className={`border-b border-border/30 ${activeSongIndex === song.index ? "bg-primary/12 ring-1 ring-inset ring-primary/35" : selected?.has(song.index) ? "bg-primary/8" : ""} ${onRowSelect ? "cursor-pointer" : ""}`}
                                     onClick={() => onRowSelect?.(song)}
                                 >
                                     {selectable && (

@@ -1,0 +1,9 @@
+<?xml version="1.0" encoding="UTF-8"?>
+<VirtualDJ_Database Version="8.1" FutureRoot="root-value">
+  <Song FilePath="D:\Music\Unknown.mp3" FileSize="111" FutureSong="song-value">
+    <Tags Author="Artist" Title="Unknown" FutureTags="tags-value"/>
+    <Infos SongLength="60" FutureInfos="infos-value"/>
+    <Scan Bpm="0.5" FutureScan="scan-value"/>
+    <Poi Pos="1.5" Type="cue" FuturePoi="poi-value"/>
+  </Song>
+</VirtualDJ_Database>

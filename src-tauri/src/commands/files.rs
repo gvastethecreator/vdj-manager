@@ -5,6 +5,7 @@ use std::path::PathBuf;
 
 use crate::database::models::*;
 use crate::database::parser;
+use crate::safety;
 
 use walkdir::WalkDir;
 
@@ -106,16 +107,7 @@ pub async fn rename_file_op(
 
     db.songs[song_index].file_path = new_path.to_string_lossy().to_string();
 
-    // Timestamped backup
-    let now = std::time::SystemTime::now()
-        .duration_since(std::time::UNIX_EPOCH)
-        .unwrap_or_default()
-        .as_millis();
-    let backup_name = format!("database_{}.xml.bak", now);
-    let ts_backup = db_path.parent().unwrap_or(std::path::Path::new(".")).join(&backup_name);
-    std::fs::copy(&db_path, &ts_backup).ok();
-    let quick_backup = db_path.with_extension("xml.bak");
-    std::fs::copy(&db_path, &quick_backup).ok();
+    safety::create_timestamped_backup(&db_path, "database")?;
     parser::write_database_checked(&db_path, &db)?;
 
     Ok(new_path.to_string_lossy().to_string())
@@ -170,9 +162,20 @@ pub async fn move_files_op(
                 // Cross-drive move: copy + delete
                 match std::fs::copy(&old_path, &new_path) {
                     Ok(_) => {
-                        std::fs::remove_file(&old_path).ok();
-                        db.songs[idx].file_path = new_path.to_string_lossy().to_string();
-                        results.push(format!("OK (copiado): {}", new_path.display()));
+                        match std::fs::remove_file(&old_path) {
+                            Ok(()) => {
+                                db.songs[idx].file_path = new_path.to_string_lossy().to_string();
+                                results.push(format!("OK (copiado): {}", new_path.display()));
+                            }
+                            Err(remove_err) => {
+                                let _ = std::fs::remove_file(&new_path);
+                                results.push(format!(
+                                    "Error removiendo original tras copiar {}: {}",
+                                    old_path.display(),
+                                    remove_err
+                                ));
+                            }
+                        }
                     }
                     Err(_) => {
                         results.push(format!("Error moviendo {}: {}", old_path.display(), e));
@@ -182,16 +185,7 @@ pub async fn move_files_op(
         }
     }
 
-    // Timestamped backup
-    let now = std::time::SystemTime::now()
-        .duration_since(std::time::UNIX_EPOCH)
-        .unwrap_or_default()
-        .as_millis();
-    let backup_name = format!("database_{}.xml.bak", now);
-    let ts_backup = db_path.parent().unwrap_or(std::path::Path::new(".")).join(&backup_name);
-    std::fs::copy(&db_path, &ts_backup).ok();
-    let quick_backup = db_path.with_extension("xml.bak");
-    std::fs::copy(&db_path, &quick_backup).ok();
+    safety::create_timestamped_backup(&db_path, "database")?;
     parser::write_database_checked(&db_path, &db)?;
 
     Ok(results)
@@ -488,16 +482,7 @@ pub async fn relocate_file(
         ));
     }
 
-    // Timestamped backup
-    let now = std::time::SystemTime::now()
-        .duration_since(std::time::UNIX_EPOCH)
-        .unwrap_or_default()
-        .as_millis();
-    let backup_name = format!("database_{}.xml.bak", now);
-    let backup_path = db_path.parent().unwrap_or(std::path::Path::new(".")).join(&backup_name);
-    std::fs::copy(&db_path, &backup_path).ok();
-    let quick_backup = db_path.with_extension("xml.bak");
-    std::fs::copy(&db_path, &quick_backup).ok();
+    safety::create_timestamped_backup(&db_path, "database")?;
 
     parser::write_database_checked(&db_path, &db)
 }

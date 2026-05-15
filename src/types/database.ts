@@ -78,6 +78,12 @@ export interface WaveformPreview {
   frequency_bands: number[];
   /** Number of frequency bands returned for rendering. */
   frequency_band_count: number;
+  /** Optional per-bucket colors extracted from VirtualDJ's waveform cache. */
+  colors: string[];
+  /** VirtualDJ cache density, when the preview came from cache.db. */
+  values_per_second: number | null;
+  /** Source used by the backend, e.g. virtualdj-cache or decoded-audio. */
+  source: string | null;
 }
 
 /** Aggregated statistics computed from the full database. */

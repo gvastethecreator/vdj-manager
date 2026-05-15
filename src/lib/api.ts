@@ -20,6 +20,7 @@ import type {
   VdjXmlNode,
   SongUpdate,
 } from "../types/database";
+import { compareDriveAwarePaths, getParentDirectory } from "./pathUtils";
 
 /**
  * Load and parse the VDJ database.xml from a folder.
@@ -39,11 +40,15 @@ export async function loadDatabase(
  */
 export async function getWaveformPreview(
   filePath: string,
-  bucketCount = 64
+  bucketCount = 64,
+  vdjFolder?: string | null,
+  fileSize?: number | null,
 ): Promise<WaveformPreview> {
   return invoke<WaveformPreview>("get_waveform_preview", {
     filePath,
     bucketCount,
+    vdjFolder,
+    fileSize,
   });
 }
 
@@ -110,7 +115,13 @@ export async function updateSongTags(
     gain?: string;
   }
 ): Promise<void> {
-  return invoke<void>("update_song_tags", { vdjFolder, index, ...tags });
+  return invoke<void>("update_song_tags", {
+    request: {
+      vdjFolder,
+      index,
+      update: { index, ...tags },
+    },
+  });
 }
 
 /**
@@ -299,10 +310,7 @@ export async function dryRunRename(
  * Extract the directory (parent folder) from a file path.
  */
 export function getDirectory(filePath: string): string {
-  const sep = filePath.includes("/") ? "/" : "\\";
-  const parts = filePath.split(sep);
-  parts.pop();
-  return parts.join(sep);
+  return getParentDirectory(filePath);
 }
 
 /**
@@ -453,24 +461,21 @@ export function getMusicRoots(songs: { file_path: string }[]): string[] {
   // Collect unique parent directories
   const dirs = new Set<string>();
   for (const s of songs) {
-    const p = s.file_path;
-    const sep = p.includes("/") ? "/" : "\\";
-    const idx = p.lastIndexOf(sep);
-    if (idx > 0) dirs.add(p.slice(0, idx));
+    const dir = getParentDirectory(s.file_path);
+    if (dir) dirs.add(dir);
   }
   if (dirs.size === 0) return [];
 
   // Sort ascending by length so shortest (highest) paths come first
-  const sorted = [...dirs].sort((a, b) => a.length - b.length);
+  const sorted = [...dirs].sort((a, b) => a.length - b.length || compareDriveAwarePaths(a, b));
 
   // Keep only paths not already covered by a shorter ancestor
   const roots: string[] = [];
   for (const dir of sorted) {
-    const sep = dir.includes("/") ? "/" : "\\";
-    const covered = roots.some((r) => dir === r || dir.startsWith(r + sep));
+    const covered = roots.some((r) => dir === r || dir.startsWith(`${r.replace(/[\\/]+$/, "")}\\`));
     if (!covered) roots.push(dir);
   }
-  return roots;
+  return roots.sort(compareDriveAwarePaths);
 }
 
 /**
@@ -508,7 +513,7 @@ export function mergeFolderLists(...folderLists: string[][]): string[] {
     }
   }
 
-  return merged;
+  return merged.sort(compareDriveAwarePaths);
 }
 
 /**

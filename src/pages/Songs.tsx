@@ -5,6 +5,7 @@ import { SongTable } from "../components/SongTable";
 import { FolderTree } from "../components/FolderTree";
 import { SongDetailsCard } from "../components/SongDetailsCard";
 import { getConfiguredMusicRoots, listPlaylists, readPlaylist, scanMusicFolder } from "../lib/api";
+import { compareDriveAwarePaths, compareSongsByDrivePath, getPathLeafName, isPathInsideFolder } from "../lib/pathUtils";
 import type { PlaylistInfo, PlaylistEntry, SongSummary } from "../types/database";
 
 type SidebarMode = "folders" | "playlists";
@@ -88,8 +89,9 @@ export function Songs() {
         }
 
         const databasePathSet = new Set(songs.map((song) => song.file_path.toLowerCase()));
+        const selectableScanRoots = new Set([...musicFolders, ...treeRoots].map((root) => root.toLowerCase()));
         const targets = selectedFolder
-            ? [selectedFolder]
+            ? selectableScanRoots.has(selectedFolder.toLowerCase()) ? [selectedFolder] : []
             : musicFolders;
 
         if (targets.length === 0) {
@@ -118,7 +120,7 @@ export function Songs() {
                 }
             }
 
-            const mapped: SongSummary[] = [...discovered.values()].map((filePath, idx) => {
+            const mapped: SongSummary[] = [...discovered.values()].sort(compareDriveAwarePaths).map((filePath, idx) => {
                 const fileName = filePath.split(/[/\\]/).pop() ?? filePath;
                 return {
                     index: -1 - idx,
@@ -170,27 +172,21 @@ export function Songs() {
         return () => {
             cancelled = true;
         };
-    }, [mode, selectedFolder, songs, musicFolders]);
+    }, [mode, selectedFolder, songs, musicFolders, treeRoots]);
 
     const librarySongs = useMemo(() => {
         if (mode !== "folders") return songs;
-        return [...songs, ...externalSongs];
+        return [...songs, ...externalSongs].sort(compareSongsByDrivePath);
     }, [mode, songs, externalSongs]);
 
     // ── Filtered songs ──
     const filteredSongs = useMemo(() => {
         if (mode === "playlists" && selectedPlaylist) {
             const pathSet = new Set(playlistEntries.map((e) => e.file_path.toLowerCase()));
-            return songs.filter((s) => pathSet.has(s.file_path.toLowerCase()));
+            return songs.filter((s) => pathSet.has(s.file_path.toLowerCase())).sort(compareSongsByDrivePath);
         }
         if (selectedFolder) {
-            const normalizedFolder = selectedFolder.toLowerCase();
-            return librarySongs.filter((song) => {
-                const normalizedPath = song.file_path.toLowerCase();
-                return normalizedPath === normalizedFolder
-                    || normalizedPath.startsWith(`${normalizedFolder}\\`)
-                    || normalizedPath.startsWith(`${normalizedFolder}/`);
-            });
+            return librarySongs.filter((song) => isPathInsideFolder(song.file_path, selectedFolder));
         }
         return librarySongs;
     }, [songs, librarySongs, mode, selectedFolder, selectedPlaylist, playlistEntries]);
@@ -233,26 +229,26 @@ export function Songs() {
     const subtitle = mode === "playlists" && selectedPlaylist
         ? selectedPlaylist.name
         : selectedFolder
-            ? selectedFolder.split("\\").pop() ?? selectedFolder
+            ? getPathLeafName(selectedFolder)
             : "";
 
     return (
         <div className="flex h-full gap-0">
             {/* ── Left sidebar ── */}
-            <div className="flex w-56 shrink-0 flex-col border-r-2 border-border bg-surface">
+            <div className="flex w-60 shrink-0 flex-col border-r border-border bg-surface/85">
                 {/* Mode tabs */}
-                <div className="flex border-b-2 border-border">
+                <div className="flex border-b border-border p-1">
                     <button
                         type="button"
                         onClick={() => { setMode("folders"); setSelectedPlaylist(null); }}
-                        className={`flex-1 py-1.5 text-[11px] font-semibold transition-colors ${mode === "folders" ? "bg-primary/12 text-primary-light" : "text-text-muted hover:text-text"}`}
+                        className={`rounded-md py-1.5 text-[11px] font-semibold transition-colors ${mode === "folders" ? "bg-primary/14 text-primary-light" : "text-text-muted hover:bg-surface-hover hover:text-text"}`}
                     >
                         Carpetas
                     </button>
                     <button
                         type="button"
                         onClick={() => { setMode("playlists"); setSelectedFolder(""); }}
-                        className={`flex-1 py-1.5 text-[11px] font-semibold transition-colors ${mode === "playlists" ? "bg-primary/12 text-primary-light" : "text-text-muted hover:text-text"}`}
+                        className={`rounded-md py-1.5 text-[11px] font-semibold transition-colors ${mode === "playlists" ? "bg-primary/14 text-primary-light" : "text-text-muted hover:bg-surface-hover hover:text-text"}`}
                     >
                         Playlists
                     </button>
@@ -260,7 +256,7 @@ export function Songs() {
 
                 {mode === "folders" && (
                     <>
-                        <div className="flex items-center justify-between border-b-2 border-border px-3 py-2">
+                        <div className="flex items-center justify-between border-b border-border px-3 py-2">
                             <span className="text-[11px] font-semibold text-text-muted">Carpetas</span>
                             <button
                                 type="button"
@@ -286,7 +282,7 @@ export function Songs() {
                             </span>
                         </button>
 
-                        <div className="flex-1 overflow-auto p-1">
+                        <div className="flex-1 overflow-auto p-2">
                             <FolderTree
                                 roots={treeRoots}
                                 onSelect={setSelectedFolder}
@@ -323,14 +319,14 @@ export function Songs() {
                                 {songs.length}
                             </span>
                         </button>
-                        {[...playlistFolders.entries()].map(([folder, pls]) => (
+                        {[...playlistFolders.entries()].sort(([a], [b]) => a.localeCompare(b)).map(([folder, pls]) => (
                             <div key={folder}>
                                 {folder && (
                                     <div className="px-3 pt-2 pb-0.5 text-[10px] font-bold uppercase tracking-wider text-text-muted">
                                         {folder}
                                     </div>
                                 )}
-                                {pls.map((pl) => (
+                                {[...pls].sort((a, b) => a.name.localeCompare(b.name)).map((pl) => (
                                     <button
                                         key={pl.path}
                                         type="button"
@@ -365,8 +361,8 @@ export function Songs() {
             </div>
 
             {/* ── Right: song table ── */}
-            <div className="min-w-0 flex-1 overflow-auto p-3">
-                <div className="mb-2.5 flex items-center justify-between">
+            <div className="min-w-0 flex-1 overflow-auto p-4">
+                <div className="mb-3 flex items-center justify-between">
                     <h2 className="text-lg font-bold text-text">
                         Canciones
                         <span className="ml-2 text-base font-normal text-text-muted">

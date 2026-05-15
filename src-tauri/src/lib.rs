@@ -5,7 +5,8 @@
 //! and duplicate detection.
 
 mod commands;
-mod database;
+pub mod database;
+pub mod safety;
 
 use commands::{configs, database as db_commands, duplicates, files, playlists, waveforms};
 

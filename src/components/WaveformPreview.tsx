@@ -1,5 +1,8 @@
 import { useEffect, useMemo, useState } from "react";
 import { getWaveformPreview } from "../lib/api";
+import { buildCueOverlayMarkers } from "../lib/cueOverlay";
+import { buildSyntheticWaveformPreview } from "../lib/waveformFallback";
+import { buildWaveformSegments } from "../lib/waveformRender";
 import type { WaveformPreview as WaveformPreviewData, CueMarker } from "../types/database";
 
 interface WaveformPreviewProps {
@@ -9,6 +12,10 @@ interface WaveformPreviewProps {
     cueMarkers?: CueMarker[];
     /** Song duration in seconds (needed to position cue markers) */
     durationSecs?: number | null;
+    /** VirtualDJ folder used to read Cache/cache.db in read-only mode */
+    vdjFolder?: string | null;
+    /** File size from database.xml, used to match VirtualDJ cache rows even if the file is offline */
+    fileSize?: number | null;
     heightClass?: string;
     svgClassName?: string;
 }
@@ -42,8 +49,12 @@ export function onWaveformQueueChange(fn: QueueListener): () => void {
     return () => { queueListeners.delete(fn); };
 }
 
-function getCacheKey(filePath: string, bucketCount: number): string {
-    return `${bucketCount}:${filePath}`;
+function getCacheKey(filePath: string, bucketCount: number, vdjFolder?: string | null, fileSize?: number | null): string {
+    return `${bucketCount}:${vdjFolder ?? ""}:${fileSize ?? ""}:${filePath}`;
+}
+
+function shouldUseDemoFallback(): boolean {
+    return new URLSearchParams(window.location.search).has("demo");
 }
 
 function runQueuedTask<T>(task: () => Promise<T>): Promise<T> {
@@ -75,8 +86,10 @@ function runQueuedTask<T>(task: () => Promise<T>): Promise<T> {
 async function loadWaveformPreview(
     filePath: string,
     bucketCount: number,
+    vdjFolder?: string | null,
+    fileSize?: number | null,
 ): Promise<WaveformPreviewData | null> {
-    const cacheKey = getCacheKey(filePath, bucketCount);
+    const cacheKey = getCacheKey(filePath, bucketCount, vdjFolder, fileSize);
     const cached = previewCache.get(cacheKey);
     if (cached !== undefined) {
         return cached;
@@ -89,12 +102,15 @@ async function loadWaveformPreview(
 
     const request = runQueuedTask(async () => {
         try {
-            const preview = await getWaveformPreview(filePath, bucketCount);
+            const preview = await getWaveformPreview(filePath, bucketCount, vdjFolder, fileSize);
             previewCache.set(cacheKey, preview);
             return preview;
         } catch {
-            previewCache.set(cacheKey, null);
-            return null;
+            const fallback = shouldUseDemoFallback()
+                ? buildSyntheticWaveformPreview(filePath, bucketCount)
+                : null;
+            previewCache.set(cacheKey, fallback);
+            return fallback;
         } finally {
             inflightCache.delete(cacheKey);
         }
@@ -102,25 +118,6 @@ async function loadWaveformPreview(
 
     inflightCache.set(cacheKey, request);
     return request;
-}
-
-function buildWaveformPath(peaks: number[]): string {
-    if (peaks.length === 0) return "";
-
-    const viewWidth = 100;
-    const viewHeight = 28;
-    const midY = viewHeight / 2;
-    const maxHalfHeight = midY - 2;
-
-    return peaks
-        .map((peak, index) => {
-            const x = peaks.length === 1
-                ? viewWidth / 2
-                : (index / (peaks.length - 1)) * viewWidth;
-            const halfHeight = 1 + (peak / 255) * maxHalfHeight;
-            return `M ${x.toFixed(2)} ${(midY - halfHeight).toFixed(2)} L ${x.toFixed(2)} ${(midY + halfHeight).toFixed(2)}`;
-        })
-        .join(" ");
 }
 
 function getBandColor(index: number, total: number): string {
@@ -134,10 +131,12 @@ export function WaveformPreview({
     bucketCount = 64,
     cueMarkers,
     durationSecs,
+    vdjFolder,
+    fileSize,
     heightClass = "h-6",
     svgClassName = "h-6",
 }: WaveformPreviewProps) {
-    const cacheKey = getCacheKey(filePath, bucketCount);
+    const cacheKey = getCacheKey(filePath, bucketCount, vdjFolder, fileSize);
     const [preview, setPreview] = useState<WaveformPreviewData | null | undefined>(
         () => previewCache.get(cacheKey),
     );
@@ -155,7 +154,7 @@ export function WaveformPreview({
 
         setPreview(undefined);
 
-        loadWaveformPreview(filePath, bucketCount).then((result) => {
+        loadWaveformPreview(filePath, bucketCount, vdjFolder, fileSize).then((result) => {
             if (!cancelled) {
                 setPreview(result);
             }
@@ -164,10 +163,10 @@ export function WaveformPreview({
         return () => {
             cancelled = true;
         };
-    }, [bucketCount, cacheKey, filePath]);
+    }, [bucketCount, cacheKey, filePath, vdjFolder, fileSize]);
 
-    const waveformPath = useMemo(
-        () => (preview?.peaks ? buildWaveformPath(preview.peaks) : ""),
+    const waveformSegments = useMemo(
+        () => (preview?.peaks ? buildWaveformSegments(preview.peaks, preview.colors) : []),
         [preview],
     );
 
@@ -196,6 +195,11 @@ export function WaveformPreview({
         });
     }, [preview]);
 
+    const visibleCueMarkers = useMemo(
+        () => buildCueOverlayMarkers(cueMarkers, durationSecs),
+        [cueMarkers, durationSecs],
+    );
+
     if (preview === undefined) {
         return (
             <div
@@ -214,16 +218,6 @@ export function WaveformPreview({
             />
         );
     }
-
-    const visibleCueMarkers = cueMarkers && durationSecs && durationSecs > 0
-        ? cueMarkers
-            .map((cue, index) => ({
-                cue,
-                index,
-                x: (cue.pos / durationSecs) * 100,
-            }))
-            .filter((item) => item.x >= 0 && item.x <= 100)
-        : [];
 
     return (
         <div className={`flex ${heightClass} w-full items-center`} title="Waveform + espectro de frecuencias del archivo">
@@ -253,25 +247,27 @@ export function WaveformPreview({
                     y1="14"
                     y2="14"
                 />
-                <path
-                    d={waveformPath}
-                    fill="none"
-                    stroke="currentColor"
-                    strokeLinecap="round"
-                    strokeWidth="1.15"
-                />
+                {waveformSegments.map((segment) => (
+                    <line
+                        key={segment.key}
+                        stroke={segment.color}
+                        strokeLinecap="round"
+                        strokeWidth="1.15"
+                        x1={segment.x.toFixed(2)}
+                        x2={segment.x.toFixed(2)}
+                        y1={segment.y1.toFixed(2)}
+                        y2={segment.y2.toFixed(2)}
+                    />
+                ))}
                 {/* Cue markers inspired by VDJ songpos/rhythm cue overlays */}
-                {visibleCueMarkers.map(({ cue, index, x }) => {
+                {visibleCueMarkers.map(({ cue, index, lineX, labelX, labelWidth, label }) => {
                     const markerColor = cue.color ?? "#ffb020";
-                    const label = cue.num ?? index + 1;
-                    const labelWidth = label >= 10 ? 5.8 : 4.4;
-                    const clampedLabelX = Math.min(Math.max(x - labelWidth / 2, 0.8), 100 - labelWidth - 0.8);
 
                     return (
                         <g key={`cue-${index}-${cue.pos}`}>
                             <line
-                                x1={x.toFixed(2)}
-                                x2={x.toFixed(2)}
+                                x1={lineX.toFixed(2)}
+                                x2={lineX.toFixed(2)}
                                 y1="5.6"
                                 y2="28"
                                 stroke={markerColor}
@@ -283,7 +279,7 @@ export function WaveformPreview({
                                 height="4.8"
                                 rx="1.2"
                                 width={labelWidth}
-                                x={clampedLabelX.toFixed(2)}
+                                x={labelX.toFixed(2)}
                                 y="0.4"
                             />
                             <text
@@ -291,7 +287,7 @@ export function WaveformPreview({
                                 fontSize="3.1"
                                 fontWeight="700"
                                 textAnchor="middle"
-                                x={x.toFixed(2)}
+                                x={(labelX + labelWidth / 2).toFixed(2)}
                                 y="3.85"
                             >
                                 {label}

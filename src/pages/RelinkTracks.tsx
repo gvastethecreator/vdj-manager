@@ -4,6 +4,7 @@ import { FolderOpen, Link2, Music, RefreshCw, Search, X } from "lucide-react";
 import { useApp } from "../App";
 import { SongDetailsCard } from "../components/SongDetailsCard";
 import { findSimilarFiles, formatSize, mergeFolderLists, relocateFile, verifyFiles } from "../lib/api";
+import { compareDriveAwarePaths } from "../lib/pathUtils";
 import type { FileVerification, SimilarFileMatch, SongSummary } from "../types/database";
 
 function getFileName(filePath: string): string {
@@ -86,6 +87,8 @@ type RelinkItem = {
     candidates: string[];
 };
 
+type MatchFilter = "all" | "withCandidates" | "unresolved" | "selected";
+
 /** Dedicated workflow to repair database entries whose files were moved or renamed on disk. */
 export function RelinkTracks() {
     const {
@@ -105,7 +108,9 @@ export function RelinkTracks() {
     const [searching, setSearching] = useState(false);
     const [relocating, setRelocating] = useState<string | null>(null);
     const [selectedMissingPath, setSelectedMissingPath] = useState<string | null>(null);
+    const [selectedMissingPaths, setSelectedMissingPaths] = useState<Set<string>>(new Set());
     const [query, setQuery] = useState("");
+    const [matchFilter, setMatchFilter] = useState<MatchFilter>("all");
 
     const configuredSearchFolders = useMemo(
         () => mergeFolderLists(musicFolders),
@@ -196,6 +201,51 @@ export function RelinkTracks() {
         }
     }
 
+    async function handleBulkBestMatches() {
+        if (!vdjFolder) return;
+        const selectedItems = relinkItems.filter((item) => selectedMissingPaths.has(item.verification.file_path));
+        const actionable = selectedItems.filter((item) => item.candidates[0]);
+
+        if (actionable.length === 0) {
+            setError("No hay tracks seleccionados con candidatos para corregir en lote.");
+            return;
+        }
+
+        setRelocating("__bulk__");
+        const relocatedPaths = new Set<string>();
+        const errors: string[] = [];
+
+        for (const item of actionable) {
+            const newPath = item.candidates[0];
+            try {
+                await relocateFile(vdjFolder, item.verification.file_path, newPath);
+                relocatedPaths.add(item.verification.file_path);
+            } catch (err) {
+                errors.push(`${getFileName(item.verification.file_path)}: ${String(err)}`);
+            }
+        }
+
+        try {
+            const verification = await verifyFiles(vdjFolder);
+            setResults(verification);
+            setMatches((prev) => prev.filter((entry) => !relocatedPaths.has(entry.missing_path)));
+            setSelectedMissingPaths((prev) => {
+                const next = new Set(prev);
+                for (const path of relocatedPaths) next.delete(path);
+                return next;
+            });
+            await reload();
+        } catch (err) {
+            errors.push(String(err));
+        } finally {
+            setRelocating(null);
+        }
+
+        if (errors.length > 0) {
+            setError(`Algunas rutas no se pudieron corregir: ${errors.slice(0, 3).join(" | ")}${errors.length > 3 ? " ..." : ""}`);
+        }
+    }
+
     async function manualRelocate(oldPath: string) {
         const file = await open({
             title: `Corregir ruta: ${getFileName(oldPath)}`,
@@ -237,14 +287,19 @@ export function RelinkTracks() {
                 verification,
                 song: songsByPath.get(verification.file_path.toLowerCase()) ?? null,
                 candidates: matchMap.get(verification.file_path) ?? [],
-            }));
+            }))
+            .sort((a, b) => compareDriveAwarePaths(a.verification.file_path, b.verification.file_path));
     }, [matches, results, songsByPath]);
 
     const filteredItems = useMemo(() => {
         const normalizedQuery = query.trim().toLowerCase();
-        if (!normalizedQuery) return relinkItems;
 
         return relinkItems.filter(({ verification, song, candidates }) => {
+            if (matchFilter === "withCandidates" && candidates.length === 0) return false;
+            if (matchFilter === "unresolved" && candidates.length > 0) return false;
+            if (matchFilter === "selected" && !selectedMissingPaths.has(verification.file_path)) return false;
+            if (!normalizedQuery) return true;
+
             const haystack = [
                 verification.file_path,
                 verification.title,
@@ -258,7 +313,15 @@ export function RelinkTracks() {
 
             return haystack.includes(normalizedQuery);
         });
-    }, [query, relinkItems]);
+    }, [query, relinkItems, matchFilter, selectedMissingPaths]);
+
+    useEffect(() => {
+        const available = new Set(relinkItems.map((item) => item.verification.file_path));
+        setSelectedMissingPaths((prev) => {
+            const next = new Set([...prev].filter((path) => available.has(path)));
+            return next.size === prev.size ? prev : next;
+        });
+    }, [relinkItems]);
 
     useEffect(() => {
         setSelectedMissingPath((prev) => (
@@ -277,7 +340,25 @@ export function RelinkTracks() {
         missing: relinkItems.length,
         withCandidates: relinkItems.filter((item) => item.candidates.length > 0).length,
         unresolved: relinkItems.filter((item) => item.candidates.length === 0).length,
-    }), [relinkItems]);
+        selected: selectedMissingPaths.size,
+    }), [relinkItems, selectedMissingPaths.size]);
+
+    function toggleSelected(path: string) {
+        setSelectedMissingPaths((prev) => {
+            const next = new Set(prev);
+            if (next.has(path)) next.delete(path);
+            else next.add(path);
+            return next;
+        });
+    }
+
+    function selectVisibleItems() {
+        setSelectedMissingPaths((prev) => {
+            const next = new Set(prev);
+            for (const item of filteredItems) next.add(item.verification.file_path);
+            return next;
+        });
+    }
 
     return (
         <div className="flex h-full gap-0">
@@ -324,13 +405,58 @@ export function RelinkTracks() {
                         Explorar carpeta manualmente
                     </button>
 
-                    <input
-                        type="text"
-                        value={query}
-                        onChange={(e) => setQuery(e.target.value)}
-                        placeholder="Filtrar por archivo, artista o candidato..."
-                        className="input w-full"
-                    />
+                    <div className="grid grid-cols-4 gap-1">
+                        {(
+                            [
+                                ["all", "Todos", counts.missing],
+                                ["withCandidates", "Match", counts.withCandidates],
+                                ["unresolved", "Sin", counts.unresolved],
+                                ["selected", "Sel.", counts.selected],
+                            ] as const
+                        ).map(([key, label, count]) => (
+                            <button
+                                key={key}
+                                type="button"
+                                onClick={() => setMatchFilter(key)}
+                                className={`rounded border px-1.5 py-1 text-[10px] font-semibold transition-colors ${matchFilter === key
+                                    ? "border-primary bg-primary/12 text-primary-light"
+                                    : "border-border bg-background text-text-muted hover:bg-surface-hover"
+                                    }`}
+                            >
+                                {label} <span className="tabular-nums">{count}</span>
+                            </button>
+                        ))}
+                    </div>
+
+                    <div className="flex gap-1.5">
+                        <input
+                            type="text"
+                            value={query}
+                            onChange={(e) => setQuery(e.target.value)}
+                            placeholder="Filtrar por archivo, artista o candidato..."
+                            className="input min-w-0 flex-1"
+                        />
+                        <button type="button" onClick={() => setQuery("")} className="btn btn-ghost btn-sm" disabled={!query}>
+                            <X className="h-3.5 w-3.5" />
+                        </button>
+                    </div>
+
+                    <div className="grid grid-cols-3 gap-1.5">
+                        <button type="button" onClick={selectVisibleItems} disabled={filteredItems.length === 0} className="btn btn-ghost btn-sm">
+                            Seleccionar visibles
+                        </button>
+                        <button type="button" onClick={() => setSelectedMissingPaths(new Set())} disabled={selectedMissingPaths.size === 0} className="btn btn-ghost btn-sm">
+                            Limpiar
+                        </button>
+                        <button
+                            type="button"
+                            onClick={() => void handleBulkBestMatches()}
+                            disabled={selectedMissingPaths.size === 0 || relocating === "__bulk__"}
+                            className="btn btn-success btn-sm"
+                        >
+                            {relocating === "__bulk__" ? "Corrigiendo..." : "Auto lote"}
+                        </button>
+                    </div>
                 </div>
 
                 <div className="border-b-2 border-border px-3 py-3">
@@ -378,6 +504,7 @@ export function RelinkTracks() {
                         <div className="space-y-1.5">
                             {filteredItems.map((item) => {
                                 const isSelected = item.verification.file_path === selectedMissingPath;
+                                const isChecked = selectedMissingPaths.has(item.verification.file_path);
                                 const title = item.song?.title ?? item.verification.title ?? getFileName(item.verification.file_path);
                                 const artist = item.song?.author ?? item.verification.author ?? "Artista desconocido";
                                 return (
@@ -391,6 +518,16 @@ export function RelinkTracks() {
                                             }`}
                                     >
                                         <div className="flex items-start justify-between gap-2">
+                                            <input
+                                                type="checkbox"
+                                                checked={isChecked}
+                                                onChange={(event) => {
+                                                    event.stopPropagation();
+                                                    toggleSelected(item.verification.file_path);
+                                                }}
+                                                onClick={(event) => event.stopPropagation()}
+                                                className="mt-0.5 accent-primary"
+                                            />
                                             <div className="min-w-0 flex-1">
                                                 <div className="truncate text-[12px] font-semibold text-text">{title}</div>
                                                 <div className="truncate text-[11px] text-text-secondary">{artist}</div>

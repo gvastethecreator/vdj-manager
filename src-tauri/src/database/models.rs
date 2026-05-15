@@ -9,9 +9,9 @@ use serde::{Deserialize, Serialize};
 #[derive(Debug, Serialize, Deserialize, Clone, Default)]
 #[serde(rename = "VirtualDJ_Database")]
 pub struct VdjDatabase {
-    #[serde(rename = "@Version")]
+    #[serde(rename = "@Version", skip_serializing_if = "Option::is_none")]
     pub version: Option<String>,
-    #[serde(rename = "Song", default)]
+    #[serde(rename = "Song", default, skip_serializing_if = "Vec::is_empty")]
     pub songs: Vec<Song>,
 }
 
@@ -20,145 +20,145 @@ pub struct VdjDatabase {
 pub struct Song {
     #[serde(rename = "@FilePath")]
     pub file_path: String,
-    #[serde(rename = "@FileSize", default)]
+    #[serde(rename = "@FileSize", default, skip_serializing_if = "Option::is_none")]
     pub file_size: Option<u64>,
-    #[serde(rename = "@Flag", default)]
+    #[serde(rename = "@Flag", default, skip_serializing_if = "Option::is_none")]
     pub flag: Option<u32>,
-    #[serde(rename = "Tags", default)]
+    #[serde(rename = "Tags", default, skip_serializing_if = "Option::is_none")]
     pub tags: Option<Tags>,
-    #[serde(rename = "Infos", default)]
+    #[serde(rename = "Infos", default, skip_serializing_if = "Option::is_none")]
     pub infos: Option<Infos>,
-    #[serde(rename = "Scan", default)]
+    #[serde(rename = "Scan", default, skip_serializing_if = "Option::is_none")]
     pub scan: Option<Scan>,
-    #[serde(rename = "Poi", default)]
+    #[serde(rename = "Poi", default, skip_serializing_if = "Vec::is_empty")]
     pub pois: Vec<Poi>,
-    #[serde(rename = "Comment", default)]
+    #[serde(rename = "Comment", default, skip_serializing_if = "Option::is_none")]
     pub comment: Option<CommentEl>,
-    #[serde(rename = "CustomMix", default)]
+    #[serde(rename = "CustomMix", default, skip_serializing_if = "Option::is_none")]
     pub custom_mix: Option<CommentEl>,
-    #[serde(rename = "Link", default)]
+    #[serde(rename = "Link", default, skip_serializing_if = "Option::is_none")]
     pub link: Option<Link>,
 }
 
 /// ID3/metadata tags for a song (author, title, genre, etc.).
 #[derive(Debug, Serialize, Deserialize, Clone, Default)]
 pub struct Tags {
-    #[serde(rename = "@Author", default)]
+    #[serde(rename = "@Author", default, skip_serializing_if = "Option::is_none")]
     pub author: Option<String>,
-    #[serde(rename = "@Title", default)]
+    #[serde(rename = "@Title", default, skip_serializing_if = "Option::is_none")]
     pub title: Option<String>,
-    #[serde(rename = "@Year", default)]
+    #[serde(rename = "@Year", default, skip_serializing_if = "Option::is_none")]
     pub year: Option<String>,
-    #[serde(rename = "@Genre", default)]
+    #[serde(rename = "@Genre", default, skip_serializing_if = "Option::is_none")]
     pub genre: Option<String>,
-    #[serde(rename = "@Bpm", default)]
+    #[serde(rename = "@Bpm", default, skip_serializing_if = "Option::is_none")]
     pub bpm: Option<String>,
-    #[serde(rename = "@Key", default)]
+    #[serde(rename = "@Key", default, skip_serializing_if = "Option::is_none")]
     pub key: Option<String>,
-    #[serde(rename = "@Album", default)]
+    #[serde(rename = "@Album", default, skip_serializing_if = "Option::is_none")]
     pub album: Option<String>,
-    #[serde(rename = "@Composer", default)]
+    #[serde(rename = "@Composer", default, skip_serializing_if = "Option::is_none")]
     pub composer: Option<String>,
-    #[serde(rename = "@Label", default)]
+    #[serde(rename = "@Label", default, skip_serializing_if = "Option::is_none")]
     pub label: Option<String>,
-    #[serde(rename = "@TrackNumber", default)]
+    #[serde(rename = "@TrackNumber", default, skip_serializing_if = "Option::is_none")]
     pub track_number: Option<String>,
-    #[serde(rename = "@Remix", default)]
+    #[serde(rename = "@Remix", default, skip_serializing_if = "Option::is_none")]
     pub remix: Option<String>,
-    #[serde(rename = "@Stars", default)]
+    #[serde(rename = "@Stars", default, skip_serializing_if = "Option::is_none")]
     pub stars: Option<String>,
-    #[serde(rename = "@Remixer", default)]
+    #[serde(rename = "@Remixer", default, skip_serializing_if = "Option::is_none")]
     pub remixer: Option<String>,
-    #[serde(rename = "@Grouping", default)]
+    #[serde(rename = "@Grouping", default, skip_serializing_if = "Option::is_none")]
     pub grouping: Option<String>,
-    #[serde(rename = "@User1", default)]
+    #[serde(rename = "@User1", default, skip_serializing_if = "Option::is_none")]
     pub user1: Option<String>,
-    #[serde(rename = "@User2", default)]
+    #[serde(rename = "@User2", default, skip_serializing_if = "Option::is_none")]
     pub user2: Option<String>,
-    #[serde(rename = "@Internal", default)]
+    #[serde(rename = "@Internal", default, skip_serializing_if = "Option::is_none")]
     pub internal: Option<String>,
-    #[serde(rename = "@Flag", default)]
+    #[serde(rename = "@Flag", default, skip_serializing_if = "Option::is_none")]
     pub flag: Option<String>,
 }
 
 /// Playback / analysis metadata (duration, bitrate, cover, play history).
 #[derive(Debug, Serialize, Deserialize, Clone, Default)]
 pub struct Infos {
-    #[serde(rename = "@SongLength", default)]
+    #[serde(rename = "@SongLength", default, skip_serializing_if = "Option::is_none")]
     pub song_length: Option<String>,
-    #[serde(rename = "@Bitrate", default)]
+    #[serde(rename = "@Bitrate", default, skip_serializing_if = "Option::is_none")]
     pub bitrate: Option<String>,
-    #[serde(rename = "@Cover", default)]
+    #[serde(rename = "@Cover", default, skip_serializing_if = "Option::is_none")]
     pub cover: Option<String>,
-    #[serde(rename = "@Color", default)]
+    #[serde(rename = "@Color", default, skip_serializing_if = "Option::is_none")]
     pub color: Option<String>,
-    #[serde(rename = "@FirstSeen", default)]
+    #[serde(rename = "@FirstSeen", default, skip_serializing_if = "Option::is_none")]
     pub first_seen: Option<String>,
-    #[serde(rename = "@FirstPlay", default)]
+    #[serde(rename = "@FirstPlay", default, skip_serializing_if = "Option::is_none")]
     pub first_play: Option<String>,
-    #[serde(rename = "@LastPlay", default)]
+    #[serde(rename = "@LastPlay", default, skip_serializing_if = "Option::is_none")]
     pub last_play: Option<String>,
-    #[serde(rename = "@PlayCount", default)]
+    #[serde(rename = "@PlayCount", default, skip_serializing_if = "Option::is_none")]
     pub play_count: Option<String>,
-    #[serde(rename = "@Corrupted", default)]
+    #[serde(rename = "@Corrupted", default, skip_serializing_if = "Option::is_none")]
     pub corrupted: Option<String>,
-    #[serde(rename = "@Gain", default)]
+    #[serde(rename = "@Gain", default, skip_serializing_if = "Option::is_none")]
     pub gain: Option<String>,
-    #[serde(rename = "@UserColor", default)]
+    #[serde(rename = "@UserColor", default, skip_serializing_if = "Option::is_none")]
     pub user_color: Option<String>,
 }
 
 /// Audio analysis scan data (BPM as period, key, volume).
 #[derive(Debug, Serialize, Deserialize, Clone, Default)]
 pub struct Scan {
-    #[serde(rename = "@Version", default)]
+    #[serde(rename = "@Version", default, skip_serializing_if = "Option::is_none")]
     pub version: Option<String>,
-    #[serde(rename = "@Flag", default)]
+    #[serde(rename = "@Flag", default, skip_serializing_if = "Option::is_none")]
     pub flag: Option<String>,
-    #[serde(rename = "@Volume", default)]
+    #[serde(rename = "@Volume", default, skip_serializing_if = "Option::is_none")]
     pub volume: Option<String>,
-    #[serde(rename = "@Bpm", default)]
+    #[serde(rename = "@Bpm", default, skip_serializing_if = "Option::is_none")]
     pub bpm: Option<String>,
-    #[serde(rename = "@AltBpm", default)]
+    #[serde(rename = "@AltBpm", default, skip_serializing_if = "Option::is_none")]
     pub alt_bpm: Option<String>,
-    #[serde(rename = "@Key", default)]
+    #[serde(rename = "@Key", default, skip_serializing_if = "Option::is_none")]
     pub key: Option<String>,
 }
 
 /// Cue point / point-of-interest marker.
 #[derive(Debug, Serialize, Deserialize, Clone, Default)]
 pub struct Poi {
-    #[serde(rename = "@Pos", default)]
+    #[serde(rename = "@Pos", default, skip_serializing_if = "Option::is_none")]
     pub pos: Option<String>,
-    #[serde(rename = "@Type", default)]
+    #[serde(rename = "@Type", default, skip_serializing_if = "Option::is_none")]
     pub poi_type: Option<String>,
-    #[serde(rename = "@Point", default)]
+    #[serde(rename = "@Point", default, skip_serializing_if = "Option::is_none")]
     pub point: Option<String>,
-    #[serde(rename = "@Name", default)]
+    #[serde(rename = "@Name", default, skip_serializing_if = "Option::is_none")]
     pub name: Option<String>,
-    #[serde(rename = "@Num", default)]
+    #[serde(rename = "@Num", default, skip_serializing_if = "Option::is_none")]
     pub num: Option<String>,
-    #[serde(rename = "@Bpm", default)]
+    #[serde(rename = "@Bpm", default, skip_serializing_if = "Option::is_none")]
     pub bpm: Option<String>,
-    #[serde(rename = "@Size", default)]
+    #[serde(rename = "@Size", default, skip_serializing_if = "Option::is_none")]
     pub size: Option<String>,
-    #[serde(rename = "@Color", default)]
+    #[serde(rename = "@Color", default, skip_serializing_if = "Option::is_none")]
     pub color: Option<String>,
-    #[serde(rename = "@Slot", default)]
+    #[serde(rename = "@Slot", default, skip_serializing_if = "Option::is_none")]
     pub slot: Option<String>,
 }
 
 /// Text content element (used for Comment and CustomMix).
 #[derive(Debug, Serialize, Deserialize, Clone, Default)]
 pub struct CommentEl {
-    #[serde(rename = "$text", default)]
+    #[serde(rename = "$text", default, skip_serializing_if = "Option::is_none")]
     pub text: Option<String>,
 }
 
 /// Linked source reference.
 #[derive(Debug, Serialize, Deserialize, Clone, Default)]
 pub struct Link {
-    #[serde(rename = "@Src", default)]
+    #[serde(rename = "@Src", default, skip_serializing_if = "Option::is_none")]
     pub src: Option<String>,
 }
 
@@ -286,6 +286,41 @@ impl Song {
             stems_path.exists()
         };
 
+        let mut cue_markers: Vec<CueMarker> = self.pois.iter().filter_map(|p| {
+            let pos = p.pos.as_ref()?.parse::<f64>().ok()?;
+            let pt = p.poi_type.as_deref().unwrap_or("");
+            if pt.eq_ignore_ascii_case("beatgrid") || pt.eq_ignore_ascii_case("automix") {
+                return None;
+            }
+
+            let color = p.color.as_ref().and_then(|c| {
+                if c.starts_with('#') {
+                    return Some(c.clone());
+                }
+                let n = c.parse::<u32>().ok()?;
+                if n == 0 { return None; }
+                let r = n & 0xff;
+                let g = (n >> 8) & 0xff;
+                let b = (n >> 16) & 0xff;
+                Some(format!("#{:02x}{:02x}{:02x}", r, g, b))
+            });
+
+            Some(CueMarker {
+                pos,
+                poi_type: p.poi_type.clone(),
+                name: p.name.clone(),
+                color,
+                num: p.num.as_ref().and_then(|n| n.parse::<u32>().ok()),
+            })
+        }).collect();
+        cue_markers.sort_by(|a, b| {
+            a.pos
+                .partial_cmp(&b.pos)
+                .unwrap_or(std::cmp::Ordering::Equal)
+                .then_with(|| a.num.cmp(&b.num))
+        });
+        let cue_count = cue_markers.len();
+
         SongSummary {
             index,
             in_database: true,
@@ -307,28 +342,8 @@ impl Song {
             bitrate: self.infos.as_ref().and_then(|i| i.bitrate.clone()),
             play_count,
             stars: self.tags.as_ref().and_then(|t| t.stars.clone()),
-            cue_count: self.pois.len(),
-            cue_markers: self.pois.iter().filter_map(|p| {
-                let pos = p.pos.as_ref()?.parse::<f64>().ok()?;
-                // Skip beatgrid/automix markers — only user cue points
-                let pt = p.poi_type.as_deref().unwrap_or("");
-                if pt == "beatgrid" || pt == "automix" { return None; }
-                let color = p.color.as_ref().and_then(|c| {
-                    let n = c.parse::<u32>().ok()?;
-                    if n == 0 { return None; }
-                    let r = n & 0xff;
-                    let g = (n >> 8) & 0xff;
-                    let b = (n >> 16) & 0xff;
-                    Some(format!("#{:02x}{:02x}{:02x}", r, g, b))
-                });
-                Some(CueMarker {
-                    pos,
-                    poi_type: p.poi_type.clone(),
-                    name: p.name.clone(),
-                    color,
-                    num: p.num.as_ref().and_then(|n| n.parse::<u32>().ok()),
-                })
-            }).collect(),
+            cue_count,
+            cue_markers,
             // Extended tags
             remix: self.tags.as_ref().and_then(|t| t.remix.clone()),
             remixer: self.tags.as_ref().and_then(|t| t.remixer.clone()),

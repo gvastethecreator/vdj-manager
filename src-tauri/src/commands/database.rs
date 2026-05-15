@@ -4,6 +4,7 @@ use std::path::PathBuf;
 
 use crate::database::models::*;
 use crate::database::parser;
+use crate::safety;
 
 fn apply_song_update(song: &mut Song, update: &SongUpdate) {
     let tags = song.tags.get_or_insert_with(Tags::default);
@@ -34,26 +35,6 @@ fn apply_song_update(song: &mut Song, update: &SongUpdate) {
         if let Some(v) = &update.color { infos.color = Some(v.clone()); }
         if let Some(v) = &update.gain  { infos.gain  = Some(v.clone()); }
     }
-}
-
-/// Create a timestamped backup of database.xml → database_<millis>.xml.bak
-fn create_timestamped_backup(db_path: &PathBuf) -> Result<String, String> {
-    let now = std::time::SystemTime::now()
-        .duration_since(std::time::UNIX_EPOCH)
-        .unwrap_or_default()
-        .as_millis();
-    let backup_name = format!(
-        "database_{}.xml.bak",
-        now
-    );
-    let backup_path = db_path.parent().unwrap_or(std::path::Path::new(".")).join(&backup_name);
-    // Also keep the standard .xml.bak for quick recovery
-    let quick_backup = db_path.with_extension("xml.bak");
-    std::fs::copy(db_path, &quick_backup)
-        .map_err(|e| format!("Error al crear backup rápido: {}", e))?;
-    std::fs::copy(db_path, &backup_path)
-        .map_err(|e| format!("Error al crear backup timestamped: {}", e))?;
-    Ok(backup_path.to_string_lossy().to_string())
 }
 
 /// Load the database and return a vec of [`SongSummary`] for the frontend.
@@ -105,8 +86,7 @@ pub async fn save_database(vdj_folder: String, songs_json: String) -> Result<(),
         }
     }
 
-    // Write timestamped backup
-    create_timestamped_backup(&db_path)?;
+    safety::create_timestamped_backup(&db_path, "database")?;
 
     parser::write_database_checked(&db_path, &db)
 }
@@ -114,60 +94,19 @@ pub async fn save_database(vdj_folder: String, songs_json: String) -> Result<(),
 /// Update tags for a single song by index. Creates timestamped backup before writing.
 #[tauri::command]
 pub async fn update_song_tags(
-    vdj_folder: String,
-    index: usize,
-    title: Option<String>,
-    author: Option<String>,
-    album: Option<String>,
-    genre: Option<String>,
-    year: Option<String>,
-    key: Option<String>,
-    bpm: Option<String>,
-    grouping: Option<String>,
-    label: Option<String>,
-    remix: Option<String>,
-    remixer: Option<String>,
-    composer: Option<String>,
-    track_number: Option<String>,
-    stars: Option<String>,
-    user1: Option<String>,
-    user2: Option<String>,
-    comment_text: Option<String>,
-    color: Option<String>,
-    gain: Option<String>,
+    request: UpdateSongTagsRequest,
 ) -> Result<(), String> {
-    let db_path = PathBuf::from(&vdj_folder).join("database.xml");
+    let db_path = PathBuf::from(&request.vdj_folder).join("database.xml");
     let mut db = parser::parse_database(&db_path)?;
 
-    if index >= db.songs.len() {
+    if request.index >= db.songs.len() {
         return Err("Índice fuera de rango".to_string());
     }
 
-    let song = &mut db.songs[index];
-    apply_song_update(song, &SongUpdate {
-        index,
-        title,
-        author,
-        album,
-        genre,
-        year,
-        key,
-        bpm,
-        grouping,
-        label,
-        remix,
-        remixer,
-        composer,
-        track_number,
-        stars,
-        user1,
-        user2,
-        comment_text,
-        color,
-        gain,
-    });
+    let song = &mut db.songs[request.index];
+    apply_song_update(song, &request.update);
 
-    create_timestamped_backup(&db_path)?;
+    safety::create_timestamped_backup(&db_path, "database")?;
 
     parser::write_database_checked(&db_path, &db)
 }
@@ -187,7 +126,7 @@ pub async fn delete_songs(
         return Ok(vec![]);
     }
 
-    create_timestamped_backup(&db_path)?;
+    safety::create_timestamped_backup(&db_path, "database")?;
 
     let mut results: Vec<String> = Vec::new();
 
@@ -247,4 +186,12 @@ pub struct SongUpdate {
     pub comment_text: Option<String>,
     pub color: Option<String>,
     pub gain: Option<String>,
+}
+
+#[derive(serde::Deserialize)]
+#[serde(rename_all = "camelCase")]
+pub struct UpdateSongTagsRequest {
+    pub vdj_folder: String,
+    pub index: usize,
+    pub update: SongUpdate,
 }

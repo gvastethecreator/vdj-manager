@@ -3,6 +3,7 @@ import type { ReactNode } from "react";
 import { listVdjConfigFiles, readVdjConfigFile, writeVdjConfigFile, formatSize } from "../lib/api";
 import { useApp } from "../App";
 import type { VdjConfigFileInfo } from "../types/database";
+import { CodeEditor } from "./CodeEditor";
 import { TreeFileNavigator, type TreeFileItem } from "./TreeFileNavigator";
 
 export function VdjResourceEditorPage({
@@ -117,9 +118,9 @@ export function VdjResourceEditorPage({
     }, [content, dirty, loadFiles, selectedFile, setError, vdjFolder]);
 
     return (
-        <div className="flex h-full gap-0">
-            <aside className="flex w-80 shrink-0 flex-col border-r-2 border-border bg-surface">
-                <div className="border-b-2 border-border px-3 py-2">
+        <div className="flex h-full gap-0 code-workspace">
+            <aside className="flex w-80 shrink-0 flex-col border-r border-border bg-surface/85">
+                <div className="border-b border-border px-3 py-3">
                     <h2 className="text-sm font-semibold text-text">{title}</h2>
                     <p className="mt-0.5 text-[11px] text-text-muted">{subtitle}</p>
                 </div>
@@ -180,14 +181,14 @@ export function VdjResourceEditorPage({
                                 <div className="mt-1 text-[11px] text-text-muted">{selectedFile.relative_path}</div>
                                 <div className="mt-2 text-[11px] text-text-muted">Tamaño: {formatSize(selectedFile.size_bytes)}</div>
                             </div>
-                            <textarea
-                                className="h-[calc(100vh-270px)] w-full rounded border-2 border-border bg-background p-3 font-mono text-[12px] text-text outline-none focus:border-primary/60"
+                            <CodeEditor
+                                label={selectedFile.name}
                                 value={content}
-                                onChange={(e) => {
-                                    setContent(e.target.value);
+                                onChange={(value) => {
+                                    setContent(value);
                                     setDirty(true);
                                 }}
-                                spellCheck={false}
+                                dirty={dirty}
                             />
                         </>
                     )}

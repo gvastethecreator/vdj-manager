@@ -10,6 +10,7 @@ import { log } from "./lib/logger";
 import type { SongSummary, DatabaseStats, Page } from "./types/database";
 import { ErrorBoundary } from "./components/ErrorBoundary";
 import { Layout } from "./components/Layout";
+import { getDemoAppState, getDemoInitialPage, isDemoMode } from "./lib/demoData";
 import { Home } from "./pages/Home";
 import { Dashboard } from "./pages/Dashboard";
 import { Songs } from "./pages/Songs";
@@ -71,17 +72,20 @@ export function useApp(): AppContextType {
 
 /** Root application component: provides global state and page routing. */
 export default function App() {
+    const demoMode = isDemoMode();
+    const demoState = demoMode ? getDemoAppState() : null;
     const [state, setState] = useState<AppState>({
-        vdjFolder: null,
-        songs: [],
-        stats: null,
+        vdjFolder: demoState?.vdjFolder ?? null,
+        songs: demoState?.songs ?? [],
+        stats: demoState?.stats ?? null,
         loading: false,
         error: null,
-        page: "home",
+        page: demoMode ? getDemoInitialPage() : "home",
     });
 
     const VALID_THEMES: Theme[] = ["dark", "light", "blue", "teal", "green", "amber", "red"];
     const [musicFolders, setMusicFolders] = useState<string[]>(() => {
+        if (demoState) return demoState.musicFolders;
         try {
             const raw = localStorage.getItem(MUSIC_FOLDERS_STORAGE_KEY);
             if (!raw) return [];
@@ -92,6 +96,7 @@ export default function App() {
         }
     });
     const [lastVdjFolder, setLastVdjFolder] = useState<string | null>(() => {
+        if (demoState) return demoState.vdjFolder;
         try {
             return localStorage.getItem(LAST_VDJ_FOLDER_STORAGE_KEY);
         } catch {

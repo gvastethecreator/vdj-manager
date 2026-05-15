@@ -4,6 +4,8 @@ use serde::{Deserialize, Serialize};
 use std::path::{Path, PathBuf};
 use xmltree::{Element, XMLNode};
 
+use crate::safety;
+
 #[derive(Debug, Serialize, Clone)]
 pub struct VdjConfigFileInfo {
     pub name: String,
@@ -307,25 +309,12 @@ fn normalize_path_for_cmp(path: &Path) -> String {
 }
 
 fn create_backup_path(target: &Path, fallback_ext: &str) -> Result<String, String> {
-    if !target.exists() {
-        return Ok(String::new());
-    }
-
-    let now = std::time::SystemTime::now()
-        .duration_since(std::time::UNIX_EPOCH)
-        .unwrap_or_default()
-        .as_millis();
-    let backup = target.with_extension(format!(
-        "{}.{}.bak",
-        target
-            .extension()
-            .and_then(|e| e.to_str())
-            .unwrap_or(fallback_ext),
-        now
-    ));
-    std::fs::copy(target, &backup)
-        .map_err(|e| format!("No se pudo crear backup del archivo: {}", e))?;
-    Ok(backup.to_string_lossy().to_string())
+    let label = target
+        .extension()
+        .and_then(|e| e.to_str())
+        .unwrap_or(fallback_ext);
+    safety::create_timestamped_backup(target, label)
+        .map(|backup| backup.map(|path| path.to_string_lossy().to_string()).unwrap_or_default())
 }
 
 fn mapper_document_from_root(root: &Element) -> VdjMapperDocument {
@@ -574,7 +563,7 @@ pub async fn write_vdj_config_file(
 
     let backup_path = create_backup_path(&target, "conf")?;
 
-    std::fs::write(&target, content)
+    safety::atomic_write_string(&target, &content)
         .map_err(|e| format!("No se pudo escribir archivo de configuración: {}", e))?;
 
     Ok(backup_path)
@@ -615,8 +604,8 @@ pub async fn get_vdj_mapper(
         .and_then(|e| e.to_str())
         .unwrap_or_default()
         .to_ascii_lowercase();
-    if ext != "vdjmap" {
-        return Err("El archivo seleccionado no es un .vdjmap".to_string());
+    if !matches!(ext.as_str(), "vdjmap" | "xml") {
+        return Err("El archivo seleccionado no es un mapper XML compatible".to_string());
     }
 
     let mapper_root = parse_mapper_root(&target)?;
@@ -638,8 +627,8 @@ pub async fn update_vdj_mapper(
         .and_then(|e| e.to_str())
         .unwrap_or_default()
         .to_ascii_lowercase();
-    if ext != "vdjmap" {
-        return Err("El archivo seleccionado no es un .vdjmap".to_string());
+    if !matches!(ext.as_str(), "vdjmap" | "xml") {
+        return Err("El archivo seleccionado no es un mapper XML compatible".to_string());
     }
 
     if mapper.device.trim().is_empty() {
@@ -653,7 +642,7 @@ pub async fn update_vdj_mapper(
         .write_with_config(&mut buffer, xmltree::EmitterConfig::new().perform_indent(true))
         .map_err(|e| format!("No se pudo serializar el mapper: {}", e))?;
 
-    std::fs::write(&target, buffer)
+    safety::atomic_write_bytes(&target, &buffer)
         .map_err(|e| format!("No se pudo escribir el mapper: {}", e))?;
 
     Ok(backup)
@@ -673,8 +662,8 @@ pub async fn get_vdj_pad_document(
         .and_then(|e| e.to_str())
         .unwrap_or_default()
         .to_ascii_lowercase();
-    if ext != "vdjpad" {
-        return Err("El archivo seleccionado no es un .vdjpad".to_string());
+    if !matches!(ext.as_str(), "vdjpad" | "xml") {
+        return Err("El archivo seleccionado no es un pad XML compatible".to_string());
     }
 
     let pad_root = parse_pad_root(&target)?;
@@ -696,8 +685,8 @@ pub async fn update_vdj_pad_document(
         .and_then(|e| e.to_str())
         .unwrap_or_default()
         .to_ascii_lowercase();
-    if ext != "vdjpad" {
-        return Err("El archivo seleccionado no es un .vdjpad".to_string());
+    if !matches!(ext.as_str(), "vdjpad" | "xml") {
+        return Err("El archivo seleccionado no es un pad XML compatible".to_string());
     }
 
     let backup = create_backup_path(&target, "vdjpad")?;
@@ -708,7 +697,7 @@ pub async fn update_vdj_pad_document(
         .write_with_config(&mut buffer, xmltree::EmitterConfig::new().perform_indent(true))
         .map_err(|e| format!("No se pudo serializar el pad: {}", e))?;
 
-    std::fs::write(&target, buffer)
+    safety::atomic_write_bytes(&target, &buffer)
         .map_err(|e| format!("No se pudo escribir el pad: {}", e))?;
 
     Ok(backup)
@@ -735,13 +724,7 @@ pub async fn update_vdj_settings(
         }
     }
 
-    let now = std::time::SystemTime::now()
-        .duration_since(std::time::UNIX_EPOCH)
-        .unwrap_or_default()
-        .as_millis();
-    let backup = settings_path.with_extension(format!("xml.{}.bak", now));
-    std::fs::copy(&settings_path, &backup)
-        .map_err(|e| format!("No se pudo crear backup de settings.xml: {}", e))?;
+    let backup = safety::create_timestamped_backup(&settings_path, "settings")?;
 
     let mut buffer = Vec::new();
     root.write_with_config(
@@ -750,8 +733,8 @@ pub async fn update_vdj_settings(
     )
     .map_err(|e| format!("No se pudo serializar settings.xml: {}", e))?;
 
-    std::fs::write(&settings_path, buffer)
+    safety::atomic_write_bytes(&settings_path, &buffer)
         .map_err(|e| format!("No se pudo escribir settings.xml: {}", e))?;
 
-    Ok(backup.to_string_lossy().to_string())
+    Ok(backup.map(|path| path.to_string_lossy().to_string()).unwrap_or_default())
 }

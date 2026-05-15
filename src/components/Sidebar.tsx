@@ -18,18 +18,38 @@ import { useApp } from "../App";
 import type { Theme } from "../App";
 import type { Page } from "../types/database";
 
-const navItems: { page: Page; label: string; icon: typeof Music }[] = [
-    { page: "dashboard", label: "Dashboard", icon: LayoutDashboard },
-    { page: "songs", label: "Canciones", icon: Music },
-    { page: "playlists", label: "Playlists", icon: ListTree },
-    { page: "duplicates", label: "Duplicados", icon: Copy },
-    { page: "missing", label: "Archivos Faltantes", icon: FileX },
-    { page: "relink", label: "Tracks Movidos", icon: Link2 },
-    { page: "orphans", label: "Huérfanos", icon: FolderSearch },
-    { page: "batch", label: "Operaciones", icon: ArrowLeftRight },
-    { page: "configs", label: "Configuraciones", icon: SlidersHorizontal },
-    { page: "pads", label: "Pads", icon: Gamepad2 },
-    { page: "mappers", label: "Mappers", icon: Joystick },
+const navSections: { title: string; items: { page: Page; label: string; icon: typeof Music }[] }[] = [
+    {
+        title: "Biblioteca",
+        items: [
+            { page: "dashboard", label: "Dashboard", icon: LayoutDashboard },
+            { page: "songs", label: "Canciones", icon: Music },
+            { page: "playlists", label: "Playlists", icon: ListTree },
+        ],
+    },
+    {
+        title: "Integridad",
+        items: [
+            { page: "duplicates", label: "Duplicados", icon: Copy },
+            { page: "missing", label: "Archivos faltantes", icon: FileX },
+            { page: "relink", label: "Tracks movidos", icon: Link2 },
+            { page: "orphans", label: "Huérfanos", icon: FolderSearch },
+        ],
+    },
+    {
+        title: "Operaciones",
+        items: [
+            { page: "batch", label: "Operaciones en lote", icon: ArrowLeftRight },
+        ],
+    },
+    {
+        title: "Recursos VDJ",
+        items: [
+            { page: "configs", label: "Configuraciones", icon: SlidersHorizontal },
+            { page: "pads", label: "Pads", icon: Gamepad2 },
+            { page: "mappers", label: "Mappers", icon: Joystick },
+        ],
+    },
 ];
 
 /** Accent colour swatches for the theme picker */
@@ -48,10 +68,10 @@ export function Sidebar() {
     const { page, setPage, vdjFolder, selectFolder, reload, loading, theme, setTheme } = useApp();
 
     return (
-        <aside className="flex w-60 flex-col border-r-2 border-border bg-surface">
+        <aside className="flex w-56 flex-col border-r border-border bg-surface/92">
             {/* Header */}
-            <div className="flex items-center gap-3 border-b-2 border-border px-4 py-3.5">
-                <div className="flex h-8 w-8 items-center justify-center rounded-[5px] bg-primary/15">
+            <div className="flex items-center gap-3 border-b border-border px-3.5 py-3">
+                <div className="flex h-8 w-8 items-center justify-center rounded-lg bg-primary/15 ring-1 ring-primary/25">
                     <Database className="h-4 w-4 text-primary" />
                 </div>
                 <div className="min-w-0 flex-1">
@@ -65,24 +85,31 @@ export function Sidebar() {
             </div>
 
             {/* Navigation */}
-            <nav className="flex-1 overflow-auto py-1.5">
-                {navItems.map(({ page: p, label, icon: Icon }) => (
-                    <button
-                        key={p}
-                        onClick={() => setPage(p)}
-                        className={`flex w-full items-center gap-3 px-4 py-2 text-[13px] transition-all ${page === p
-                            ? "bg-primary/12 text-primary-light border-r-2 border-primary font-medium"
-                            : "text-text-secondary hover:bg-surface-hover hover:text-text"
-                            }`}
-                    >
-                        <Icon className="h-4 w-4 shrink-0" />
-                        {label}
-                    </button>
+            <nav className="flex-1 overflow-auto px-2 py-2">
+                {navSections.map((section) => (
+                    <section key={section.title} className="mb-3 last:mb-0">
+                        <h2 className="px-2.5 pb-1 text-[10px] font-semibold uppercase tracking-wide text-text-muted">
+                            {section.title}
+                        </h2>
+                        {section.items.map(({ page: p, label, icon: Icon }) => (
+                            <button
+                                key={p}
+                                onClick={() => setPage(p)}
+                                className={`mb-0.5 flex w-full items-center gap-2.5 rounded-md px-2.5 py-2 text-[12px] transition-all ${page === p
+                                    ? "bg-primary/14 text-primary-light shadow-[inset_2px_0_0_var(--color-primary)]"
+                                    : "text-text-secondary hover:bg-surface-hover/70 hover:text-text"
+                                    }`}
+                            >
+                                <Icon className="h-4 w-4 shrink-0" />
+                                <span className="truncate">{label}</span>
+                            </button>
+                        ))}
+                    </section>
                 ))}
             </nav>
 
             {/* Theme picker */}
-            <div className="border-t-2 border-border px-3 py-2">
+            <div className="border-t border-border px-3 py-2">
                 <p className="mb-1.5 text-[10px] font-semibold text-text-muted uppercase tracking-wide">Tema</p>
                 <div className="flex flex-wrap gap-1.5">
                     {ACCENT_THEMES.map(({ theme: t, color, label }) => (
@@ -91,11 +118,11 @@ export function Sidebar() {
                             type="button"
                             onClick={() => setTheme(t)}
                             title={label}
-                            className="h-5 w-5 rounded-full border-2 transition-all"
+                            className="h-5 w-5 rounded-full border transition-all"
                             style={{
                                 backgroundColor: color,
-                                borderColor: theme === t ? "#fff" : "transparent",
-                                boxShadow: theme === t ? `0 0 0 1px ${color}` : "none",
+                                borderColor: theme === t ? "rgba(255,255,255,.9)" : "rgba(255,255,255,.12)",
+                                boxShadow: theme === t ? `0 0 0 2px ${color}55` : "none",
                             }}
                         />
                     ))}
@@ -103,7 +130,7 @@ export function Sidebar() {
             </div>
 
             {/* Footer actions */}
-            <div className="border-t-2 border-border p-2.5 space-y-1.5">
+            <div className="space-y-1.5 border-t border-border p-2.5">
                 <button
                     onClick={selectFolder}
                     className="btn btn-primary btn-sm w-full"

@@ -5,6 +5,58 @@
 La aplicación sigue un modelo **Tauri 2**: un backend Rust que expone comandos IPC
 y un frontend React que los invoca via `@tauri-apps/api/core`.
 
+## Estado actual y dirección acordada
+
+Este documento ahora registra dos cosas distintas y complementarias:
+
+- el **estado actual** del código que existe hoy en el repo;
+- la **dirección acordada** en la sesión de arquitectura del `2026-05-15`.
+
+Los documentos maestros de esa dirección son:
+
+- `CONTEXT.md`
+- `docs/adr/0001-browser-de-biblioteca-como-seam-principal.md`
+- `docs/adr/0002-patch-in-place-para-mutaciones-criticas-de-database.md`
+- `docs/superpowers/plans/2026-05-15-vdj-manager-slices-criticos.md`
+
+### Dirección acordada del producto
+
+#### Núcleo de biblioteca
+
+- El seam principal del núcleo deja de ser una suma de páginas soberanas y pasa a ser un **Browser de biblioteca**.
+- La navegación objetivo del shell debe reflejar una sola entrada principal de **Biblioteca**, con vistas/fuentes internas para:
+  - colección general;
+  - `Playlists`;
+  - `History`.
+- `MissingFiles` deja de ser dueño de la corrección: la **Verificación de integridad** diagnostica y la **Reconciliación de rutas** vive en `RelinkTracks`.
+- Las **Entradas descubiertas** siguen siendo first-class dentro del browser, pero con tipo propio y **Catalogación explícita** para entrar en `database.xml`.
+
+#### Estudio de recursos
+
+- `Configs`, `Pads` y `Mappers` siguen siendo páginas separadas a nivel de producto.
+- Debajo de esa separación comparten invariantes de guardado, backup, validación y contratos backend.
+- La API pública debe ser explícita por recurso; los helpers genéricos quedan como implementación interna.
+- La política general del estudio es: **editor especializado por defecto + modo raw avanzado como fallback**.
+
+#### Motor de mutaciones críticas
+
+- Las mutaciones críticas sobre `database.xml` deben usar **patch-in-place** sobre el XML original.
+- La identidad canónica de escritura es `originalFilePath`, no el índice posicional.
+- El matching de rutas debe ser Windows-friendly (normalizado y case-insensitive) sin depender de `canonicalize()` como identidad principal.
+- El contrato IPC deja de basarse en `String` humanas y pasa a un **reporte tipado** por operación/ítem.
+- La atomicidad acordada para operaciones batch es **por ítem**, no all-or-nothing del lote.
+- Si el writer no puede garantizar fidelidad estructural, debe **abortar sin escribir**; no hay fallback automático al serializer legacy.
+- El journal persistido vive en app data y queda ligado a una **Biblioteca VirtualDJ** concreta.
+- Si existe una **Recuperación de mutación** pendiente, la app permite lectura/diagnóstico, pero bloquea nuevas mutaciones críticas hasta resolverla.
+
+### Qué sigue siendo “estado actual”
+
+- El routing real todavía es state-based por `page: Page`.
+- La sidebar todavía expone varias páginas top-level (`Songs`, `Playlists`, `Duplicates`, etc.).
+- Muchas mutaciones críticas todavía usan índices posicionales y respuestas stringly-typed.
+- `MissingFiles` y `RelinkTracks` todavía comparten parte del territorio funcional.
+- `delete_songs`, `rename_file_op` y `move_files_op` todavía no representan el contrato objetivo acordado.
+
 ```text
 ┌──────────────────────────────────────────┐
 │              Frontend (WebView)          │
@@ -80,6 +132,8 @@ El mismo contexto también conserva:
 Routing local por estado (`page: Page`), sin react-router.
 En la página `home`, se renderiza sin `Layout`; el resto usa `Layout` (sidebar + main).
 
+La dirección acordada no elimina esta técnica de routing inmediatamente, pero sí cambia su semántica: el shell debe converger hacia una entrada principal de **Biblioteca** que hospede al **Browser de biblioteca**, dejando `Songs` y `Playlists` como vistas transitorias o adaptadores mientras dure la migración.
+
 Páginas principales activas:
 
 - `Dashboard`
@@ -92,6 +146,14 @@ Páginas principales activas:
 - `Configs`
 - `Pads`
 - `Mappers`
+
+Dirección acordada:
+
+- `Dashboard` permanece como superficie de resumen/observabilidad.
+- `Songs` + `Playlists` deben converger hacia el **Browser de biblioteca**.
+- `MissingFiles` permanece como diagnóstico; `RelinkTracks` absorbe el ownership de la **Reconciliación de rutas**.
+- `Duplicates` y `BatchOperations` siguen como herramientas del núcleo mientras el Browser madura.
+- `Configs`, `Pads` y `Mappers` siguen agrupadas bajo el **Estudio de recursos**.
 
 ### Tabla virtualizada
 

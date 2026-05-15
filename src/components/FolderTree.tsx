@@ -1,6 +1,8 @@
 import { useState, useEffect } from "react";
 import { ChevronRight, ChevronDown, Folder, FolderOpen } from "lucide-react";
 import { listSubdirectories } from "../lib/api";
+import { compareDriveAwarePaths, getPathLeafName } from "../lib/pathUtils";
+import { buildDrivePathTree } from "../lib/pathTree";
 
 interface TreeNode {
     path: string;
@@ -30,29 +32,42 @@ export function FolderTree({
        immediately sees top-level subdirectories. */
     useEffect(() => {
         let cancelled = false;
+
+        function addChildrenToNode(items: TreeNode[], path: string, children: TreeNode[]): TreeNode[] {
+            return items.map((node) => {
+                if (node.path.toLowerCase() === path.toLowerCase()) {
+                    const existing = new Set((node.children ?? []).map((child) => child.path.toLowerCase()));
+                    const mergedChildren = [
+                        ...(node.children ?? []),
+                        ...children.filter((child) => !existing.has(child.path.toLowerCase())),
+                    ].sort((a, b) => compareDriveAwarePaths(a.path, b.path));
+
+                    return { ...node, expanded: true, children: mergedChildren };
+                }
+
+                return {
+                    ...node,
+                    children: node.children ? addChildrenToNode(node.children, path, children) : node.children,
+                };
+            });
+        }
+
         async function initRoots() {
-            const result: TreeNode[] = [];
+            let result: TreeNode[] = buildDrivePathTree(roots);
             for (const r of roots) {
                 try {
                     const subdirs = await listSubdirectories(r);
-                    result.push({
-                        path: r,
-                        name: r.split("\\").pop() || r.split("/").pop() || r,
-                        expanded: true,
-                        children: subdirs.map((s) => ({
+                    const children = subdirs
+                        .sort(compareDriveAwarePaths)
+                        .map((s) => ({
                             path: s,
-                            name: s.split("\\").pop() || s.split("/").pop() || s,
+                            name: getPathLeafName(s),
                             expanded: false,
                             children: null,
-                        })),
-                    });
+                        }));
+                    result = addChildrenToNode(result, r, children);
                 } catch {
-                    result.push({
-                        path: r,
-                        name: r.split("\\").pop() || r.split("/").pop() || r,
-                        expanded: false,
-                        children: null,
-                    });
+                    result = addChildrenToNode(result, r, []);
                 }
             }
             if (!cancelled) setNodes(result);
@@ -73,9 +88,9 @@ export function FolderTree({
                     if (!node.expanded && node.children === null) {
                         try {
                             const subdirs = await listSubdirectories(node.path);
-                            const children: TreeNode[] = subdirs.map((s) => ({
+                            const children: TreeNode[] = subdirs.sort(compareDriveAwarePaths).map((s) => ({
                                 path: s,
-                                name: s.split("\\").pop() || s.split("/").pop() || s,
+                                name: getPathLeafName(s),
                                 expanded: false,
                                 children: null,
                             }));

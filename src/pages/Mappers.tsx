@@ -1,6 +1,7 @@
 import { useCallback, useEffect, useMemo, useState } from "react";
-import { Plus, Save, Trash2 } from "lucide-react";
+import { FileCode2, ListChecks, Plus, Save, Trash2 } from "lucide-react";
 import { useApp } from "../App";
+import { CodeEditor } from "../components/CodeEditor";
 import { TreeFileNavigator, type TreeFileItem } from "../components/TreeFileNavigator";
 import { formatSize, getVdjMapper, listVdjConfigFiles, readVdjConfigFile, updateVdjMapper, writeVdjConfigFile } from "../lib/api";
 import type { VdjConfigFileInfo, VdjMapperBinding, VdjMapperDocument } from "../types/database";
@@ -12,8 +13,11 @@ const EMPTY_BINDING: VdjMapperBinding = {
 };
 
 function isMapperFile(file: VdjConfigFileInfo | null): boolean {
-    return !!file?.path.toLowerCase().endsWith(".vdjmap");
+    const path = file?.path.toLowerCase() ?? "";
+    return path.endsWith(".vdjmap") || path.endsWith(".xml");
 }
+
+type MapperEditorMode = "bindings" | "xml";
 
 /** Competent editor for VirtualDJ controller mappings with structured binding editing for `.vdjmap`. */
 export function Mappers() {
@@ -29,6 +33,7 @@ export function Mappers() {
     const [mapper, setMapper] = useState<VdjMapperDocument | null>(null);
     const [mapperDirty, setMapperDirty] = useState(false);
     const [lastBackup, setLastBackup] = useState<string | null>(null);
+    const [editorMode, setEditorMode] = useState<MapperEditorMode>("bindings");
 
     const loadFiles = useCallback(async () => {
         if (!vdjFolder) {
@@ -200,9 +205,9 @@ export function Mappers() {
     }, [loadFiles, mapper, mapperDirty, selectedFile, setError, vdjFolder]);
 
     return (
-        <div className="flex h-full gap-0">
-            <aside className="flex w-80 shrink-0 flex-col border-r-2 border-border bg-surface">
-                <div className="border-b-2 border-border px-3 py-2">
+        <div className="flex h-full gap-0 code-workspace">
+            <aside className="flex w-80 shrink-0 flex-col border-r border-border bg-surface/85">
+                <div className="border-b border-border px-3 py-3">
                     <h2 className="text-sm font-semibold text-text">Mappers</h2>
                     <p className="mt-0.5 text-[11px] text-text-muted">
                         Editor de mappings y definiciones de controladores usando la estructura real de <code>Mappers/</code> y <code>Devices/</code>.
@@ -246,7 +251,7 @@ export function Mappers() {
                             </div>
                             <div className="flex items-center gap-2">
                                 {mapperDirty || rawDirty ? <span className="rounded bg-warning/15 px-2 py-1 text-[11px] text-warning">Cambios pendientes</span> : null}
-                                {isMapperFile(selectedFile) && mapper ? (
+                                {isMapperFile(selectedFile) && mapper && editorMode === "bindings" ? (
                                     <button type="button" onClick={saveMapper} disabled={saving || !mapperDirty} className="btn btn-primary btn-sm">
                                         <Save className="h-3.5 w-3.5" /> Guardar mapper
                                     </button>
@@ -266,6 +271,29 @@ export function Mappers() {
 
                         {isMapperFile(selectedFile) && mapper ? (
                             <div className="space-y-4">
+                                <div className="flex items-center justify-between gap-3">
+                                    <div className="tab-group w-80">
+                                        <button type="button" className={`tab-item ${editorMode === "bindings" ? "tab-active" : ""}`} onClick={() => setEditorMode("bindings")}>
+                                            <ListChecks className="mr-1 inline h-3.5 w-3.5" /> Bindings
+                                        </button>
+                                        <button type="button" className={`tab-item ${editorMode === "xml" ? "tab-active" : ""}`} onClick={() => setEditorMode("xml")}>
+                                            <FileCode2 className="mr-1 inline h-3.5 w-3.5" /> XML
+                                        </button>
+                                    </div>
+                                    <span className="text-[11px] text-text-muted">Edita controles y acciones; XML queda como respaldo.</span>
+                                </div>
+                                {editorMode === "xml" ? (
+                                    <CodeEditor
+                                        label={selectedFile.name}
+                                        value={rawContent}
+                                        onChange={(value) => {
+                                            setRawContent(value);
+                                            setRawDirty(true);
+                                        }}
+                                        dirty={rawDirty}
+                                    />
+                                ) : (
+                                    <>
                                 <div className="card p-4">
                                     <div className="mb-3">
                                         <h4 className="text-sm font-semibold text-text">Metadatos del mapper</h4>
@@ -325,7 +353,7 @@ export function Mappers() {
                                         {filteredBindings.map((binding) => {
                                             const index = mapper.mappings.indexOf(binding);
                                             return (
-                                                <div key={`${binding.value}-${index}`} className="rounded border border-border/60 bg-surface-hover/20 p-3">
+                                                <div key={`${binding.value}-${index}`} className="rounded-lg border border-border/60 bg-background/45 p-3">
                                                     <div className="grid gap-3 xl:grid-cols-[240px_1fr_auto] xl:items-start">
                                                         <label className="space-y-1 text-[11px] text-text-muted">
                                                             <span>Control / value</span>
@@ -338,7 +366,7 @@ export function Mappers() {
                                                         <label className="space-y-1 text-[11px] text-text-muted">
                                                             <span>Action</span>
                                                             <textarea
-                                                                className="min-h-20 w-full rounded border-2 border-border bg-background p-2 font-mono text-[12px] text-text outline-none focus:border-primary/60"
+                                                                className="min-h-20 w-full rounded-lg border border-border bg-background p-2 font-mono text-[12px] text-text outline-none focus:border-primary/60"
                                                                 value={binding.action}
                                                                 onChange={(e) => updateBinding(index, { action: e.target.value })}
                                                                 spellCheck={false}
@@ -367,20 +395,22 @@ export function Mappers() {
                                         ) : null}
                                     </div>
                                 </div>
+                                    </>
+                                )}
                             </div>
                         ) : (
                             <div className="space-y-3">
-                                <div className="card p-4 text-sm text-text-muted">
+                                <div className="rounded-lg border border-warning/25 bg-warning/8 p-4 text-sm text-text-muted">
                                     Este archivo no es un <code>.vdjmap</code> estructurado. Se muestra en modo texto para mantener compatibilidad con definiciones u otros formatos.
                                 </div>
-                                <textarea
-                                    className="h-[calc(100vh-260px)] w-full rounded border-2 border-border bg-background p-3 font-mono text-[12px] text-text outline-none focus:border-primary/60"
+                                <CodeEditor
+                                    label={selectedFile.name}
                                     value={rawContent}
-                                    onChange={(e) => {
-                                        setRawContent(e.target.value);
+                                    onChange={(value) => {
+                                        setRawContent(value);
                                         setRawDirty(true);
                                     }}
-                                    spellCheck={false}
+                                    dirty={rawDirty}
                                 />
                             </div>
                         )}
