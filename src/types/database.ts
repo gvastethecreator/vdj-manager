@@ -236,6 +236,32 @@ export interface RelinkFileResult {
   message: string | null;
 }
 
+/** Machine-readable outcome of the journaled single-item rename. */
+export type RenameFileStatus =
+  | "completed"
+  | "failed_validation"
+  | "target_conflict"
+  | "rolled_back"
+  | "manual_review_required"
+  | "journal_failure";
+
+export type MutationJournalPhase =
+  | "planned"
+  | "fs_applied"
+  | "completed"
+  | "rolled_back"
+  | "manual_review_required";
+
+/** Result of a rename that coordinates filesystem and database.xml. */
+export interface RenameFileResult {
+  status: RenameFileStatus;
+  originalFilePath: string;
+  newFilePath: string;
+  journalId: string | null;
+  phase: MutationJournalPhase | null;
+  message: string | null;
+}
+
 /** Preview result of a batch dry-run operation. */
 export interface DryRunResult {
   description: string;

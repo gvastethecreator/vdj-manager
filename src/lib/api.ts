@@ -22,6 +22,7 @@ import type {
   InlineSongUpdate,
   UpdateSongTagsResult,
   RelinkFileResult,
+  RenameFileResult,
 } from "../types/database";
 import { compareDriveAwarePaths, getParentDirectory } from "./pathUtils";
 
@@ -145,16 +146,18 @@ export async function scanMusicFolder(
 /**
  * Rename a file on disk and update the database path.
  * @param vdjFolder - VirtualDJ folder path
- * @param songIndex - Song index in the database
- * @param newName - New filename (without path)
- * @returns The new absolute file path
+ * @param originalFilePath - Stable path identity from database.xml
+ * @param newFileName - Literal filename (without path or pattern expansion)
+ * @returns Journaled phase/result for the filesystem + database mutation
  */
 export async function renameFileOp(
   vdjFolder: string,
-  songIndex: number,
-  newName: string
-): Promise<string> {
-  return invoke<string>("rename_file_op", { vdjFolder, songIndex, newName });
+  originalFilePath: string,
+  newFileName: string,
+): Promise<RenameFileResult> {
+  return invoke<RenameFileResult>("rename_file_op", {
+    request: { vdjFolder, originalFilePath, newFileName },
+  });
 }
 
 /**

@@ -5,9 +5,9 @@ import { SongTable } from "../components/SongTable";
 import { FolderTree } from "../components/FolderTree";
 import {
     moveFilesOp, renameFileOp, saveSongUpdates,
-    dryRunMove, dryRunRename, getConfiguredMusicRoots,
+    dryRunMove, getConfiguredMusicRoots,
 } from "../lib/api";
-import type { DryRunResult, SongUpdate } from "../types/database";
+import type { DryRunResult, RenameFileResult, SongUpdate } from "../types/database";
 
 type BatchAction = "move" | "rename" | "tag";
 
@@ -17,7 +17,7 @@ export function BatchOperations() {
     const [selected, setSelected] = useState<Set<number>>(new Set());
     const [action, setAction] = useState<BatchAction>("move");
     const [targetFolder, setTargetFolder] = useState("");
-    const [renamePattern, setRenamePattern] = useState("{artist} - {title}");
+    const [renameFileName, setRenameFileName] = useState("");
     const [tagForm, setTagForm] = useState({
         title: "", author: "", album: "", genre: "", year: "",
         remix: "", remixer: "", composer: "", label: "", trackNumber: "",
@@ -68,7 +68,14 @@ export function BatchOperations() {
             if (action === "move" && targetFolder) {
                 result = await dryRunMove(vdjFolder, indices, targetFolder);
             } else if (action === "rename") {
-                result = await dryRunRename(vdjFolder, indices, renamePattern);
+                if (selected.size !== 1 || renameFileName.length === 0) return;
+                const song = songs.find((item) => item.index === indices[0]);
+                if (!song) return;
+                result = {
+                    description: "Renombrar un archivo con el nombre literal indicado",
+                    affected_count: 1,
+                    details: [`${song.file_name} → ${renameFileName}`],
+                };
             } else {
                 const fieldList = running_tag_fields.map(([k, v]) => `${k}="${v}"`).join(", ");
                 result = {
@@ -96,26 +103,19 @@ export function BatchOperations() {
             if (action === "move" && targetFolder) {
                 setLog(await moveFilesOp(vdjFolder, indices, targetFolder));
             } else if (action === "rename") {
-                const results: string[] = [];
-                for (const idx of indices) {
-                    const song = songs.find((s) => s.index === idx);
-                    if (!song) continue;
-                    const ext = song.file_name.split(".").pop() ?? "mp3";
-                    const newName = renamePattern
-                        .replace("{artist}", song.author ?? "Unknown")
-                        .replace("{title}", song.title ?? song.file_name.replace(`.${ext}`, ""))
-                        .replace("{album}", song.album ?? "")
-                        .replace("{genre}", song.genre ?? "")
-                        .replace("{bpm}", song.bpm ? song.bpm.toFixed(0) : "")
-                        .replace("{year}", song.year ?? "")
-                        .replace(/[<>:"/\\|?*]/g, "_") + `.${ext}`;
-                    try {
-                        results.push(`OK: ${await renameFileOp(vdjFolder, idx, newName)}`);
-                    } catch (err) {
-                        results.push(`Error [${song.file_name}]: ${err}`);
-                    }
-                }
-                setLog(results);
+                if (selected.size !== 1 || renameFileName.length === 0) return;
+                const song = songs.find((item) => item.index === indices[0]);
+                if (!song) return;
+                const result: RenameFileResult = await renameFileOp(
+                    vdjFolder,
+                    song.file_path,
+                    renameFileName,
+                );
+                setLog([
+                    `${result.status} · fase=${result.phase ?? "—"} · journal=${result.journalId ?? "—"}`,
+                    result.message ?? `${result.originalFilePath} → ${result.newFilePath}`,
+                ]);
+                if (result.status === "completed") await reload();
             } else if (action === "tag" && running_tag_fields.length > 0) {
                 const patch = Object.fromEntries(running_tag_fields) as Omit<SongUpdate, "index">;
                 const updates: SongUpdate[] = indices.map((index) => ({ index, ...patch }));
@@ -123,7 +123,7 @@ export function BatchOperations() {
                 const results = indices.map((idx) => `OK: ${songs.find((x) => x.index === idx)?.file_name ?? idx}`);
                 setLog(results);
             }
-            await reload();
+            if (action !== "rename") await reload();
         } catch (err) {
             setError(String(err));
         } finally {
@@ -199,11 +199,15 @@ export function BatchOperations() {
                     {action === "rename" && (
                         <div>
                             <label className="mb-1 block text-[11px] text-text-muted">
-                                Patrón ({"{artist}"}, {"{title}"}, {"{album}"}, {"{genre}"}, {"{bpm}"}, {"{year}"})
+                                Nombre de archivo destino (literal, con extensión)
                             </label>
-                            <input type="text" value={renamePattern}
-                                onChange={(e) => setRenamePattern(e.target.value)}
+                            <input type="text" value={renameFileName}
+                                onChange={(e) => setRenameFileName(e.target.value)}
+                                placeholder="ejemplo.mp3"
                                 className="input w-full" />
+                            <p className="mt-1 text-[10px] text-text-muted">
+                                Selecciona exactamente una canción. El backend valida el nombre sin sanitizarlo.
+                            </p>
                         </div>
                     )}
 
@@ -263,10 +267,10 @@ export function BatchOperations() {
                         <span className="text-[13px] text-text-muted">{selected.size} canciones seleccionadas</span>
                         <div className="flex gap-2">
                             <button type="button" onClick={runDryRun}
-                                disabled={running || selected.size === 0 || (action === "tag" && running_tag_fields.length === 0)}
+                                disabled={running || selected.size === 0 || (action === "rename" && (selected.size !== 1 || renameFileName.length === 0)) || (action === "tag" && running_tag_fields.length === 0)}
                                 className="btn btn-warning">Vista Previa</button>
                             <button type="button" onClick={execute}
-                                disabled={running || selected.size === 0 || (action === "tag" && running_tag_fields.length === 0)}
+                                disabled={running || selected.size === 0 || (action === "rename" && (selected.size !== 1 || renameFileName.length === 0)) || (action === "tag" && running_tag_fields.length === 0)}
                                 className="btn btn-primary">
                                 {running ? "Ejecutando..." : "Ejecutar"}
                             </button>

@@ -1,12 +1,17 @@
 //! Tauri commands for file verification and file-system operations.
 
 use std::collections::{HashMap, HashSet};
-use std::path::PathBuf;
+use std::path::{Path, PathBuf};
 
 use crate::database::models::*;
 use crate::database::parser;
+use crate::mutation_journal::{
+    MutationJournalItem, MutationJournalPhase, MutationJournalStore, MutationOperationKind,
+};
 use crate::safety;
 
+use serde::{Deserialize, Serialize};
+use tauri::Manager;
 use walkdir::WalkDir;
 
 /// Verify that every song in the database exists on disk with the expected size.
@@ -74,43 +79,590 @@ pub async fn scan_music_folder(folder_path: String) -> Result<Vec<String>, Strin
     Ok(files)
 }
 
-/// Rename a file on disk and update the database entry
+/// Request for the journaled single-item rename operation.
+///
+/// `original_file_path` is the stable database identity.  The command never
+/// accepts a UI index and `new_file_name` is deliberately a literal filename;
+/// pattern expansion and sanitization belong nowhere in this critical path.
+#[derive(Debug, Clone, Deserialize)]
+#[serde(rename_all = "camelCase")]
+pub struct RenameFileRequest {
+    pub vdj_folder: String,
+    pub original_file_path: String,
+    pub new_file_name: String,
+}
+
+#[derive(Debug, Clone, Copy, PartialEq, Eq, Serialize)]
+#[serde(rename_all = "snake_case")]
+pub enum RenameFileStatus {
+    Completed,
+    FailedValidation,
+    TargetConflict,
+    RolledBack,
+    ManualReviewRequired,
+    JournalFailure,
+}
+
+/// Machine-readable outcome of the single-item rename choreography.
+#[derive(Debug, Clone, Serialize)]
+#[serde(rename_all = "camelCase")]
+pub struct RenameFileResult {
+    pub status: RenameFileStatus,
+    pub original_file_path: String,
+    pub new_file_path: String,
+    pub journal_id: Option<String>,
+    pub phase: Option<MutationJournalPhase>,
+    pub message: Option<String>,
+}
+
+impl RenameFileResult {
+    fn new(
+        status: RenameFileStatus,
+        original_file_path: impl Into<String>,
+        new_file_path: impl Into<String>,
+        journal_id: Option<String>,
+        phase: Option<MutationJournalPhase>,
+        message: Option<String>,
+    ) -> Self {
+        Self {
+            status,
+            original_file_path: original_file_path.into(),
+            new_file_path: new_file_path.into(),
+            journal_id,
+            phase,
+            message,
+        }
+    }
+}
+
+/// Rename a single file and patch its database reference with a durable
+/// journal and physical rollback on every database failure.
+///
+/// Tauri resolves the app-data directory here, while the core below receives
+/// a caller-owned [`MutationJournalStore`].  Keeping that seam explicit makes
+/// the filesystem/database choreography testable with temporary directories.
 #[tauri::command]
 pub async fn rename_file_op(
-    vdj_folder: String,
-    song_index: usize,
-    new_name: String,
-) -> Result<String, String> {
-    let db_path = PathBuf::from(&vdj_folder).join("database.xml");
-    let mut db = parser::parse_database(&db_path)?;
+    app: tauri::AppHandle,
+    request: RenameFileRequest,
+) -> Result<RenameFileResult, String> {
+    let app_data_dir = app
+        .path()
+        .app_data_dir()
+        .map_err(|error| format!("No se pudo resolver app-data para el journal: {error}"))?;
+    let store = MutationJournalStore::new(app_data_dir);
+    Ok(rename_file_core(&store, request))
+}
 
-    if song_index >= db.songs.len() {
-        return Err("Índice fuera de rango".to_string());
+/// Core rename engine using the production filesystem rename and patcher.
+pub fn rename_file_core(
+    store: &MutationJournalStore,
+    request: RenameFileRequest,
+) -> RenameFileResult {
+    rename_file_core_with_hooks(
+        store,
+        request,
+        rename_without_replace,
+        |database_path, original_file_path, new_file_path| {
+            let patch = parser::patch_song_path_in_place(
+                database_path,
+                original_file_path,
+                new_file_path,
+            )?;
+            match patch.status {
+                RelinkFileStatus::Completed => Ok(()),
+                status => Err(format!(
+                    "patch_song_path_in_place no completó ({status:?}): {}",
+                    patch
+                        .message
+                        .unwrap_or_else(|| "resultado no exitoso".to_string())
+                )),
+            }
+        },
+    )
+}
+
+/// Move a regular file without ever replacing a destination that appeared
+/// after preflight. The same primitive is used for forward apply and rollback.
+#[cfg(windows)]
+fn rename_without_replace(from: &Path, to: &Path) -> Result<(), String> {
+    use std::os::windows::ffi::OsStrExt;
+    use windows_sys::Win32::Storage::FileSystem::MoveFileExW;
+
+    let from_wide: Vec<u16> = from.as_os_str().encode_wide().chain(Some(0)).collect();
+    let to_wide: Vec<u16> = to.as_os_str().encode_wide().chain(Some(0)).collect();
+    // No MOVEFILE_REPLACE_EXISTING: Windows atomically fails on any existing
+    // destination, including entries that `Path::exists` cannot observe.
+    let moved = unsafe { MoveFileExW(from_wide.as_ptr(), to_wide.as_ptr(), 0) };
+    if moved == 0 {
+        Err(std::io::Error::last_os_error().to_string())
+    } else {
+        Ok(())
     }
+}
 
-    let old_path = PathBuf::from(&db.songs[song_index].file_path);
-    if !old_path.exists() {
-        return Err(format!("El archivo no existe: {}", old_path.display()));
+#[cfg(not(windows))]
+fn rename_without_replace(from: &Path, to: &Path) -> Result<(), String> {
+    // Same-directory audio moves are regular files. Creating the destination
+    // hard link is atomic and fails if any directory entry already exists.
+    std::fs::hard_link(from, to).map_err(|error| error.to_string())?;
+    if let Err(error) = std::fs::remove_file(from) {
+        let _ = std::fs::remove_file(to);
+        return Err(error.to_string());
     }
+    Ok(())
+}
 
-    let new_path = old_path
-        .parent()
-        .ok_or("No se pudo obtener directorio padre")?
-        .join(&new_name);
+/// Test seam for the rename choreography.  Hooks are intentionally narrow:
+/// they can fail deterministically without touching a real VirtualDJ folder,
+/// while the journal and rollback state machine remains the production one.
+pub(crate) fn rename_file_core_with_hooks<R, P>(
+    store: &MutationJournalStore,
+    request: RenameFileRequest,
+    mut rename: R,
+    mut patch: P,
+) -> RenameFileResult
+where
+    R: FnMut(&Path, &Path) -> Result<(), String>,
+    P: FnMut(&Path, &str, &str) -> Result<(), String>,
+{
+    let original = request.original_file_path.clone();
+    let preflight = match rename_preflight(&request) {
+        Ok(paths) => paths,
+        Err((status, path, message)) => {
+            return RenameFileResult::new(status, original, path, None, None, Some(message));
+        }
+    };
+    let (old_path, new_path, database_path) = preflight;
+    let old_path_string = old_path.to_string_lossy().to_string();
+    let new_path_string = new_path.to_string_lossy().to_string();
 
+    let item = MutationJournalItem::new(&old_path_string, Some(&new_path_string));
+    let operation = match store.plan_operation(
+        &request.vdj_folder,
+        MutationOperationKind::Rename,
+        vec![item],
+    ) {
+        Ok(operation) => operation,
+        Err(error) => {
+            return RenameFileResult::new(
+                RenameFileStatus::JournalFailure,
+                original,
+                new_path_string,
+                None,
+                None,
+                Some(format!("No se pudo persistir la fase planned: {error}")),
+            );
+        }
+    };
+    let journal_id = operation.journal_id.clone();
+    let item_id = operation.items[0].item_id.clone();
+
+    // Re-check the target after the journal commit.  A concurrent creator
+    // must never be overwritten just because preflight was initially clean.
     if new_path.exists() {
-        return Err(format!("Ya existe un archivo con ese nombre: {}", new_path.display()));
+        return close_planned_as_rollback(
+            store,
+            &request.vdj_folder,
+            &journal_id,
+            &item_id,
+            &original,
+            &new_path_string,
+            RenameFileStatus::TargetConflict,
+            "El destino apareció mientras se preparaba el rename".to_string(),
+        );
     }
 
-    std::fs::rename(&old_path, &new_path)
-        .map_err(|e| format!("Error al renombrar: {}", e))?;
+    if let Err(error) = rename(&old_path, &new_path) {
+        let status = match std::fs::symlink_metadata(&new_path) {
+            Ok(_) => RenameFileStatus::TargetConflict,
+            Err(metadata_error) if metadata_error.kind() == std::io::ErrorKind::NotFound => {
+                RenameFileStatus::RolledBack
+            }
+            // An unreadable directory entry is not safe to treat as absent.
+            Err(_) => RenameFileStatus::TargetConflict,
+        };
+        return match store.transition_item(
+            &request.vdj_folder,
+            &journal_id,
+            &item_id,
+            MutationJournalPhase::RolledBack,
+        ) {
+            Ok(operation) => RenameFileResult::new(
+                status,
+                original,
+                new_path_string,
+                Some(journal_id),
+                Some(operation.phase),
+                Some(format!("No se pudo renombrar físicamente: {error}")),
+            ),
+            Err(journal_error) => RenameFileResult::new(
+                RenameFileStatus::JournalFailure,
+                original,
+                new_path_string,
+                Some(journal_id),
+                Some(MutationJournalPhase::Planned),
+                Some(format!(
+                    "Falló el rename físico ({error}) y también el cierre del journal: {journal_error}"
+                )),
+            ),
+        };
+    }
 
-    db.songs[song_index].file_path = new_path.to_string_lossy().to_string();
+    // From this point on the filesystem has changed.  If the journal cannot
+    // record FsApplied, restore the source before returning a manual-review
+    // result so the pending journal cannot hide a physical mismatch.
+    if let Err(journal_error) = store.transition_item(
+        &request.vdj_folder,
+        &journal_id,
+        &item_id,
+        MutationJournalPhase::FsApplied,
+    ) {
+        let rollback_error = rename(&new_path, &old_path).err();
+        let message = format!(
+            "No se pudo persistir FsApplied: {journal_error}; rollback: {}",
+            rollback_error
+                .as_deref()
+                .unwrap_or("completado")
+        );
+        let (phase, message) = persist_manual_review_or_report_actual(
+            store,
+            &request.vdj_folder,
+            &journal_id,
+            &item_id,
+            MutationJournalPhase::Planned,
+            message,
+        );
+        return RenameFileResult::new(
+            RenameFileStatus::ManualReviewRequired,
+            original,
+            new_path_string,
+            Some(journal_id),
+            Some(phase),
+            Some(message),
+        );
+    }
 
-    safety::create_timestamped_backup(&db_path, "database")?;
-    parser::write_database_checked(&db_path, &db)?;
+    if let Err(patch_error) = patch(&database_path, &old_path_string, &new_path_string) {
+        return rollback_after_database_failure(
+            store,
+            &request.vdj_folder,
+            &journal_id,
+            &item_id,
+            &old_path,
+            &new_path,
+            &original,
+            &new_path_string,
+            patch_error,
+            &mut rename,
+        );
+    }
 
-    Ok(new_path.to_string_lossy().to_string())
+    match store.transition_item(
+        &request.vdj_folder,
+        &journal_id,
+        &item_id,
+        MutationJournalPhase::Completed,
+    ) {
+        Ok(operation) => RenameFileResult::new(
+            RenameFileStatus::Completed,
+            original,
+            new_path_string,
+            Some(journal_id),
+            Some(operation.phase),
+            None,
+        ),
+        Err(error) => {
+            let (phase, message) = persist_manual_review_or_report_actual(
+                store,
+                &request.vdj_folder,
+                &journal_id,
+                &item_id,
+                MutationJournalPhase::FsApplied,
+                format!(
+                    "filesystem y database están aplicados, pero no se pudo cerrar el journal: {error}"
+                ),
+            );
+            RenameFileResult::new(
+                RenameFileStatus::ManualReviewRequired,
+                original,
+                new_path_string,
+                Some(journal_id),
+                Some(phase),
+                Some(message),
+            )
+        }
+    }
+}
+
+fn rename_preflight(
+    request: &RenameFileRequest,
+) -> Result<(PathBuf, PathBuf, PathBuf), (RenameFileStatus, String, String)> {
+    if request.vdj_folder.trim().is_empty() {
+        return Err((
+            RenameFileStatus::FailedValidation,
+            String::new(),
+            "vdjFolder es obligatorio".to_string(),
+        ));
+    }
+    if request.original_file_path.trim().is_empty() {
+        return Err((
+            RenameFileStatus::FailedValidation,
+            String::new(),
+            "originalFilePath es obligatorio".to_string(),
+        ));
+    }
+    if let Err(message) = validate_windows_file_name(&request.new_file_name) {
+        return Err((
+            RenameFileStatus::FailedValidation,
+            String::new(),
+            message,
+        ));
+    }
+
+    let old_path = PathBuf::from(&request.original_file_path);
+    let vdj_folder = PathBuf::from(&request.vdj_folder);
+    if !old_path.is_absolute() || !vdj_folder.is_absolute() {
+        return Err((
+            RenameFileStatus::FailedValidation,
+            String::new(),
+            "vdjFolder y originalFilePath deben ser rutas absolutas".to_string(),
+        ));
+    }
+
+    let metadata = match std::fs::metadata(&old_path) {
+        Ok(metadata) if metadata.is_file() => metadata,
+        Ok(_) => {
+            return Err((
+                RenameFileStatus::FailedValidation,
+                old_path.to_string_lossy().to_string(),
+                "El origen debe ser un archivo regular".to_string(),
+            ));
+        }
+        Err(error) => {
+            return Err((
+                RenameFileStatus::FailedValidation,
+                old_path.to_string_lossy().to_string(),
+                format!("El archivo origen no existe o no se puede leer: {error}"),
+            ));
+        }
+    };
+    let _ = metadata;
+
+    let Some(parent) = old_path.parent() else {
+        return Err((
+            RenameFileStatus::FailedValidation,
+            old_path.to_string_lossy().to_string(),
+            "No se pudo obtener el directorio padre del origen".to_string(),
+        ));
+    };
+    let new_path = parent.join(&request.new_file_name);
+    let parent_string = parent.to_string_lossy();
+    let target_parent_string = new_path
+        .parent()
+        .map(|path| path.to_string_lossy().into_owned())
+        .unwrap_or_default();
+    if !parser::windows_paths_equal(&parent_string, &target_parent_string) {
+        return Err((
+            RenameFileStatus::FailedValidation,
+            new_path.to_string_lossy().to_string(),
+            "El rename debe conservar exactamente el mismo directorio padre".to_string(),
+        ));
+    }
+    if parser::windows_paths_equal(
+        &old_path.to_string_lossy(),
+        &new_path.to_string_lossy(),
+    ) {
+        return Err((
+            RenameFileStatus::FailedValidation,
+            new_path.to_string_lossy().to_string(),
+            "El nombre destino no cambia la ruta (no-op)".to_string(),
+        ));
+    }
+    if new_path.exists() {
+        return Err((
+            RenameFileStatus::TargetConflict,
+            new_path.to_string_lossy().to_string(),
+            "Ya existe un archivo o directorio con ese nombre".to_string(),
+        ));
+    }
+
+    Ok((old_path, new_path, vdj_folder.join("database.xml")))
+}
+
+fn validate_windows_file_name(name: &str) -> Result<(), String> {
+    if name.is_empty() || name == "." || name == ".." {
+        return Err("El nombre destino no puede estar vacío ni ser . o ..".to_string());
+    }
+    if name.encode_utf16().count() > 255 {
+        return Err("El nombre destino supera 255 unidades UTF-16".to_string());
+    }
+    if name.chars().any(|character| {
+        character.is_control()
+            || matches!(character, '<' | '>' | ':' | '"' | '/' | '\\' | '|' | '?' | '*')
+    }) {
+        return Err("El nombre destino contiene caracteres inválidos para Windows".to_string());
+    }
+    if name.ends_with('.') || name.ends_with(' ') {
+        return Err("El nombre destino no puede terminar en punto ni espacio".to_string());
+    }
+
+    let stem = name.split('.').next().unwrap_or(name);
+    let stem = stem.trim_end_matches(['.', ' ']);
+    let uppercase = stem.to_ascii_uppercase();
+    let reserved = matches!(
+        uppercase.as_str(),
+        "CON" | "PRN" | "AUX" | "NUL"
+    ) || ["COM", "LPT"].iter().any(|prefix| {
+        uppercase.strip_prefix(prefix).is_some_and(|suffix| {
+            matches!(suffix, "1" | "2" | "3" | "4" | "5" | "6" | "7" | "8" | "9" | "¹" | "²" | "³")
+        })
+    });
+    if reserved {
+        return Err("El nombre destino está reservado por Windows".to_string());
+    }
+    Ok(())
+}
+
+fn close_planned_as_rollback(
+    store: &MutationJournalStore,
+    library: &str,
+    journal_id: &str,
+    item_id: &str,
+    original: &str,
+    target: &str,
+    status: RenameFileStatus,
+    message: String,
+) -> RenameFileResult {
+    match store.transition_item(library, journal_id, item_id, MutationJournalPhase::RolledBack) {
+        Ok(operation) => RenameFileResult::new(
+            status,
+            original,
+            target,
+            Some(journal_id.to_string()),
+            Some(operation.phase),
+            Some(message),
+        ),
+        Err(error) => RenameFileResult::new(
+            RenameFileStatus::JournalFailure,
+            original,
+            target,
+            Some(journal_id.to_string()),
+            Some(MutationJournalPhase::Planned),
+            Some(format!("{message}; no se pudo cerrar el journal: {error}")),
+        ),
+    }
+}
+
+fn persist_manual_review_or_report_actual(
+    store: &MutationJournalStore,
+    library: &str,
+    journal_id: &str,
+    item_id: &str,
+    actual_phase_on_failure: MutationJournalPhase,
+    message: String,
+) -> (MutationJournalPhase, String) {
+    let observed_phase = store
+        .load_library(library)
+        .ok()
+        .and_then(|document| {
+            document
+                .operations
+                .iter()
+                .find(|operation| operation.journal_id == journal_id)
+                .and_then(|operation| {
+                    operation
+                        .items
+                        .iter()
+                        .find(|item| item.item_id == item_id)
+                        .map(|item| item.phase)
+                })
+        })
+        .unwrap_or(actual_phase_on_failure);
+    match store.require_manual_review(library, journal_id, item_id, message.clone()) {
+        Ok(operation) => (operation.phase, message),
+        Err(error) => (
+            observed_phase,
+            format!(
+                "{message}; además no se pudo persistir manual_review_required: {error}"
+            ),
+        ),
+    }
+}
+
+fn rollback_after_database_failure<R>(
+    store: &MutationJournalStore,
+    library: &str,
+    journal_id: &str,
+    item_id: &str,
+    old_path: &Path,
+    new_path: &Path,
+    original: &str,
+    target: &str,
+    patch_error: String,
+    rename: &mut R,
+) -> RenameFileResult
+where
+    R: FnMut(&Path, &Path) -> Result<(), String>,
+{
+    match rename(new_path, old_path) {
+        Ok(()) => match store.transition_item(
+            library,
+            journal_id,
+            item_id,
+            MutationJournalPhase::RolledBack,
+        ) {
+            Ok(operation) => RenameFileResult::new(
+                RenameFileStatus::RolledBack,
+                original,
+                target,
+                Some(journal_id.to_string()),
+                Some(operation.phase),
+                Some(format!("El commit de database.xml falló y el archivo fue revertido: {patch_error}")),
+            ),
+            Err(error) => {
+                let (phase, message) = persist_manual_review_or_report_actual(
+                    store,
+                    library,
+                    journal_id,
+                    item_id,
+                    MutationJournalPhase::FsApplied,
+                    format!(
+                        "El archivo fue revertido, pero no se pudo persistir rolled_back: {error}; causa DB: {patch_error}"
+                    ),
+                );
+                RenameFileResult::new(
+                    RenameFileStatus::ManualReviewRequired,
+                    original,
+                    target,
+                    Some(journal_id.to_string()),
+                    Some(phase),
+                    Some(message),
+                )
+            }
+        },
+        Err(rollback_error) => {
+            let message = format!(
+                "Falló el commit de database.xml ({patch_error}) y también el rollback físico: {rollback_error}"
+            );
+            let (phase, message) = persist_manual_review_or_report_actual(
+                store,
+                library,
+                journal_id,
+                item_id,
+                MutationJournalPhase::FsApplied,
+                message,
+            );
+            RenameFileResult::new(
+                RenameFileStatus::ManualReviewRequired,
+                original,
+                target,
+                Some(journal_id.to_string()),
+                Some(phase),
+                Some(message),
+            )
+        }
+    }
 }
 
 /// Move selected files to a target folder and update the database
@@ -953,5 +1505,304 @@ mod tests {
         assert_eq!(before, std::fs::read(&db_path).expect("database should remain unchanged"));
 
         std::fs::remove_dir_all(&dir).expect("temp directory should be removed");
+    }
+
+    fn rename_fixture(label: &str) -> (PathBuf, PathBuf, PathBuf, PathBuf) {
+        let root = unique_temp_dir(label);
+        let vdj_folder = root.join("VirtualDJ");
+        let app_data = root.join("app-data");
+        std::fs::create_dir_all(&vdj_folder).expect("VDJ folder should be created");
+        std::fs::create_dir_all(&app_data).expect("app-data folder should be created");
+        let source = root.join("Track.mp3");
+        std::fs::write(&source, b"track").expect("source should be written");
+        let database = vdj_folder.join("database.xml");
+        let xml = format!(
+            r#"<VirtualDJ_Database><Song FilePath="{}" FileSize="5"/></VirtualDJ_Database>"#,
+            source.to_string_lossy()
+        );
+        std::fs::write(&database, xml).expect("database fixture should be written");
+        (root, vdj_folder, app_data, source)
+    }
+
+    fn rename_request(vdj_folder: &Path, source: &Path, name: &str) -> RenameFileRequest {
+        RenameFileRequest {
+            vdj_folder: vdj_folder.to_string_lossy().to_string(),
+            original_file_path: source.to_string_lossy().to_string(),
+            new_file_name: name.to_string(),
+        }
+    }
+
+    #[test]
+    fn rename_happy_path_persists_database_and_completed_journal() {
+        let (root, vdj_folder, app_data, source) = rename_fixture("rename-happy");
+        let store = MutationJournalStore::new(&app_data);
+
+        let result = rename_file_core(
+            &store,
+            rename_request(&vdj_folder, &source, "Renamed.mp3"),
+        );
+
+        assert_eq!(result.status, RenameFileStatus::Completed);
+        let target = root.join("Renamed.mp3");
+        assert!(!source.exists(), "source should be moved");
+        assert!(target.exists(), "target should exist");
+        let database = parser::parse_database(&vdj_folder.join("database.xml"))
+            .expect("patched database should parse");
+        assert_eq!(database.songs[0].file_path, target.to_string_lossy());
+        let journal = store
+            .load_library(&vdj_folder)
+            .expect("journal should load");
+        assert_eq!(journal.operations.len(), 1);
+        assert_eq!(
+            journal.operations[0].items[0].phase,
+            MutationJournalPhase::Completed
+        );
+        std::fs::remove_dir_all(root).expect("temporary fixture should be removed");
+    }
+
+    #[test]
+    fn rename_rejects_target_conflict_before_creating_journal() {
+        let (root, vdj_folder, app_data, source) = rename_fixture("rename-conflict");
+        let target = root.join("Existing.mp3");
+        std::fs::write(&target, b"existing").expect("target should be written");
+        let store = MutationJournalStore::new(&app_data);
+
+        let result = rename_file_core(
+            &store,
+            rename_request(&vdj_folder, &source, "Existing.mp3"),
+        );
+
+        assert_eq!(result.status, RenameFileStatus::TargetConflict);
+        assert!(source.exists());
+        assert!(target.exists());
+        assert!(store
+            .load_library(&vdj_folder)
+            .expect("journal should load")
+            .operations
+            .is_empty());
+        std::fs::remove_dir_all(root).expect("temporary fixture should be removed");
+    }
+
+    #[test]
+    fn rename_primitive_never_replaces_a_destination_created_after_preflight() {
+        let (root, _vdj_folder, _app_data, source) = rename_fixture("rename-race");
+        let target = root.join("Raced.mp3");
+        std::fs::write(&target, b"do not replace").expect("race target should be written");
+
+        let error = rename_without_replace(&source, &target)
+            .expect_err("no-replace rename must reject an existing directory entry");
+
+        assert!(!error.is_empty());
+        assert_eq!(
+            std::fs::read(&target).expect("race target should remain readable"),
+            b"do not replace"
+        );
+        assert_eq!(
+            std::fs::read(&source).expect("source should remain readable"),
+            b"track"
+        );
+        std::fs::remove_dir_all(root).expect("temporary fixture should be removed");
+    }
+
+    #[test]
+    fn rename_race_reports_target_conflict_and_preserves_both_files() {
+        let (root, vdj_folder, app_data, source) = rename_fixture("rename-race-result");
+        let store = MutationJournalStore::new(&app_data);
+        let target = root.join("Raced.mp3");
+
+        let result = rename_file_core_with_hooks(
+            &store,
+            rename_request(&vdj_folder, &source, "Raced.mp3"),
+            |from, to| {
+                std::fs::write(to, b"concurrent target")
+                    .map_err(|error| error.to_string())?;
+                rename_without_replace(from, to)
+            },
+            |_database, _original, _target| Ok(()),
+        );
+
+        assert_eq!(result.status, RenameFileStatus::TargetConflict);
+        assert_eq!(result.phase, Some(MutationJournalPhase::RolledBack));
+        assert_eq!(
+            std::fs::read(&target).expect("concurrent target should survive"),
+            b"concurrent target"
+        );
+        assert_eq!(
+            std::fs::read(&source).expect("source should survive"),
+            b"track"
+        );
+        std::fs::remove_dir_all(root).expect("temporary fixture should be removed");
+    }
+
+    #[test]
+    fn rename_rejects_invalid_literal_without_touching_filesystem() {
+        let (root, vdj_folder, app_data, source) = rename_fixture("rename-invalid");
+        let store = MutationJournalStore::new(&app_data);
+
+        for invalid in [
+            "bad/name.mp3",
+            "CON.txt",
+            "COM¹.txt",
+            "LPT².wav",
+            "trailing. ",
+            "a\nname.mp3",
+        ] {
+            let result = rename_file_core(
+                &store,
+                rename_request(&vdj_folder, &source, invalid),
+            );
+            assert_eq!(result.status, RenameFileStatus::FailedValidation);
+            assert!(source.exists());
+        }
+        assert!(store
+            .load_library(&vdj_folder)
+            .expect("journal should load")
+            .operations
+            .is_empty());
+        std::fs::remove_dir_all(root).expect("temporary fixture should be removed");
+    }
+
+    #[test]
+    fn rename_rolls_back_when_database_commit_fails() {
+        let (root, vdj_folder, app_data, source) = rename_fixture("rename-db-fail");
+        let store = MutationJournalStore::new(&app_data);
+
+        let result = rename_file_core_with_hooks(
+            &store,
+            rename_request(&vdj_folder, &source, "Renamed.mp3"),
+            |from, to| std::fs::rename(from, to).map_err(|error| error.to_string()),
+            |_database, _original, _target| Err("injected database failure".to_string()),
+        );
+
+        assert_eq!(result.status, RenameFileStatus::RolledBack);
+        assert!(source.exists());
+        assert!(!root.join("Renamed.mp3").exists());
+        let journal = store
+            .load_library(&vdj_folder)
+            .expect("journal should load");
+        assert_eq!(
+            journal.operations[0].items[0].phase,
+            MutationJournalPhase::RolledBack
+        );
+        std::fs::remove_dir_all(root).expect("temporary fixture should be removed");
+    }
+
+    #[test]
+    fn rename_persists_planned_before_invoking_filesystem_hook() {
+        let (root, vdj_folder, app_data, source) = rename_fixture("rename-planned");
+        let store = MutationJournalStore::new(&app_data);
+        let library = vdj_folder.to_string_lossy().to_string();
+        let mut saw_planned = false;
+
+        let result = rename_file_core_with_hooks(
+            &store,
+            rename_request(&vdj_folder, &source, "Renamed.mp3"),
+            |_from, _to| {
+                let journal = store.load_library(&library).expect("planned journal should load");
+                assert_eq!(journal.operations.len(), 1);
+                assert_eq!(
+                    journal.operations[0].items[0].phase,
+                    MutationJournalPhase::Planned
+                );
+                saw_planned = true;
+                Err("injected filesystem failure".to_string())
+            },
+            |_database, _original, _target| Ok(()),
+        );
+
+        assert!(saw_planned);
+        assert_eq!(result.status, RenameFileStatus::RolledBack);
+        assert!(source.exists());
+        std::fs::remove_dir_all(root).expect("temporary fixture should be removed");
+    }
+
+    #[test]
+    fn rename_reports_the_persisted_phase_when_secondary_journal_marking_fails() {
+        let (root, vdj_folder, app_data, source) = rename_fixture("rename-phase-truth");
+        let store = MutationJournalStore::new(&app_data);
+        let library = vdj_folder.to_string_lossy().to_string();
+
+        let result = rename_file_core_with_hooks(
+            &store,
+            rename_request(&vdj_folder, &source, "Renamed.mp3"),
+            rename_without_replace,
+            |_database, _original, _target| {
+                let document = store.load_library(&library).expect("journal should load");
+                let operation = &document.operations[0];
+                store
+                    .transition_item(
+                        &library,
+                        &operation.journal_id,
+                        &operation.items[0].item_id,
+                        MutationJournalPhase::RolledBack,
+                    )
+                    .expect("simulated conflicting journal phase should persist");
+                Ok(())
+            },
+        );
+
+        assert_eq!(result.status, RenameFileStatus::ManualReviewRequired);
+        assert_eq!(result.phase, Some(MutationJournalPhase::RolledBack));
+        assert!(result
+            .message
+            .as_deref()
+            .is_some_and(|message| message.contains("no se pudo persistir manual_review_required")));
+        std::fs::remove_dir_all(root).expect("temporary fixture should be removed");
+    }
+
+    #[test]
+    fn journal_failure_happens_before_filesystem_hook() {
+        let (root, vdj_folder, app_data, source) = rename_fixture("rename-journal-fail");
+        std::fs::remove_dir_all(&app_data).expect("app-data directory should be removable");
+        std::fs::write(&app_data, b"not a directory").expect("app-data blocker should be written");
+        let store = MutationJournalStore::new(&app_data);
+        let mut rename_called = false;
+
+        let result = rename_file_core_with_hooks(
+            &store,
+            rename_request(&vdj_folder, &source, "Renamed.mp3"),
+            |_from, _to| {
+                rename_called = true;
+                Ok(())
+            },
+            |_database, _original, _target| Ok(()),
+        );
+
+        assert_eq!(result.status, RenameFileStatus::JournalFailure);
+        assert!(!rename_called);
+        assert!(source.exists());
+        std::fs::remove_dir_all(root).expect("temporary fixture should be removed");
+    }
+
+    #[test]
+    fn rename_reports_manual_review_when_physical_rollback_fails() {
+        let (root, vdj_folder, app_data, source) = rename_fixture("rename-rollback-fail");
+        let store = MutationJournalStore::new(&app_data);
+        let mut calls = 0usize;
+
+        let result = rename_file_core_with_hooks(
+            &store,
+            rename_request(&vdj_folder, &source, "Renamed.mp3"),
+            |from, to| {
+                calls += 1;
+                if calls == 2 {
+                    return Err("injected rollback failure".to_string());
+                }
+                std::fs::rename(from, to).map_err(|error| error.to_string())
+            },
+            |_database, _original, _target| Err("injected database failure".to_string()),
+        );
+
+        assert_eq!(result.status, RenameFileStatus::ManualReviewRequired);
+        assert!(!source.exists());
+        assert!(root.join("Renamed.mp3").exists());
+        let journal = store
+            .load_library(&vdj_folder)
+            .expect("journal should load");
+        assert_eq!(
+            journal.operations[0].items[0].phase,
+            MutationJournalPhase::ManualReviewRequired
+        );
+        std::fs::remove_dir_all(root).expect("temporary fixture should be removed");
     }
 }
