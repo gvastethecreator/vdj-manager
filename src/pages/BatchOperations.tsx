@@ -5,9 +5,10 @@ import { SongTable } from "../components/SongTable";
 import { FolderTree } from "../components/FolderTree";
 import {
     moveFilesOp, renameFileOp, saveSongUpdates,
-    dryRunMove, getConfiguredMusicRoots,
+    planMoveFiles, getConfiguredMusicRoots,
 } from "../lib/api";
-import type { DryRunResult, RenameFileResult, SongUpdate } from "../types/database";
+import { moveStatusLabel, transferMethodLabel } from "../lib/moveReport";
+import type { DryRunResult, MoveBatchReport, RenameFileResult, SongUpdate } from "../types/database";
 
 type BatchAction = "move" | "rename" | "tag";
 
@@ -30,6 +31,7 @@ export function BatchOperations() {
     const [running, setRunning] = useState(false);
     const [log, setLog] = useState<string[]>([]);
     const [dryResult, setDryResult] = useState<DryRunResult | null>(null);
+    const [moveReport, setMoveReport] = useState<MoveBatchReport | null>(null);
 
     // Derive tree roots from actual music paths; fall back to VDJ folder
     const treeRoots = useMemo(
@@ -47,6 +49,10 @@ export function BatchOperations() {
     }, []);
     const selectAll = useCallback(() => setSelected(new Set(songs.map((s) => s.index))), [songs]);
     const deselectAll = useCallback(() => setSelected(new Set()), []);
+    const selectedPaths = useMemo(
+        () => songs.filter((song) => selected.has(song.index)).map((song) => song.file_path),
+        [selected, songs],
+    );
 
     async function pickTarget() {
         const folder = await open({ directory: true, title: "Seleccionar carpeta destino" });
@@ -64,9 +70,14 @@ export function BatchOperations() {
         if (!vdjFolder || selected.size === 0) return;
         const indices = Array.from(selected);
         try {
-            let result: DryRunResult;
             if (action === "move" && targetFolder) {
-                result = await dryRunMove(vdjFolder, indices, targetFolder);
+                setMoveReport(await planMoveFiles(vdjFolder, selectedPaths, targetFolder));
+                setDryResult(null);
+                return;
+            }
+            let result: DryRunResult;
+            if (action === "move") {
+                return;
             } else if (action === "rename") {
                 if (selected.size !== 1 || renameFileName.length === 0) return;
                 const song = songs.find((item) => item.index === indices[0]);
@@ -98,10 +109,16 @@ export function BatchOperations() {
         setRunning(true);
         setLog([]);
         setDryResult(null);
+        setMoveReport(null);
         try {
             const indices = Array.from(selected);
             if (action === "move" && targetFolder) {
-                setLog(await moveFilesOp(vdjFolder, indices, targetFolder));
+                const report = await moveFilesOp(vdjFolder, selectedPaths, targetFolder);
+                setMoveReport(report);
+                if (report.summary.completed > 0) {
+                    setSelected(new Set());
+                    await reload();
+                }
             } else if (action === "rename") {
                 if (selected.size !== 1 || renameFileName.length === 0) return;
                 const song = songs.find((item) => item.index === indices[0]);
@@ -123,7 +140,7 @@ export function BatchOperations() {
                 const results = indices.map((idx) => `OK: ${songs.find((x) => x.index === idx)?.file_name ?? idx}`);
                 setLog(results);
             }
-            if (action !== "rename") await reload();
+            if (action === "tag") await reload();
         } catch (err) {
             setError(String(err));
         } finally {
@@ -172,7 +189,7 @@ export function BatchOperations() {
                         { key: "tag", label: "Editar Tag" },
                     ] as const).map(({ key, label }) => (
                         <button key={key} type="button"
-                            onClick={() => { setAction(key); setDryResult(null); }}
+                            onClick={() => { setAction(key); setDryResult(null); setMoveReport(null); }}
                             className={`tab-item flex-1 ${action === key ? "tab-active" : ""}`}>
                             {label}
                         </button>
@@ -267,10 +284,10 @@ export function BatchOperations() {
                         <span className="text-[13px] text-text-muted">{selected.size} canciones seleccionadas</span>
                         <div className="flex gap-2">
                             <button type="button" onClick={runDryRun}
-                                disabled={running || selected.size === 0 || (action === "rename" && (selected.size !== 1 || renameFileName.length === 0)) || (action === "tag" && running_tag_fields.length === 0)}
+                                disabled={running || selected.size === 0 || (action === "move" && targetFolder.length === 0) || (action === "rename" && (selected.size !== 1 || renameFileName.length === 0)) || (action === "tag" && running_tag_fields.length === 0)}
                                 className="btn btn-warning">Vista Previa</button>
                             <button type="button" onClick={execute}
-                                disabled={running || selected.size === 0 || (action === "rename" && (selected.size !== 1 || renameFileName.length === 0)) || (action === "tag" && running_tag_fields.length === 0)}
+                                disabled={running || selected.size === 0 || (action === "move" && targetFolder.length === 0) || (action === "rename" && (selected.size !== 1 || renameFileName.length === 0)) || (action === "tag" && running_tag_fields.length === 0)}
                                 className="btn btn-primary">
                                 {running ? "Ejecutando..." : "Ejecutar"}
                             </button>
@@ -294,6 +311,27 @@ export function BatchOperations() {
                                     {line}
                                 </div>
                             ))}
+                        </div>
+                    </div>
+                )}
+
+                {moveReport && (
+                    <div className="card space-y-2 border-info/30 bg-info/5 p-3">
+                        <div className="flex items-center justify-between gap-3">
+                            <h4 className="text-xs font-bold text-info">Reporte de movimiento</h4>
+                            <span className="text-[11px] text-text-muted">
+                                {moveReport.summary.completed} completados · {moveReport.summary.ready} listos · {moveReport.summary.blocked} bloqueados · {moveReport.summary.manualReview} revisión manual
+                            </span>
+                        </div>
+                        <div className="max-h-52 overflow-auto rounded-[5px] border-2 border-border bg-surface p-2">
+                            {moveReport.items.map((item) => {
+                                const method = transferMethodLabel(item.transferMethod);
+                                return (
+                                    <div key={`${item.originalFilePath}:${item.targetFilePath}`} className={`text-[11px] ${item.status === "db_committed" || item.status === "ready" ? "text-success" : item.status === "manual_review_required" ? "text-error" : "text-warning"}`}>
+                                        {moveStatusLabel(item.status)} · {item.originalFilePath} → {item.targetFilePath || "—"}{method ? ` · ${method}` : ""}{item.message ? ` — ${item.message}` : ""}
+                                    </div>
+                                );
+                            })}
                         </div>
                     </div>
                 )}

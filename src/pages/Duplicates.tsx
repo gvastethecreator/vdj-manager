@@ -3,8 +3,9 @@ import { open } from "@tauri-apps/plugin-dialog";
 import { useApp } from "../App";
 import { findDuplicates, getDirectory, removeLibraryEntries, moveFilesOp } from "../lib/api";
 import { dedupeRemovalPaths, removalStatusLabel, summarizeRemoval } from "../lib/libraryRemoval";
+import { moveStatusLabel, transferMethodLabel } from "../lib/moveReport";
 import { SongMiniTable } from "../components/SongTable";
-import type { DuplicateResult, DuplicateGroup, LibraryRemovalResult } from "../types/database";
+import type { DuplicateResult, DuplicateGroup, LibraryRemovalResult, MoveBatchReport } from "../types/database";
 
 type DupTab = "by_name" | "by_size" | "by_hash";
 
@@ -25,25 +26,26 @@ export function Duplicates() {
     // Action state
     const [deleteModal, setDeleteModal] = useState<DeleteModal>({ open: false });
     const [actionRunning, setActionRunning] = useState(false);
-    const [actionLog, setActionLog] = useState<string[]>([]);
     const [removalResults, setRemovalResults] = useState<LibraryRemovalResult[]>([]);
+    const [moveReport, setMoveReport] = useState<MoveBatchReport | null>(null);
 
     async function moveSelected() {
         if (!vdjFolder || selected.size === 0) return;
         const folder = await open({ directory: true, title: "Mover archivos seleccionados a…" });
         if (!folder) return;
         setActionRunning(true);
-        setActionLog([]);
         setRemovalResults([]);
         try {
-            const log = await moveFilesOp(vdjFolder, Array.from(selected), folder);
-            setActionLog(log);
+            const report = await moveFilesOp(vdjFolder, selectedPaths, folder);
+            setMoveReport(report);
             setSelected(new Set());
-            await reload();
-            await runScan();
+            if (report.summary.completed > 0) await reload();
+            setLoading(true);
+            setResult(await findDuplicates(vdjFolder));
         } catch (err) {
             setError(String(err));
         } finally {
+            setLoading(false);
             setActionRunning(false);
         }
     }
@@ -52,8 +54,8 @@ export function Duplicates() {
         setLoading(true);
         setResult(null);
         setSelected(new Set());
-        setActionLog([]);
         setRemovalResults([]);
+        setMoveReport(null);
         try {
             const r = await findDuplicates(vdjFolder);
             setResult(r);
@@ -154,7 +156,7 @@ export function Duplicates() {
         if (!vdjFolder || selectedPaths.length === 0) return;
         setDeleteModal({ open: false });
         setActionRunning(true);
-        setActionLog([]);
+        setMoveReport(null);
         try {
             const outcomes = await removeLibraryEntries(
                 vdjFolder,
@@ -273,14 +275,19 @@ export function Duplicates() {
                         </div>
                     )}
 
-                    {/* Action log */}
-                    {actionLog.length > 0 && (
-                        <div className="max-h-40 overflow-auto rounded-lg border border-border bg-surface p-2.5">
-                            {actionLog.map((line, i) => (
-                                <div key={i} className={`text-[11px] ${line.startsWith("✓") ? "text-success" : line.startsWith("⚠") ? "text-warning" : "text-text-secondary"}`}>
-                                    {line}
-                                </div>
-                            ))}
+                    {moveReport && (
+                        <div className="max-h-48 overflow-auto rounded-lg border border-border bg-surface p-2.5">
+                            <div className="mb-2 text-[11px] font-semibold text-text">
+                                Movimiento: {moveReport.summary.completed} completados · {moveReport.summary.blocked} bloqueados · {moveReport.summary.manualReview} revisión manual
+                            </div>
+                            {moveReport.items.map((item) => {
+                                const method = transferMethodLabel(item.transferMethod);
+                                return (
+                                    <div key={`${item.originalFilePath}:${item.targetFilePath}`} className={`text-[11px] ${item.status === "db_committed" ? "text-success" : item.status === "manual_review_required" ? "text-error" : "text-warning"}`}>
+                                        {moveStatusLabel(item.status)} · {item.originalFilePath} → {item.targetFilePath || "—"}{method ? ` · ${method}` : ""}{item.message ? ` — ${item.message}` : ""}
+                                    </div>
+                                );
+                            })}
                         </div>
                     )}
 

@@ -8,7 +8,6 @@ use crate::database::parser;
 use crate::mutation_journal::{
     MutationJournalItem, MutationJournalPhase, MutationJournalStore, MutationOperationKind,
 };
-use crate::safety;
 
 use serde::{Deserialize, Serialize};
 use tauri::Manager;
@@ -665,82 +664,696 @@ where
     }
 }
 
-/// Move selected files to a target folder and update the database
+#[derive(Debug, Clone, Deserialize)]
+#[serde(rename_all = "camelCase")]
+pub struct MoveBatchRequest {
+    pub vdj_folder: String,
+    pub original_file_paths: Vec<String>,
+    pub target_folder: String,
+}
+
+#[derive(Debug, Clone, Copy, PartialEq, Eq, Serialize)]
+#[serde(rename_all = "snake_case")]
+pub enum MoveItemStatus {
+    Ready,
+    FailedValidation,
+    TargetConflict,
+    FsMoved,
+    DbCommitted,
+    RolledBack,
+    ManualReviewRequired,
+}
+
+#[derive(Debug, Clone, Copy, PartialEq, Eq, Serialize)]
+#[serde(rename_all = "snake_case")]
+pub enum MoveTransferMethod {
+    Rename,
+    CopyDelete,
+}
+
+#[derive(Debug, Clone, Serialize)]
+#[serde(rename_all = "camelCase")]
+pub struct MoveItemResult {
+    pub original_file_path: String,
+    pub target_file_path: String,
+    pub status: MoveItemStatus,
+    pub message: Option<String>,
+    pub journal_id: Option<String>,
+    pub transfer_method: Option<MoveTransferMethod>,
+}
+
+#[derive(Debug, Clone, Default, Serialize)]
+#[serde(rename_all = "camelCase")]
+pub struct MoveBatchSummary {
+    pub total: usize,
+    pub ready: usize,
+    pub completed: usize,
+    pub blocked: usize,
+    pub manual_review: usize,
+}
+
+#[derive(Debug, Clone, Serialize)]
+#[serde(rename_all = "camelCase")]
+pub struct MoveBatchReport {
+    pub summary: MoveBatchSummary,
+    pub items: Vec<MoveItemResult>,
+}
+
+#[derive(Debug, Clone)]
+struct PlannedMoveItem {
+    result: MoveItemResult,
+    source_path: Option<PathBuf>,
+    target_path: Option<PathBuf>,
+}
+
+fn filesystem_entry_exists(path: &Path) -> bool {
+    match std::fs::symlink_metadata(path) {
+        Ok(_) => true,
+        Err(error) => error.kind() != std::io::ErrorKind::NotFound,
+    }
+}
+
+fn validate_regular_file(path: &Path) -> Result<(), String> {
+    if !path.is_absolute() {
+        return Err("La ruta origen debe ser absoluta".to_string());
+    }
+    let metadata = std::fs::symlink_metadata(path)
+        .map_err(|error| format!("No se pudo validar el archivo origen: {error}"))?;
+    if metadata.file_type().is_symlink() || !metadata.file_type().is_file() {
+        return Err("El origen debe ser un archivo regular, no un enlace o directorio".to_string());
+    }
+    #[cfg(windows)]
+    {
+        use std::os::windows::fs::MetadataExt;
+        use windows_sys::Win32::Storage::FileSystem::FILE_ATTRIBUTE_REPARSE_POINT;
+        if metadata.file_attributes() & FILE_ATTRIBUTE_REPARSE_POINT != 0 {
+            return Err("El origen es un reparse point y requiere revisión manual".to_string());
+        }
+    }
+    Ok(())
+}
+
+fn validate_target_directory(path: &Path) -> Result<(), String> {
+    if !path.is_absolute() {
+        return Err("La carpeta destino debe ser absoluta".to_string());
+    }
+    let metadata = std::fs::symlink_metadata(path)
+        .map_err(|error| format!("No se pudo validar la carpeta destino: {error}"))?;
+    if metadata.file_type().is_symlink() || !metadata.file_type().is_dir() {
+        return Err("El destino debe ser un directorio existente y no puede ser un enlace".to_string());
+    }
+    #[cfg(windows)]
+    {
+        use std::os::windows::fs::MetadataExt;
+        use windows_sys::Win32::Storage::FileSystem::FILE_ATTRIBUTE_REPARSE_POINT;
+        if metadata.file_attributes() & FILE_ATTRIBUTE_REPARSE_POINT != 0 {
+            return Err("La carpeta destino es un reparse point y requiere revisión manual".to_string());
+        }
+    }
+    Ok(())
+}
+
+fn build_move_plan(request: &MoveBatchRequest) -> Result<Vec<PlannedMoveItem>, String> {
+    let library_path = PathBuf::from(&request.vdj_folder);
+    let database_path = library_path.join("database.xml");
+    let database = parser::parse_database(&database_path)?;
+    let target_folder = PathBuf::from(&request.target_folder);
+    let target_error = if !library_path.is_absolute() {
+        Some("vdjFolder debe ser una ruta absoluta".to_string())
+    } else {
+        validate_target_directory(&target_folder).err()
+    };
+    let mut seen = HashSet::new();
+    let mut planned = Vec::new();
+
+    for original_file_path in &request.original_file_paths {
+        let key = path_key(original_file_path);
+        if !seen.insert(key) {
+            continue;
+        }
+        let blocked = |message: String| PlannedMoveItem {
+            result: MoveItemResult {
+                original_file_path: original_file_path.clone(),
+                target_file_path: String::new(),
+                status: MoveItemStatus::FailedValidation,
+                message: Some(message),
+                journal_id: None,
+                transfer_method: None,
+            },
+            source_path: None,
+            target_path: None,
+        };
+        if original_file_path.trim().is_empty() {
+            planned.push(blocked("originalFilePath es obligatorio".to_string()));
+            continue;
+        }
+        if let Some(message) = &target_error {
+            planned.push(blocked(message.clone()));
+            continue;
+        }
+
+        let matches: Vec<&Song> = database
+            .songs
+            .iter()
+            .filter(|song| parser::windows_paths_equal(&song.file_path, original_file_path))
+            .collect();
+        if matches.len() != 1 {
+            planned.push(blocked(if matches.is_empty() {
+                "No se encontró la entrada por originalFilePath".to_string()
+            } else {
+                "originalFilePath coincide con varias entradas".to_string()
+            }));
+            continue;
+        }
+
+        let source_path = PathBuf::from(&matches[0].file_path);
+        if let Err(message) = validate_regular_file(&source_path) {
+            planned.push(blocked(message));
+            continue;
+        }
+        let Some(file_name) = source_path.file_name() else {
+            planned.push(blocked("El origen no tiene nombre de archivo".to_string()));
+            continue;
+        };
+        let target_path = target_folder.join(file_name);
+        if parser::windows_paths_equal(
+            &source_path.to_string_lossy(),
+            &target_path.to_string_lossy(),
+        ) {
+            planned.push(blocked("El movimiento sería un no-op".to_string()));
+            continue;
+        }
+        let target_file_path = target_path.to_string_lossy().to_string();
+        let target_conflict = filesystem_entry_exists(&target_path);
+        planned.push(PlannedMoveItem {
+            result: MoveItemResult {
+                original_file_path: original_file_path.clone(),
+                target_file_path,
+                status: if target_conflict {
+                    MoveItemStatus::TargetConflict
+                } else {
+                    MoveItemStatus::Ready
+                },
+                message: target_conflict.then(|| "Ya existe una entrada en el destino".to_string()),
+                journal_id: None,
+                transfer_method: None,
+            },
+            source_path: Some(source_path),
+            target_path: Some(target_path),
+        });
+    }
+
+    let mut target_counts: HashMap<String, usize> = HashMap::new();
+    for item in planned.iter().filter(|item| item.result.status == MoveItemStatus::Ready) {
+        *target_counts.entry(path_key(&item.result.target_file_path)).or_default() += 1;
+    }
+    for item in &mut planned {
+        if item.result.status == MoveItemStatus::Ready
+            && target_counts
+                .get(&path_key(&item.result.target_file_path))
+                .copied()
+                .unwrap_or_default()
+                > 1
+        {
+            item.result.status = MoveItemStatus::TargetConflict;
+            item.result.message = Some("Varios ítems del lote comparten el mismo destino".to_string());
+        }
+    }
+    Ok(planned)
+}
+
+fn summarize_move_items(items: &[MoveItemResult]) -> MoveBatchSummary {
+    MoveBatchSummary {
+        total: items.len(),
+        ready: items.iter().filter(|item| item.status == MoveItemStatus::Ready).count(),
+        completed: items
+            .iter()
+            .filter(|item| item.status == MoveItemStatus::DbCommitted)
+            .count(),
+        blocked: items
+            .iter()
+            .filter(|item| {
+                matches!(
+                    item.status,
+                    MoveItemStatus::FailedValidation
+                        | MoveItemStatus::TargetConflict
+                        | MoveItemStatus::RolledBack
+                )
+            })
+            .count(),
+        manual_review: items
+            .iter()
+            .filter(|item| item.status == MoveItemStatus::ManualReviewRequired)
+            .count(),
+    }
+}
+
+fn public_move_report(planned: &[PlannedMoveItem]) -> MoveBatchReport {
+    let items: Vec<MoveItemResult> = planned.iter().map(|item| item.result.clone()).collect();
+    MoveBatchReport {
+        summary: summarize_move_items(&items),
+        items,
+    }
+}
+
+fn close_unapplied_move_item(
+    store: &MutationJournalStore,
+    library: &str,
+    journal_id: &str,
+    item_id: &str,
+    result: &mut MoveItemResult,
+    status: MoveItemStatus,
+    message: String,
+) {
+    match store.transition_item(
+        library,
+        journal_id,
+        item_id,
+        MutationJournalPhase::RolledBack,
+    ) {
+        Ok(_) => {
+            result.status = status;
+            result.message = Some(message);
+        }
+        Err(error) => {
+            let (phase, message) = persist_manual_review_or_report_actual(
+                store,
+                library,
+                journal_id,
+                item_id,
+                MutationJournalPhase::Planned,
+                format!("{message}; no se pudo cerrar rolled_back: {error}"),
+            );
+            result.status = MoveItemStatus::ManualReviewRequired;
+            result.message = Some(format!("fase journal={phase:?}: {message}"));
+        }
+    }
+}
+
+#[tauri::command]
+pub async fn plan_move_files(request: MoveBatchRequest) -> Result<MoveBatchReport, String> {
+    build_move_plan(&request).map(|planned| public_move_report(&planned))
+}
+
+#[derive(Debug, Clone, Copy, PartialEq, Eq)]
+enum MoveTransferFailureKind {
+    TargetConflict,
+    CleanFailure,
+    Uncertain,
+}
+
+#[derive(Debug, Clone)]
+struct MoveTransferFailure {
+    kind: MoveTransferFailureKind,
+    message: String,
+}
+
+impl std::fmt::Display for MoveTransferFailure {
+    fn fmt(&self, formatter: &mut std::fmt::Formatter<'_>) -> std::fmt::Result {
+        formatter.write_str(&self.message)
+    }
+}
+
+impl MoveTransferFailure {
+    fn clean(message: impl Into<String>) -> Self {
+        Self { kind: MoveTransferFailureKind::CleanFailure, message: message.into() }
+    }
+
+    fn conflict(message: impl Into<String>) -> Self {
+        Self { kind: MoveTransferFailureKind::TargetConflict, message: message.into() }
+    }
+
+    fn uncertain(message: impl Into<String>) -> Self {
+        Self { kind: MoveTransferFailureKind::Uncertain, message: message.into() }
+    }
+}
+
+fn cleanup_copy_failure(to: &Path, message: String) -> MoveTransferFailure {
+    match std::fs::remove_file(to) {
+        Ok(()) => MoveTransferFailure::clean(message),
+        Err(cleanup_error) => MoveTransferFailure::uncertain(format!(
+            "{message}; además no se pudo limpiar la copia: {cleanup_error}"
+        )),
+    }
+}
+
+fn copy_delete_no_replace(from: &Path, to: &Path) -> Result<(), MoveTransferFailure> {
+    use std::io::Write;
+    let mut source = std::fs::File::open(from)
+        .map_err(|error| MoveTransferFailure::clean(error.to_string()))?;
+    let mut target = std::fs::OpenOptions::new()
+        .write(true)
+        .create_new(true)
+        .open(to)
+        .map_err(|error| {
+            if filesystem_entry_exists(to) {
+                MoveTransferFailure::conflict(error.to_string())
+            } else {
+                MoveTransferFailure::clean(error.to_string())
+            }
+        })?;
+    let copy_result = std::io::copy(&mut source, &mut target)
+        .and_then(|_| target.flush())
+        .and_then(|_| target.sync_all());
+    if let Err(error) = copy_result {
+        drop(target);
+        return Err(cleanup_copy_failure(to, error.to_string()));
+    }
+    let source_len = match source.metadata() {
+        Ok(metadata) => metadata.len(),
+        Err(error) => {
+            drop(target);
+            return Err(cleanup_copy_failure(
+                to,
+                format!("No se pudo validar el origen copiado: {error}"),
+            ));
+        }
+    };
+    let target_len = match target.metadata() {
+        Ok(metadata) => metadata.len(),
+        Err(error) => {
+            drop(target);
+            return Err(cleanup_copy_failure(
+                to,
+                format!("No se pudo validar la copia: {error}"),
+            ));
+        }
+    };
+    drop(target);
+    if source_len != target_len {
+        return Err(cleanup_copy_failure(
+            to,
+            "La copia no conserva el tamaño del archivo".to_string(),
+        ));
+    }
+    if let Err(error) = std::fs::remove_file(from) {
+        return Err(cleanup_copy_failure(
+            to,
+            format!("No se pudo remover el origen después de copiar: {error}"),
+        ));
+    }
+    Ok(())
+}
+
+fn transfer_file_no_replace(
+    from: &Path,
+    to: &Path,
+) -> Result<MoveTransferMethod, MoveTransferFailure> {
+    let target_parent = to
+        .parent()
+        .ok_or_else(|| MoveTransferFailure::clean("El destino no tiene directorio padre"))?;
+    validate_target_directory(target_parent).map_err(MoveTransferFailure::clean)?;
+    match rename_without_replace(from, to) {
+        Ok(()) => Ok(MoveTransferMethod::Rename),
+        Err(rename_error) => {
+            if filesystem_entry_exists(to) {
+                return Err(MoveTransferFailure::conflict(format!(
+                    "El destino apareció durante el movimiento: {rename_error}"
+                )));
+            }
+            copy_delete_no_replace(from, to)
+                .map(|()| MoveTransferMethod::CopyDelete)
+                .map_err(|mut copy_error| {
+                    copy_error.message = format!(
+                        "Falló rename ({rename_error}) y fallback copy-delete ({})",
+                        copy_error.message
+                    );
+                    copy_error
+                })
+        }
+    }
+}
+
 #[tauri::command]
 pub async fn move_files_op(
-    vdj_folder: String,
-    song_indices: Vec<usize>,
-    target_folder: String,
-) -> Result<Vec<String>, String> {
-    let db_path = PathBuf::from(&vdj_folder).join("database.xml");
-    let mut db = parser::parse_database(&db_path)?;
-    let target = PathBuf::from(&target_folder);
-
-    if !target.exists() {
-        std::fs::create_dir_all(&target)
-            .map_err(|e| format!("Error al crear directorio destino: {}", e))?;
-    }
-
-    let mut results = Vec::new();
-
-    for &idx in &song_indices {
-        if idx >= db.songs.len() {
-            results.push(format!("Índice {} fuera de rango", idx));
-            continue;
-        }
-
-        let old_path = PathBuf::from(&db.songs[idx].file_path);
-        if !old_path.exists() {
-            results.push(format!("No existe: {}", old_path.display()));
-            continue;
-        }
-
-        let file_name = old_path
-            .file_name()
-            .ok_or("Sin nombre de archivo")?;
-        let new_path = target.join(file_name);
-
-        if new_path.exists() {
-            results.push(format!("Ya existe en destino: {}", new_path.display()));
-            continue;
-        }
-
-        match std::fs::rename(&old_path, &new_path) {
-            Ok(_) => {
-                db.songs[idx].file_path = new_path.to_string_lossy().to_string();
-                results.push(format!("OK: {}", new_path.display()));
+    app: tauri::AppHandle,
+    request: MoveBatchRequest,
+) -> Result<MoveBatchReport, String> {
+    let app_data_dir = app
+        .path()
+        .app_data_dir()
+        .map_err(|error| format!("No se pudo resolver app-data para el journal: {error}"))?;
+    let store = MutationJournalStore::new(app_data_dir);
+    execute_move_batch_with_hooks(
+        &store,
+        request,
+        transfer_file_no_replace,
+        |database_path, original, target| {
+            let result = parser::patch_song_path_in_place(database_path, original, target)?;
+            if result.status == RelinkFileStatus::Completed {
+                Ok(())
+            } else {
+                Err(result
+                    .message
+                    .unwrap_or_else(|| format!("El patch de database.xml terminó en {:?}", result.status)))
             }
-            Err(e) => {
-                // Cross-drive move: copy + delete
-                match std::fs::copy(&old_path, &new_path) {
-                    Ok(_) => {
-                        match std::fs::remove_file(&old_path) {
-                            Ok(()) => {
-                                db.songs[idx].file_path = new_path.to_string_lossy().to_string();
-                                results.push(format!("OK (copiado): {}", new_path.display()));
-                            }
-                            Err(remove_err) => {
-                                let _ = std::fs::remove_file(&new_path);
-                                results.push(format!(
-                                    "Error removiendo original tras copiar {}: {}",
-                                    old_path.display(),
-                                    remove_err
-                                ));
-                            }
-                        }
-                    }
-                    Err(_) => {
-                        results.push(format!("Error moviendo {}: {}", old_path.display(), e));
-                    }
+        },
+    )
+}
+
+fn execute_move_batch_with_hooks<T, P>(
+    store: &MutationJournalStore,
+    request: MoveBatchRequest,
+    mut transfer: T,
+    mut patch: P,
+) -> Result<MoveBatchReport, String>
+where
+    T: FnMut(&Path, &Path) -> Result<MoveTransferMethod, MoveTransferFailure>,
+    P: FnMut(&Path, &str, &str) -> Result<(), String>,
+{
+    let mut planned = build_move_plan(&request)?;
+    let ready_indices: Vec<usize> = planned
+        .iter()
+        .enumerate()
+        .filter_map(|(index, item)| (item.result.status == MoveItemStatus::Ready).then_some(index))
+        .collect();
+    if ready_indices.is_empty() {
+        return Ok(public_move_report(&planned));
+    }
+    let journal_items: Vec<MutationJournalItem> = ready_indices
+        .iter()
+        .map(|index| {
+            MutationJournalItem::new(
+                planned[*index]
+                    .source_path
+                    .as_ref()
+                    .expect("ready item has source")
+                    .to_string_lossy(),
+                Some(
+                    planned[*index]
+                        .target_path
+                        .as_ref()
+                        .expect("ready item has target")
+                        .to_string_lossy(),
+                ),
+            )
+        })
+        .collect();
+    let operation = match store.plan_operation(
+        &request.vdj_folder,
+        MutationOperationKind::Move,
+        journal_items,
+    ) {
+        Ok(operation) => operation,
+        Err(error) => {
+            for index in ready_indices {
+                planned[index].result.status = MoveItemStatus::ManualReviewRequired;
+                planned[index].result.message = Some(format!("No se pudo crear el journal: {error}"));
+            }
+            return Ok(public_move_report(&planned));
+        }
+    };
+    let database_path = PathBuf::from(&request.vdj_folder).join("database.xml");
+
+    for (position, index) in ready_indices.into_iter().enumerate() {
+        let source = planned[index].source_path.clone().expect("ready source");
+        let target = planned[index].target_path.clone().expect("ready target");
+        let journal_item = &operation.items[position];
+        planned[index].result.journal_id = Some(operation.journal_id.clone());
+
+        if let Err(error) = validate_regular_file(&source) {
+            close_unapplied_move_item(
+                store,
+                &request.vdj_folder,
+                &operation.journal_id,
+                &journal_item.item_id,
+                &mut planned[index].result,
+                MoveItemStatus::FailedValidation,
+                error,
+            );
+            continue;
+        }
+        if let Err(error) = validate_target_directory(Path::new(&request.target_folder)) {
+            close_unapplied_move_item(
+                store,
+                &request.vdj_folder,
+                &operation.journal_id,
+                &journal_item.item_id,
+                &mut planned[index].result,
+                MoveItemStatus::FailedValidation,
+                format!("La carpeta destino cambió después del preflight: {error}"),
+            );
+            continue;
+        }
+        if filesystem_entry_exists(&target) {
+            close_unapplied_move_item(
+                store,
+                &request.vdj_folder,
+                &operation.journal_id,
+                &journal_item.item_id,
+                &mut planned[index].result,
+                MoveItemStatus::TargetConflict,
+                "El destino apareció después del preflight".to_string(),
+            );
+            continue;
+        }
+
+        let transfer_method = match transfer(&source, &target) {
+            Ok(method) => method,
+            Err(error) => {
+                if error.kind == MoveTransferFailureKind::Uncertain {
+                    let (phase, message) = persist_manual_review_or_report_actual(
+                        store,
+                        &request.vdj_folder,
+                        &operation.journal_id,
+                        &journal_item.item_id,
+                        MutationJournalPhase::Planned,
+                        format!("El transfer falló con estado físico incierto: {}", error.message),
+                    );
+                    planned[index].result.status = MoveItemStatus::ManualReviewRequired;
+                    planned[index].result.message = Some(format!("fase journal={phase:?}: {message}"));
+                } else {
+                    let status = if error.kind == MoveTransferFailureKind::TargetConflict {
+                        MoveItemStatus::TargetConflict
+                    } else {
+                        MoveItemStatus::RolledBack
+                    };
+                    close_unapplied_move_item(
+                        store,
+                        &request.vdj_folder,
+                        &operation.journal_id,
+                        &journal_item.item_id,
+                        &mut planned[index].result,
+                        status,
+                        error.message,
+                    );
+                }
+                continue;
+            }
+        };
+        planned[index].result.status = MoveItemStatus::FsMoved;
+        planned[index].result.transfer_method = Some(transfer_method);
+
+        if let Err(error) = store.transition_item(
+            &request.vdj_folder,
+            &operation.journal_id,
+            &journal_item.item_id,
+            MutationJournalPhase::FsApplied,
+        ) {
+            let rollback = transfer(&target, &source);
+            match rollback {
+                Ok(_) => close_unapplied_move_item(
+                    store,
+                    &request.vdj_folder,
+                    &operation.journal_id,
+                    &journal_item.item_id,
+                    &mut planned[index].result,
+                    MoveItemStatus::RolledBack,
+                    format!("No se pudo persistir fs_applied ({error}); archivo revertido"),
+                ),
+                Err(rollback_error) => {
+                    let (phase, message) = persist_manual_review_or_report_actual(
+                        store,
+                        &request.vdj_folder,
+                        &operation.journal_id,
+                        &journal_item.item_id,
+                        MutationJournalPhase::Planned,
+                        format!(
+                            "No se pudo persistir fs_applied ({error}) ni revertir el archivo ({rollback_error})"
+                        ),
+                    );
+                    planned[index].result.status = MoveItemStatus::ManualReviewRequired;
+                    planned[index].result.message =
+                        Some(format!("fase journal={phase:?}: {message}"));
                 }
             }
+            continue;
+        }
+
+        if let Err(error) = patch(
+            &database_path,
+            &source.to_string_lossy(),
+            &target.to_string_lossy(),
+        ) {
+            match transfer(&target, &source) {
+                Ok(_) => match store.transition_item(
+                    &request.vdj_folder,
+                    &operation.journal_id,
+                    &journal_item.item_id,
+                    MutationJournalPhase::RolledBack,
+                ) {
+                    Ok(_) => {
+                        planned[index].result.status = MoveItemStatus::RolledBack;
+                        planned[index].result.message = Some(format!(
+                            "Falló database.xml y el archivo fue revertido: {error}"
+                        ));
+                    }
+                    Err(journal_error) => {
+                        let (phase, message) = persist_manual_review_or_report_actual(
+                            store,
+                            &request.vdj_folder,
+                            &operation.journal_id,
+                            &journal_item.item_id,
+                            MutationJournalPhase::FsApplied,
+                            format!(
+                                "Archivo revertido, pero falló rolled_back ({journal_error}); DB={error}"
+                            ),
+                        );
+                        planned[index].result.status = MoveItemStatus::ManualReviewRequired;
+                        planned[index].result.message = Some(format!("fase journal={phase:?}: {message}"));
+                    }
+                },
+                Err(rollback_error) => {
+                    let (phase, message) = persist_manual_review_or_report_actual(
+                        store,
+                        &request.vdj_folder,
+                        &operation.journal_id,
+                        &journal_item.item_id,
+                        MutationJournalPhase::FsApplied,
+                        format!("Falló DB ({error}) y rollback físico ({rollback_error})"),
+                    );
+                    planned[index].result.status = MoveItemStatus::ManualReviewRequired;
+                    planned[index].result.message = Some(format!("fase journal={phase:?}: {message}"));
+                }
+            }
+            continue;
+        }
+
+        match store.transition_item(
+            &request.vdj_folder,
+            &operation.journal_id,
+            &journal_item.item_id,
+            MutationJournalPhase::Completed,
+        ) {
+            Ok(_) => {
+                planned[index].result.status = MoveItemStatus::DbCommitted;
+                planned[index].result.message = None;
+            }
+            Err(error) => {
+                let (phase, message) = persist_manual_review_or_report_actual(
+                    store,
+                    &request.vdj_folder,
+                    &operation.journal_id,
+                    &journal_item.item_id,
+                    MutationJournalPhase::FsApplied,
+                    format!("Filesystem y DB aplicados; no se pudo cerrar completed: {error}"),
+                );
+                planned[index].result.status = MoveItemStatus::ManualReviewRequired;
+                planned[index].result.message = Some(format!("fase journal={phase:?}: {message}"));
+            }
         }
     }
-
-    safety::create_timestamped_backup(&db_path, "database")?;
-    parser::write_database_checked(&db_path, &db)?;
-
-    Ok(results)
+    Ok(public_move_report(&planned))
 }
 
 /// Find audio files on disk that are NOT in the database
@@ -1235,56 +1848,6 @@ pub struct DryRunResult {
 }
 
 #[tauri::command]
-pub async fn dry_run_move(
-    vdj_folder: String,
-    song_indices: Vec<usize>,
-    target_folder: String,
-) -> Result<DryRunResult, String> {
-    let db_path = PathBuf::from(&vdj_folder).join("database.xml");
-    let db = parser::parse_database(&db_path)?;
-    let target = PathBuf::from(&target_folder);
-
-    let mut details = Vec::new();
-    let mut affected = 0usize;
-
-    for &idx in &song_indices {
-        if idx >= db.songs.len() {
-            details.push(format!("⚠ Índice {} fuera de rango", idx));
-            continue;
-        }
-        let old_path = PathBuf::from(&db.songs[idx].file_path);
-        let file_name = old_path.file_name().unwrap_or_default();
-        let new_path = target.join(file_name);
-
-        if !old_path.exists() {
-            details.push(format!("⚠ No existe: {}", old_path.display()));
-        } else if new_path.exists() {
-            details.push(format!(
-                "⚠ Ya existe en destino: {}",
-                new_path.display()
-            ));
-        } else {
-            details.push(format!(
-                "✓ {} → {}",
-                old_path.display(),
-                new_path.display()
-            ));
-            affected += 1;
-        }
-    }
-
-    Ok(DryRunResult {
-        description: format!(
-            "Mover {} archivo(s) a {}",
-            song_indices.len(),
-            target_folder
-        ),
-        affected_count: affected,
-        details,
-    })
-}
-
-#[tauri::command]
 pub async fn dry_run_rename(
     vdj_folder: String,
     song_indices: Vec<usize>,
@@ -1530,6 +2093,216 @@ mod tests {
             original_file_path: source.to_string_lossy().to_string(),
             new_file_name: name.to_string(),
         }
+    }
+
+    fn move_fixture(
+        label: &str,
+        file_names: &[&str],
+    ) -> (PathBuf, PathBuf, PathBuf, PathBuf, Vec<PathBuf>) {
+        let root = unique_temp_dir(label);
+        let vdj_folder = root.join("VirtualDJ");
+        let app_data = root.join("app-data");
+        let music = root.join("music");
+        let target = root.join("target");
+        std::fs::create_dir_all(&vdj_folder).expect("vdj fixture should exist");
+        std::fs::create_dir_all(&music).expect("music fixture should exist");
+        std::fs::create_dir_all(&target).expect("target fixture should exist");
+        let mut files = Vec::new();
+        let mut songs = String::new();
+        for file_name in file_names {
+            let path = music.join(file_name);
+            std::fs::write(&path, format!("audio-{file_name}")).expect("audio fixture should write");
+            let xml_path = path.to_string_lossy().replace('&', "&amp;");
+            songs.push_str(&format!(r#"<Song FilePath="{xml_path}"/>"#));
+            files.push(path);
+        }
+        std::fs::write(
+            vdj_folder.join("database.xml"),
+            format!(r#"<VirtualDJ_Database>{songs}</VirtualDJ_Database>"#),
+        )
+        .expect("database fixture should write");
+        (root, vdj_folder, app_data, target, files)
+    }
+
+    fn move_request(vdj_folder: &Path, target: &Path, files: &[PathBuf]) -> MoveBatchRequest {
+        MoveBatchRequest {
+            vdj_folder: vdj_folder.to_string_lossy().to_string(),
+            original_file_paths: files
+                .iter()
+                .map(|path| path.to_string_lossy().to_string())
+                .collect(),
+            target_folder: target.to_string_lossy().to_string(),
+        }
+    }
+
+    #[test]
+    fn move_planner_reports_ready_missing_and_target_conflict_before_execution() {
+        let (root, vdj_folder, _app_data, target, files) =
+            move_fixture("move-plan-mixed", &["Ready.mp3", "Conflict.mp3"]);
+        let missing = root.join("music").join("Missing.mp3");
+        let db_path = vdj_folder.join("database.xml");
+        let xml = std::fs::read_to_string(&db_path).expect("database should read");
+        std::fs::write(
+            &db_path,
+            xml.replace(
+                "</VirtualDJ_Database>",
+                &format!(
+                    r#"<Song FilePath="{}"/></VirtualDJ_Database>"#,
+                    missing.to_string_lossy()
+                ),
+            ),
+        )
+        .expect("missing database entry should write");
+        std::fs::write(target.join("Conflict.mp3"), b"existing")
+            .expect("conflict fixture should write");
+        let mut requested = files.clone();
+        requested.push(missing);
+
+        let report = public_move_report(
+            &build_move_plan(&move_request(&vdj_folder, &target, &requested))
+                .expect("planner should return per-item results"),
+        );
+
+        assert_eq!(report.summary.total, 3);
+        assert_eq!(report.summary.ready, 1);
+        assert_eq!(report.summary.blocked, 2);
+        assert_eq!(report.items[0].status, MoveItemStatus::Ready);
+        assert_eq!(report.items[1].status, MoveItemStatus::TargetConflict);
+        assert_eq!(report.items[2].status, MoveItemStatus::FailedValidation);
+        assert!(files.iter().all(|path| path.exists()));
+        std::fs::remove_dir_all(root).expect("temporary fixture should be removed");
+    }
+
+    #[test]
+    fn move_executor_commits_only_ready_items_from_a_mixed_batch() {
+        let (root, vdj_folder, app_data, target, files) =
+            move_fixture("move-execute-mixed", &["Ready.mp3", "Conflict.mp3"]);
+        std::fs::write(target.join("Conflict.mp3"), b"existing")
+            .expect("conflict fixture should write");
+        let store = MutationJournalStore::new(&app_data);
+
+        let report = execute_move_batch_with_hooks(
+            &store,
+            move_request(&vdj_folder, &target, &files),
+            transfer_file_no_replace,
+            |database, original, destination| {
+                let result = parser::patch_song_path_in_place(database, original, destination)?;
+                (result.status == RelinkFileStatus::Completed)
+                    .then_some(())
+                    .ok_or_else(|| format!("patch status={:?}", result.status))
+            },
+        )
+        .expect("mixed batch should return a report");
+
+        assert_eq!(report.items[0].status, MoveItemStatus::DbCommitted);
+        assert_eq!(report.items[1].status, MoveItemStatus::TargetConflict);
+        assert!(!files[0].exists());
+        assert!(target.join("Ready.mp3").is_file());
+        assert!(files[1].is_file());
+        let database = parser::parse_database(&vdj_folder.join("database.xml"))
+            .expect("database should remain readable");
+        assert!(database.songs.iter().any(|song| {
+            parser::windows_paths_equal(&song.file_path, &target.join("Ready.mp3").to_string_lossy())
+        }));
+        assert_eq!(store.list_pending(&vdj_folder).expect("journal should load").len(), 0);
+        std::fs::remove_dir_all(root).expect("temporary fixture should be removed");
+    }
+
+    #[test]
+    fn move_executor_rolls_back_physical_file_when_database_patch_fails() {
+        let (root, vdj_folder, app_data, target, files) =
+            move_fixture("move-db-rollback", &["Track.mp3"]);
+        let store = MutationJournalStore::new(&app_data);
+
+        let report = execute_move_batch_with_hooks(
+            &store,
+            move_request(&vdj_folder, &target, &files),
+            transfer_file_no_replace,
+            |_database, _original, _destination| Err("injected DB failure".to_string()),
+        )
+        .expect("rollback should be a typed result");
+
+        assert_eq!(report.items[0].status, MoveItemStatus::RolledBack);
+        assert!(files[0].is_file());
+        assert!(!target.join("Track.mp3").exists());
+        assert_eq!(store.list_pending(&vdj_folder).expect("journal should load").len(), 0);
+        std::fs::remove_dir_all(root).expect("temporary fixture should be removed");
+    }
+
+    #[test]
+    fn move_executor_reports_copy_delete_transfer_method() {
+        let (root, vdj_folder, app_data, target, files) =
+            move_fixture("move-copy-delete", &["Track.mp3"]);
+        let store = MutationJournalStore::new(&app_data);
+
+        let report = execute_move_batch_with_hooks(
+            &store,
+            move_request(&vdj_folder, &target, &files),
+            |from, to| {
+                copy_delete_no_replace(from, to)?;
+                Ok(MoveTransferMethod::CopyDelete)
+            },
+            |database, original, destination| {
+                let result = parser::patch_song_path_in_place(database, original, destination)?;
+                (result.status == RelinkFileStatus::Completed)
+                    .then_some(())
+                    .ok_or_else(|| format!("patch status={:?}", result.status))
+            },
+        )
+        .expect("copy-delete should be reported");
+
+        assert_eq!(report.items[0].status, MoveItemStatus::DbCommitted);
+        assert_eq!(
+            report.items[0].transfer_method,
+            Some(MoveTransferMethod::CopyDelete)
+        );
+        std::fs::remove_dir_all(root).expect("temporary fixture should be removed");
+    }
+
+    #[test]
+    fn move_transfer_revalidates_target_directory_after_planning() {
+        let (root, _vdj_folder, _app_data, target, files) =
+            move_fixture("move-target-dir-race", &["Track.mp3"]);
+        std::fs::remove_dir(&target).expect("empty target fixture should be removable");
+        std::fs::write(&target, b"replacement entry").expect("replacement should write");
+
+        let error = transfer_file_no_replace(&files[0], &target.join("Track.mp3"))
+            .expect_err("replaced target directory must be rejected");
+
+        assert_eq!(error.kind, MoveTransferFailureKind::CleanFailure);
+        assert!(files[0].is_file());
+        assert_eq!(
+            std::fs::read(&target).expect("replacement should remain"),
+            b"replacement entry"
+        );
+        std::fs::remove_dir_all(root).expect("temporary fixture should be removed");
+    }
+
+    #[test]
+    fn move_uncertain_copy_cleanup_requires_manual_review() {
+        let (root, vdj_folder, app_data, target, files) =
+            move_fixture("move-copy-uncertain", &["Track.mp3"]);
+        let store = MutationJournalStore::new(&app_data);
+
+        let report = execute_move_batch_with_hooks(
+            &store,
+            move_request(&vdj_folder, &target, &files),
+            |_from, to| {
+                std::fs::write(to, b"partial copy").expect("partial target should write");
+                Err(MoveTransferFailure::uncertain("simulated cleanup failure"))
+            },
+            |_database, _original, _destination| Ok(()),
+        )
+        .expect("uncertain physical state should be typed");
+
+        assert_eq!(
+            report.items[0].status,
+            MoveItemStatus::ManualReviewRequired
+        );
+        assert!(files[0].is_file());
+        assert!(target.join("Track.mp3").is_file());
+        assert_eq!(store.list_pending(&vdj_folder).expect("journal should load").len(), 1);
+        std::fs::remove_dir_all(root).expect("temporary fixture should be removed");
     }
 
     #[test]

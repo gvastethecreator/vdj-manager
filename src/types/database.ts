@@ -279,6 +279,37 @@ export interface LibraryRemovalResult {
   message: string | null;
 }
 
+export type MoveItemStatus =
+  | "ready"
+  | "failed_validation"
+  | "target_conflict"
+  | "fs_moved"
+  | "db_committed"
+  | "rolled_back"
+  | "manual_review_required";
+
+export type MoveTransferMethod = "rename" | "copy_delete";
+
+export interface MoveItemResult {
+  originalFilePath: string;
+  targetFilePath: string;
+  status: MoveItemStatus;
+  message: string | null;
+  journalId: string | null;
+  transferMethod: MoveTransferMethod | null;
+}
+
+export interface MoveBatchReport {
+  summary: {
+    total: number;
+    ready: number;
+    completed: number;
+    blocked: number;
+    manualReview: number;
+  };
+  items: MoveItemResult[];
+}
+
 /** Preview result of a batch dry-run operation. */
 export interface DryRunResult {
   description: string;

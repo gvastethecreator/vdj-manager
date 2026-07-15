@@ -25,6 +25,7 @@ import type {
   RenameFileResult,
   LibraryRemovalMode,
   LibraryRemovalResult,
+  MoveBatchReport,
 } from "../types/database";
 import { compareDriveAwarePaths, getParentDirectory } from "./pathUtils";
 
@@ -158,22 +159,14 @@ export async function renameFileOp(
   });
 }
 
-/**
- * Move multiple songs to a target folder, updating database paths.
- * @param vdjFolder - VirtualDJ folder path
- * @param songIndices - Array of song indices to move
- * @param targetFolder - Destination directory
- * @returns Array of result strings per file ("OK: ..." or "Error: ...")
- */
+/** Execute the journaled per-item move plan using stable path identities. */
 export async function moveFilesOp(
   vdjFolder: string,
-  songIndices: number[],
+  originalFilePaths: string[],
   targetFolder: string
-): Promise<string[]> {
-  return invoke<string[]>("move_files_op", {
-    vdjFolder,
-    songIndices,
-    targetFolder,
+): Promise<MoveBatchReport> {
+  return invoke<MoveBatchReport>("move_files_op", {
+    request: { vdjFolder, originalFilePaths, targetFolder },
   });
 }
 
@@ -273,18 +266,14 @@ export async function listSubdirectories(
   return invoke<string[]>("list_subdirectories", { folderPath });
 }
 
-/**
- * Dry-run preview of a move operation.
- */
-export async function dryRunMove(
+/** Plan a batch move without applying filesystem or database changes. */
+export async function planMoveFiles(
   vdjFolder: string,
-  songIndices: number[],
+  originalFilePaths: string[],
   targetFolder: string
-): Promise<DryRunResult> {
-  return invoke<DryRunResult>("dry_run_move", {
-    vdjFolder,
-    songIndices,
-    targetFolder,
+): Promise<MoveBatchReport> {
+  return invoke<MoveBatchReport>("plan_move_files", {
+    request: { vdjFolder, originalFilePaths, targetFolder },
   });
 }
 
