@@ -326,6 +326,63 @@ pub struct FileVerification {
     pub actual_size: Option<u64>,
 }
 
+/// A structured candidate returned by the backend relink scorer.
+///
+/// The backend owns both the score and the ordering.  Consumers may decorate
+/// these values for display, but must not recompute or reorder them as a new
+/// source of truth.
+#[derive(Debug, Serialize, Clone)]
+#[serde(rename_all = "camelCase")]
+pub struct SimilarFileCandidate {
+    pub path: String,
+    pub score: i32,
+    pub reasons: Vec<String>,
+    pub same_extension: bool,
+    pub same_stem: bool,
+    pub same_name: bool,
+    pub size_match: bool,
+}
+
+/// Candidates for one missing database entry.
+#[derive(Debug, Serialize, Clone)]
+#[serde(rename_all = "camelCase")]
+pub struct SimilarFileMatch {
+    pub status: SimilarFileMatchStatus,
+    pub original_file_path: String,
+    pub candidates: Vec<SimilarFileCandidate>,
+    pub message: Option<String>,
+}
+
+#[derive(Debug, Serialize, Clone, Copy, PartialEq, Eq)]
+#[serde(rename_all = "snake_case")]
+pub enum SimilarFileMatchStatus {
+    Completed,
+    NotFound,
+    ManualReviewRequired,
+}
+
+/// Machine-readable result of a single-item path reconciliation.
+#[derive(Debug, Serialize, Clone, Copy, PartialEq, Eq)]
+#[serde(rename_all = "snake_case")]
+pub enum RelinkFileStatus {
+    Completed,
+    FailedValidation,
+    ReferenceCollision,
+    ManualReviewRequired,
+    NotFound,
+}
+
+#[derive(Debug, Serialize, Clone)]
+#[serde(rename_all = "camelCase")]
+pub struct RelinkFileResult {
+    pub status: RelinkFileStatus,
+    pub original_file_path: String,
+    pub new_file_path: String,
+    pub file_size: Option<u64>,
+    pub collision_path: Option<String>,
+    pub message: Option<String>,
+}
+
 #[derive(Debug, Serialize, Clone)]
 pub struct DuplicateGroup {
     pub key: String,

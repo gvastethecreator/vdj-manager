@@ -31,6 +31,7 @@ pub fn run() {
             files::move_files_op,
             files::find_orphan_files,
             files::find_similar_files,
+            files::find_relink_candidates,
             files::relocate_file,
             files::list_subdirectories,
             files::dry_run_move,

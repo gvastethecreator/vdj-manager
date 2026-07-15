@@ -2,10 +2,12 @@ use std::fs;
 use std::path::{Path, PathBuf};
 use std::time::{SystemTime, UNIX_EPOCH};
 
-use vdj_manager_lib::database::models::{InlineSongUpdate, Poi, Song, UpdateSongTagsStatus};
+use vdj_manager_lib::database::models::{
+    InlineSongUpdate, Poi, RelinkFileStatus, Song, UpdateSongTagsStatus,
+};
 use vdj_manager_lib::database::parser::{
-    normalize_windows_path, parse_database, patch_song_in_place, windows_paths_equal,
-    write_database_checked,
+    normalize_windows_path, parse_database, patch_song_in_place, patch_song_path_in_place,
+    windows_paths_equal, write_database_checked,
 };
 
 fn fixture(name: &str) -> PathBuf {
@@ -165,6 +167,64 @@ fn patch_song_in_place_reports_not_found_without_writing() {
     .expect("not-found should be represented as a typed result");
     assert!(matches!(result.status, UpdateSongTagsStatus::NotFound));
     assert_eq!(before, fs::read(&db_path).expect("DB should remain unchanged"));
+
+    fs::remove_dir_all(&dir).expect("temp dir should be removed");
+}
+
+#[test]
+fn patch_song_path_in_place_updates_path_and_size_without_serializer_loss() {
+    let dir = unique_temp_dir("database-relink-patch");
+    fs::create_dir_all(&dir).expect("temp dir should be created");
+    let db_path = dir.join("database.xml");
+    fs::copy(fixture("database_unknown_attrs.xml"), &db_path).expect("fixture should be copied");
+    let new_path = dir.join("Música").join("Destino.mp3");
+    fs::create_dir_all(new_path.parent().expect("target parent should exist"))
+        .expect("target parent should be created");
+    fs::write(&new_path, b"new audio bytes").expect("target fixture should be written");
+
+    let result = patch_song_path_in_place(
+        &db_path,
+        r"d:/music/unknown.mp3",
+        &new_path.to_string_lossy(),
+    )
+    .expect("path patch should return a typed result");
+    assert!(matches!(result.status, RelinkFileStatus::Completed));
+    assert_eq!(result.file_size, Some(15));
+
+    let output = fs::read_to_string(&db_path).expect("patched DB should be readable");
+    assert!(output.contains("FutureRoot=\"root-value\""));
+    assert!(output.contains("FutureSong=\"song-value\""));
+    assert!(output.contains("FutureTags=\"tags-value\""));
+    let reparsed = parse_database(&db_path).expect("patched DB should reparse");
+    assert_eq!(reparsed.songs[0].file_path, new_path.to_string_lossy());
+    assert_eq!(reparsed.songs[0].file_size, Some(15));
+
+    fs::remove_dir_all(&dir).expect("temp dir should be removed");
+}
+
+#[test]
+fn patch_song_path_in_place_uses_case_insensitive_unicode_matching() {
+    let dir = unique_temp_dir("database-relink-unicode");
+    fs::create_dir_all(&dir).expect("temp dir should be created");
+    let db_path = dir.join("database.xml");
+    let xml = r#"<VirtualDJ_Database><Song FilePath="D:\MÚSICA\Árbol.mp3" FileSize="1" Future="keep"/></VirtualDJ_Database>"#;
+    fs::write(&db_path, xml).expect("unicode fixture should be written");
+    let target = dir.join("Nueva").join("Árbol.mp3");
+    fs::create_dir_all(target.parent().expect("target parent should exist"))
+        .expect("target parent should be created");
+    fs::write(&target, b"unicode target").expect("target fixture should be written");
+
+    let result = patch_song_path_in_place(
+        &db_path,
+        r"d:/música/árbol.mp3",
+        &target.to_string_lossy(),
+    )
+    .expect("unicode path patch should return a typed result");
+    assert!(matches!(result.status, RelinkFileStatus::Completed));
+    let output = fs::read_to_string(&db_path).expect("patched DB should be readable");
+    assert!(output.contains(&format!(r#"FilePath="{}""#, target.to_string_lossy())));
+    assert!(output.contains(r#"FileSize="14""#));
+    assert!(output.contains(r#"Future="keep""#));
 
     fs::remove_dir_all(&dir).expect("temp dir should be removed");
 }

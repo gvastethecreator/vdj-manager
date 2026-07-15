@@ -406,6 +406,32 @@ fn attr<'a>(tag: &'a XmlTag, name: &str) -> Result<Option<&'a XmlAttr>, String> 
     Ok(matches.into_iter().next())
 }
 
+/// Return direct `<Song>` children and their decoded `FilePath` values.
+///
+/// Reconciliation uses this helper for both the preflight snapshot and the
+/// just-before-commit snapshot.  Attribute/decode failures are propagated so
+/// a malformed database can never be mistaken for a missing source or a
+/// collision-free target.
+fn direct_song_file_paths(
+    source: &[u8],
+    tags: &[XmlTag],
+    database_root_start: usize,
+) -> Result<Vec<(usize, String)>, String> {
+    let mut songs = Vec::new();
+    for (index, tag) in tags.iter().enumerate() {
+        if tag.is_end
+            || tag.name != "Song"
+            || tag.parent_start != Some(database_root_start)
+        {
+            continue;
+        }
+        let Some(file_attr) = attr(tag, "FilePath")? else { continue };
+        let file_path = decode_xml_value(source, file_attr.value_start, file_attr.value_end)?;
+        songs.push((index, file_path));
+    }
+    Ok(songs)
+}
+
 fn child_tags<'a>(tags: &'a [XmlTag], song: &XmlTag, name: &str) -> Vec<(usize, &'a XmlTag)> {
     tags.iter()
         .enumerate()
@@ -495,6 +521,281 @@ pub fn patch_song_in_place(
     update: &InlineSongUpdate,
 ) -> Result<UpdateSongTagsResult, String> {
     patch_song_in_place_with_before_commit(path, original_file_path, update, || Ok(()))
+}
+
+/// Patch a song's physical reference in place, preserving every byte outside
+/// `FilePath` and `FileSize` on the target `<Song>` node.
+///
+/// Reconciliation deliberately shares the scanner/optimistic writer used by
+/// the inline tag editor, but is a separate narrow operation so it cannot
+/// silently fall back to the legacy whole-document serializer.
+pub fn patch_song_path_in_place(
+    path: &Path,
+    original_file_path: &str,
+    new_file_path: &str,
+) -> Result<RelinkFileResult, String> {
+    patch_song_path_in_place_with_before_commit(
+        path,
+        original_file_path,
+        new_file_path,
+        || Ok(()),
+    )
+}
+
+fn patch_song_path_in_place_with_before_commit<F>(
+    path: &Path,
+    original_file_path: &str,
+    new_file_path: &str,
+    before_commit: F,
+) -> Result<RelinkFileResult, String>
+where
+    F: FnOnce() -> Result<(), String>,
+{
+    let result = |status: RelinkFileStatus,
+                  file_size: Option<u64>,
+                  message: Option<String>,
+                  collision_path: Option<String>| RelinkFileResult {
+        status,
+        original_file_path: original_file_path.to_string(),
+        new_file_path: new_file_path.to_string(),
+        file_size,
+        collision_path,
+        message,
+    };
+
+    if original_file_path.trim().is_empty() || new_file_path.trim().is_empty() {
+        return Ok(result(
+            RelinkFileStatus::FailedValidation,
+            None,
+            Some("La ruta original y la ruta destino son obligatorias".to_string()),
+            None,
+        ));
+    }
+
+    let patch_lock = database_patch_lock(path)?;
+    let _patch_guard = patch_lock
+        .lock()
+        .map_err(|_| "Writer de database.xml bloqueado".to_string())?;
+    let source = fs::read(path).map_err(|error| format!("No se pudo leer database.xml: {}", error))?;
+    let tags = scan_xml_tags(&source).map_err(|error| format!("unsafe_to_patch: {}", error))?;
+
+    let database_roots: Vec<&XmlTag> = tags
+        .iter()
+        .filter(|tag| {
+            !tag.is_end && tag.name == "VirtualDJ_Database" && tag.parent_start.is_none()
+        })
+        .collect();
+    if database_roots.len() != 1 {
+        return Ok(result(
+            RelinkFileStatus::ManualReviewRequired,
+            None,
+            Some("La estructura de database.xml no permite una reconciliación segura".to_string()),
+            None,
+        ));
+    }
+    let database_root_start = database_roots[0].start;
+
+    let direct_songs = direct_song_file_paths(&source, &tags, database_root_start)?;
+    let mut matching_songs: Vec<(usize, String)> = direct_songs
+        .iter()
+        .filter(|(_, file_path)| windows_paths_equal(file_path, original_file_path))
+        .cloned()
+        .collect();
+
+    let target_size = match fs::metadata(new_file_path) {
+        Ok(metadata) if metadata.is_file() => metadata.len(),
+        Ok(_) => {
+            return Ok(result(
+                RelinkFileStatus::FailedValidation,
+                None,
+                Some("La ruta destino no apunta a un archivo regular".to_string()),
+                None,
+            ));
+        }
+        Err(error) => {
+            return Ok(result(
+                RelinkFileStatus::FailedValidation,
+                None,
+                Some(format!("No se pudo leer metadata del destino: {}", error)),
+                None,
+            ));
+        }
+    };
+
+    if matching_songs.is_empty() {
+        return Ok(result(
+            RelinkFileStatus::NotFound,
+            Some(target_size),
+            Some("No se encontró la entrada con la ruta original".to_string()),
+            None,
+        ));
+    }
+    if matching_songs.len() != 1 {
+        return Ok(result(
+            RelinkFileStatus::ManualReviewRequired,
+            Some(target_size),
+            Some("La ruta original coincide con más de una entrada".to_string()),
+            Some(matching_songs[0].1.clone()),
+        ));
+    }
+
+    let (song_index, _current_file_path) = matching_songs.remove(0);
+    let song = &tags[song_index];
+
+    let target_collision = direct_songs.iter().find_map(|(_, file_path)| {
+        if !windows_paths_equal(file_path, original_file_path)
+            && windows_paths_equal(&file_path, new_file_path)
+        {
+            Some(file_path.clone())
+        } else {
+            None
+        }
+    });
+    if let Some(collision_path) = target_collision {
+        return Ok(result(
+            RelinkFileStatus::ReferenceCollision,
+            Some(target_size),
+            Some("La ruta destino ya pertenece a otra entrada catalogada".to_string()),
+            Some(collision_path),
+        ));
+    }
+
+    let path_value = Some(new_file_path.to_string());
+    let size_value = Some(target_size.to_string());
+    let mut edits = Vec::new();
+    plan_attribute_updates(
+        &source,
+        song,
+        &[("FilePath", &path_value), ("FileSize", &size_value)],
+        &mut edits,
+    )?;
+
+    edits.sort_by(|left, right| {
+        right
+            .start
+            .cmp(&left.start)
+            .then_with(|| right.end.cmp(&left.end))
+    });
+    let mut patched = source.clone();
+    for edit in edits {
+        patched.splice(edit.start..edit.end, edit.replacement.into_bytes());
+    }
+    let patched = String::from_utf8(patched)
+        .map_err(|_| "El parche produciría XML no UTF-8".to_string())?;
+    let candidate = patched.trim_start_matches('\u{feff}');
+    let reparsed = from_str::<VdjDatabase>(candidate)
+        .map_err(|error| format!("unsafe_to_patch: XML resultante inválido: {}", error))?;
+    validate_database_integrity(&reparsed)
+        .map_err(|error| format!("unsafe_to_patch: {}", error))?;
+
+    before_commit()?;
+    let current_source = fs::read(path)
+        .map_err(|error| format!("No se pudo releer database.xml antes del commit: {}", error))?;
+    let current_tags = scan_xml_tags(&current_source)
+        .map_err(|error| format!("unsafe_to_patch: {}", error))?;
+    let current_database_roots: Vec<&XmlTag> = current_tags
+        .iter()
+        .filter(|tag| {
+            !tag.is_end && tag.name == "VirtualDJ_Database" && tag.parent_start.is_none()
+        })
+        .collect();
+    if current_database_roots.len() != 1 {
+        return Ok(result(
+            RelinkFileStatus::ManualReviewRequired,
+            Some(target_size),
+            Some("La estructura de database.xml cambió durante la reconciliación".to_string()),
+            None,
+        ));
+    }
+    let current_root_start = current_database_roots[0].start;
+    let current_direct_songs = direct_song_file_paths(
+        &current_source,
+        &current_tags,
+        current_root_start,
+    )?;
+    let current_matching_songs: Vec<String> = current_direct_songs
+        .iter()
+        .filter(|(_, file_path)| windows_paths_equal(file_path, original_file_path))
+        .map(|(_, file_path)| file_path.clone())
+        .collect();
+    if current_matching_songs.is_empty() {
+        return Ok(result(
+            RelinkFileStatus::NotFound,
+            Some(target_size),
+            Some("La entrada original ya no existe en database.xml".to_string()),
+            None,
+        ));
+    }
+    if current_matching_songs.len() != 1 {
+        return Ok(result(
+            RelinkFileStatus::ManualReviewRequired,
+            Some(target_size),
+            Some("La ruta original coincide con más de una entrada".to_string()),
+            Some(current_matching_songs[0].clone()),
+        ));
+    }
+    let current_collision = current_direct_songs.iter().find_map(|(_, file_path)| {
+        if !windows_paths_equal(file_path, original_file_path)
+            && windows_paths_equal(&file_path, new_file_path)
+        {
+            Some(file_path.clone())
+        } else {
+            None
+        }
+    });
+    if let Some(collision_path) = current_collision {
+        return Ok(result(
+            RelinkFileStatus::ReferenceCollision,
+            Some(target_size),
+            Some("La ruta destino ya pertenece a otra entrada catalogada".to_string()),
+            Some(collision_path),
+        ));
+    }
+    if current_source != source {
+        return Ok(result(
+            RelinkFileStatus::ManualReviewRequired,
+            Some(target_size),
+            Some("database.xml cambió durante la reconciliación".to_string()),
+            None,
+        ));
+    }
+
+    let final_target_size = match fs::metadata(new_file_path) {
+        Ok(metadata) if metadata.is_file() => metadata.len(),
+        Ok(_) => {
+            return Ok(result(
+                RelinkFileStatus::FailedValidation,
+                None,
+                Some("La ruta destino dejó de ser un archivo regular".to_string()),
+                None,
+            ));
+        }
+        Err(error) => {
+            return Ok(result(
+                RelinkFileStatus::FailedValidation,
+                None,
+                Some(format!("No se pudo releer metadata del destino: {}", error)),
+                None,
+            ));
+        }
+    };
+    if final_target_size != target_size {
+        return Ok(result(
+            RelinkFileStatus::FailedValidation,
+            Some(final_target_size),
+            Some("El tamaño del destino cambió durante la reconciliación".to_string()),
+            None,
+        ));
+    }
+
+    safety::create_timestamped_backup(path, "database-relink")?;
+    safety::atomic_write_string(path, &patched)?;
+    Ok(result(
+        RelinkFileStatus::Completed,
+        Some(final_target_size),
+        None,
+        None,
+    ))
 }
 
 fn patch_song_in_place_with_before_commit<F>(
@@ -851,6 +1152,78 @@ mod tests {
             .count();
         assert_eq!(backups, 0, "conflict must abort before backup/write");
 
+        fs::remove_dir_all(&dir).expect("temp dir should be removed");
+    }
+
+    #[test]
+    fn relink_aborts_without_database_write_when_target_changes_before_commit() {
+        let nonce = SystemTime::now()
+            .duration_since(UNIX_EPOCH)
+            .expect("time should advance")
+            .as_nanos();
+        let dir = std::env::temp_dir().join(format!(
+            "vdj-manager-relink-target-race-{}-{nonce}",
+            std::process::id()
+        ));
+        fs::create_dir_all(&dir).expect("temp dir should exist");
+        let db_path = dir.join("database.xml");
+        let target = dir.join("target.mp3");
+        let xml = format!(
+            r#"<VirtualDJ_Database><Song FilePath="D:\Music\Missing.mp3" FileSize="1" Future="keep"/></VirtualDJ_Database>"#
+        );
+        fs::write(&db_path, xml).expect("database fixture should write");
+        fs::write(&target, b"old").expect("target fixture should write");
+        let before = fs::read(&db_path).expect("database should be readable");
+
+        let result = patch_song_path_in_place_with_before_commit(
+            &db_path,
+            r"D:\Music\Missing.mp3",
+            &target.to_string_lossy(),
+            || {
+                fs::write(&target, b"target changed after preflight")
+                    .map_err(|error| error.to_string())
+            },
+        )
+        .expect("target race should return a typed result");
+
+        assert!(matches!(result.status, RelinkFileStatus::FailedValidation));
+        assert_eq!(before, fs::read(&db_path).expect("database must remain byte-identical"));
+        fs::remove_dir_all(&dir).expect("temp dir should be removed");
+    }
+
+    #[test]
+    fn relink_rechecks_source_and_target_collision_before_commit() {
+        let nonce = SystemTime::now()
+            .duration_since(UNIX_EPOCH)
+            .expect("time should advance")
+            .as_nanos();
+        let dir = std::env::temp_dir().join(format!(
+            "vdj-manager-relink-collision-race-{}-{nonce}",
+            std::process::id()
+        ));
+        fs::create_dir_all(&dir).expect("temp dir should exist");
+        let db_path = dir.join("database.xml");
+        let target = dir.join("target.mp3");
+        fs::write(&target, b"target").expect("target fixture should write");
+        let initial = format!(
+            r#"<VirtualDJ_Database><Song FilePath="D:\Music\Missing.mp3" FileSize="1"/></VirtualDJ_Database>"#
+        );
+        let collision = format!(
+            r#"<VirtualDJ_Database><Song FilePath="D:\Music\Missing.mp3" FileSize="1"/><Song FilePath="{}" FileSize="6"/></VirtualDJ_Database>"#,
+            target.to_string_lossy()
+        );
+        fs::write(&db_path, initial).expect("database fixture should write");
+
+        let result = patch_song_path_in_place_with_before_commit(
+            &db_path,
+            r"D:\Music\Missing.mp3",
+            &target.to_string_lossy(),
+            || fs::write(&db_path, &collision).map_err(|error| error.to_string()),
+        )
+        .expect("collision race should return a typed result");
+
+        assert!(matches!(result.status, RelinkFileStatus::ReferenceCollision));
+        assert_eq!(fs::read_to_string(&db_path).expect("database should be readable"), collision);
         fs::remove_dir_all(&dir).expect("temp dir should be removed");
     }
 }

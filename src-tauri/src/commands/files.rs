@@ -1,6 +1,6 @@
 //! Tauri commands for file verification and file-system operations.
 
-use std::collections::HashMap;
+use std::collections::{HashMap, HashSet};
 use std::path::PathBuf;
 
 use crate::database::models::*;
@@ -216,275 +216,437 @@ pub async fn find_orphan_files(
     Ok(orphans)
 }
 
-/// A candidate match for relocating a missing file.
-#[derive(serde::Serialize, Clone)]
-pub struct SimilarFileMatch {
-    /// The original missing path from the database
-    pub missing_path: String,
-    /// Candidate files found on disk with similar names
-    pub candidates: Vec<String>,
+fn normalize_for_match(raw: &str) -> String {
+    raw.to_lowercase()
+        .chars()
+        .map(|ch| if ch.is_alphanumeric() { ch } else { ' ' })
+        .collect::<String>()
+        .split_whitespace()
+        .collect::<Vec<_>>()
+        .join(" ")
+}
+
+fn path_key(raw: &str) -> String {
+    parser::normalize_windows_path(raw).to_lowercase()
+}
+
+#[derive(Clone)]
+struct MissingInfo {
+    expected_size: Option<u64>,
+    title_norm: Option<String>,
+    author_norm: Option<String>,
+    extension: String,
+}
+
+#[derive(Clone)]
+struct ScannedFile {
+    path: String,
+    name_lower: String,
+    stem_lower: String,
+    extension: String,
+    size: u64,
+    path_norm: String,
+}
+
+fn missing_info_for_song(song: &Song) -> MissingInfo {
+    let extension = std::path::Path::new(&song.file_path)
+        .extension()
+        .map(|extension| extension.to_string_lossy().to_lowercase())
+        .unwrap_or_default();
+    MissingInfo {
+        expected_size: song.file_size,
+        title_norm: song
+            .tags
+            .as_ref()
+            .and_then(|tags| tags.title.as_ref())
+            .map(|value| normalize_for_match(value))
+            .filter(|value| !value.is_empty()),
+        author_norm: song
+            .tags
+            .as_ref()
+            .and_then(|tags| tags.author.as_ref())
+            .map(|value| normalize_for_match(value))
+            .filter(|value| !value.is_empty()),
+        extension,
+    }
+}
+
+fn collect_scanned_files(scan_folders: &[String]) -> Vec<ScannedFile> {
+    let mut scanned_files = Vec::new();
+    let mut seen_roots = HashSet::new();
+    let mut seen_files = HashSet::new();
+
+    for scan_folder in scan_folders {
+        let root_key = path_key(scan_folder);
+        if !seen_roots.insert(root_key) {
+            continue;
+        }
+        for entry in WalkDir::new(scan_folder)
+            .follow_links(true)
+            .into_iter()
+            .filter_map(|entry| entry.ok())
+        {
+            let metadata = match entry.metadata() {
+                Ok(metadata) if metadata.is_file() => metadata,
+                _ => continue,
+            };
+            let Some(name) = entry.path().file_name() else { continue };
+            let path = entry.path().to_string_lossy().to_string();
+            if !seen_files.insert(path_key(&path)) {
+                continue;
+            }
+            let name_lower = name.to_string_lossy().to_lowercase();
+            let stem_lower = entry
+                .path()
+                .file_stem()
+                .map(|stem| stem.to_string_lossy().to_lowercase())
+                .unwrap_or_default();
+            let extension = entry
+                .path()
+                .extension()
+                .map(|extension| extension.to_string_lossy().to_lowercase())
+                .unwrap_or_default();
+            scanned_files.push(ScannedFile {
+                path_norm: normalize_for_match(&path),
+                path,
+                name_lower,
+                stem_lower,
+                extension,
+                size: metadata.len(),
+            });
+        }
+    }
+
+    scanned_files.sort_by(|left, right| path_key(&left.path).cmp(&path_key(&right.path)));
+    scanned_files
+}
+
+fn find_candidates_for_paths(
+    vdj_folder: &str,
+    original_file_paths: &[String],
+    scan_folders: &[String],
+) -> Result<Vec<SimilarFileMatch>, String> {
+    let db_path = PathBuf::from(vdj_folder).join("database.xml");
+    let db = parser::parse_database(&db_path)?;
+    let scanned_files = collect_scanned_files(scan_folders);
+    let mut results = Vec::new();
+    let mut seen_missing = HashSet::new();
+
+    for original_file_path in original_file_paths {
+        if !seen_missing.insert(path_key(original_file_path)) {
+            continue;
+        }
+        let matching_songs: Vec<&Song> = db
+            .songs
+            .iter()
+            .filter(|song| parser::windows_paths_equal(&song.file_path, original_file_path))
+            .collect();
+        if matching_songs.is_empty() {
+            results.push(SimilarFileMatch {
+                status: SimilarFileMatchStatus::NotFound,
+                original_file_path: original_file_path.clone(),
+                candidates: Vec::new(),
+                message: Some("No se encontró la entrada con la ruta original".to_string()),
+            });
+            continue;
+        }
+        if matching_songs.len() > 1 {
+            results.push(SimilarFileMatch {
+                status: SimilarFileMatchStatus::ManualReviewRequired,
+                original_file_path: original_file_path.clone(),
+                candidates: Vec::new(),
+                message: Some("La ruta original coincide con más de una entrada".to_string()),
+            });
+            continue;
+        }
+        let missing_info = Some(missing_info_for_song(matching_songs[0]));
+        let missing_info = missing_info.as_ref();
+        let missing_name = std::path::Path::new(original_file_path)
+            .file_name()
+            .map(|name| name.to_string_lossy().to_lowercase())
+            .unwrap_or_default();
+        let missing_stem = std::path::Path::new(&missing_name)
+            .file_stem()
+            .map(|stem| stem.to_string_lossy().to_lowercase())
+            .unwrap_or_default();
+        let missing_extension = missing_info
+            .map(|info| info.extension.as_str())
+            .unwrap_or_else(|| {
+                std::path::Path::new(original_file_path)
+                    .extension()
+                    .and_then(|extension| extension.to_str())
+                    .unwrap_or("")
+            })
+            .to_lowercase();
+        let mut candidates_by_path: HashMap<String, SimilarFileCandidate> = HashMap::new();
+
+        for scanned in &scanned_files {
+            let same_name = scanned.name_lower == missing_name;
+            let same_stem = !missing_stem.is_empty() && scanned.stem_lower == missing_stem;
+            let similar_stem = !same_stem
+                && !missing_stem.is_empty()
+                && (scanned.stem_lower.contains(&missing_stem)
+                    || missing_stem.contains(&scanned.stem_lower));
+            let same_extension = !missing_extension.is_empty()
+                && scanned.extension == missing_extension;
+            let mut score = 0i32;
+            let mut reasons = Vec::new();
+            if same_name {
+                score += 260;
+                reasons.push("same_name".to_string());
+            }
+            if same_stem {
+                score += 180;
+                reasons.push("same_stem".to_string());
+            } else if similar_stem {
+                score += 95;
+                reasons.push("similar_stem".to_string());
+            }
+            if same_extension {
+                score += 30;
+                reasons.push("same_extension".to_string());
+            }
+
+            let mut size_match = false;
+            if let Some(info) = missing_info {
+                if let Some(expected) = info.expected_size {
+                    if expected == scanned.size {
+                        score += 320;
+                        size_match = true;
+                        reasons.push("size_match".to_string());
+                    } else {
+                        let diff = expected.abs_diff(scanned.size);
+                        let pct = (diff as f64) / (expected.max(1) as f64);
+                        if pct <= 0.01 {
+                            score += 190;
+                            reasons.push("size_close".to_string());
+                        } else if pct <= 0.03 {
+                            score += 120;
+                            reasons.push("size_close".to_string());
+                        } else if pct <= 0.08 {
+                            score += 55;
+                            reasons.push("size_close".to_string());
+                        }
+                    }
+                }
+                if let Some(title) = &info.title_norm {
+                    if scanned.path_norm.contains(title) {
+                        score += 90;
+                        reasons.push("title_match".to_string());
+                    }
+                }
+                if let Some(author) = &info.author_norm {
+                    if scanned.path_norm.contains(author) {
+                        score += 70;
+                        reasons.push("author_match".to_string());
+                    }
+                }
+            }
+
+            if score <= 0 {
+                continue;
+            }
+            let candidate = SimilarFileCandidate {
+                path: scanned.path.clone(),
+                score,
+                reasons,
+                same_extension,
+                same_stem,
+                same_name,
+                size_match,
+            };
+            let key = path_key(&scanned.path);
+            match candidates_by_path.get(&key) {
+                Some(existing)
+                    if existing.score > candidate.score
+                        || (existing.score == candidate.score
+                            && path_key(&existing.path) <= path_key(&candidate.path)) => {}
+                _ => {
+                    candidates_by_path.insert(key, candidate);
+                }
+            }
+        }
+
+        let mut candidates: Vec<SimilarFileCandidate> = candidates_by_path.into_values().collect();
+        candidates.sort_by(|left, right| {
+            right
+                .score
+                .cmp(&left.score)
+                .then_with(|| path_key(&left.path).cmp(&path_key(&right.path)))
+        });
+        candidates.truncate(40);
+        results.push(SimilarFileMatch {
+            status: SimilarFileMatchStatus::Completed,
+            original_file_path: original_file_path.clone(),
+            candidates,
+            message: None,
+        });
+    }
+
+    Ok(results)
 }
 
 /// Find files with similar names to missing database entries.
-/// Scans `scan_folder` recursively and matches by filename similarity.
+/// Scans one folder recursively.  This compatibility command now returns the
+/// same structured, backend-ordered candidates used by the relink owner.
 #[tauri::command]
 pub async fn find_similar_files(
     vdj_folder: String,
     missing_paths: Vec<String>,
     scan_folder: String,
 ) -> Result<Vec<SimilarFileMatch>, String> {
-    fn normalize_for_match(raw: &str) -> String {
-        raw.to_lowercase()
-            .chars()
-            .map(|ch| if ch.is_alphanumeric() { ch } else { ' ' })
-            .collect::<String>()
-            .split_whitespace()
-            .collect::<Vec<_>>()
-            .join(" ")
-    }
-
-    #[derive(Clone)]
-    struct MissingInfo {
-        expected_size: Option<u64>,
-        title_norm: Option<String>,
-        author_norm: Option<String>,
-        extension: String,
-    }
-
-    #[derive(Clone)]
-    struct ScannedFile {
-        path: String,
-        name_lower: String,
-        stem_lower: String,
-        extension: String,
-        size: Option<u64>,
-        path_norm: String,
-    }
-
-    // Optional DB context for stronger matching (size/title/author)
-    let db_context: HashMap<String, MissingInfo> = {
-        let db_path = PathBuf::from(&vdj_folder).join("database.xml");
-        match parser::parse_database(&db_path) {
-            Ok(db) => db
-                .songs
-                .into_iter()
-                .map(|song| {
-                    let extension = std::path::Path::new(&song.file_path)
-                        .extension()
-                        .map(|e| e.to_string_lossy().to_lowercase())
-                        .unwrap_or_default();
-
-                    let info = MissingInfo {
-                        expected_size: song.file_size,
-                        title_norm: song
-                            .tags
-                            .as_ref()
-                            .and_then(|t| t.title.as_ref())
-                            .map(|v| normalize_for_match(v))
-                            .filter(|v| !v.is_empty()),
-                        author_norm: song
-                            .tags
-                            .as_ref()
-                            .and_then(|t| t.author.as_ref())
-                            .map(|v| normalize_for_match(v))
-                            .filter(|v| !v.is_empty()),
-                        extension,
-                    };
-
-                    (song.file_path.to_lowercase(), info)
-                })
-                .collect(),
-            Err(_) => HashMap::new(),
-        }
-    };
-
-    // Build scan index from disk for scoring
-    let mut scanned_files: Vec<ScannedFile> = Vec::new();
-
-    for entry in WalkDir::new(&scan_folder)
-        .follow_links(true)
-        .into_iter()
-        .filter_map(|e| e.ok())
-    {
-        if entry.file_type().is_file() {
-            if let Some(name) = entry.path().file_name() {
-                let name_lower = name.to_string_lossy().to_lowercase();
-                let stem_lower = entry
-                    .path()
-                    .file_stem()
-                    .map(|s| s.to_string_lossy().to_lowercase())
-                    .unwrap_or_default();
-                let extension = entry
-                    .path()
-                    .extension()
-                    .map(|e| e.to_string_lossy().to_lowercase())
-                    .unwrap_or_default();
-                let path = entry.path().to_string_lossy().to_string();
-
-                scanned_files.push(ScannedFile {
-                    path_norm: normalize_for_match(&path),
-                    path,
-                    name_lower,
-                    stem_lower,
-                    extension,
-                    size: entry.metadata().ok().map(|m| m.len()),
-                });
-            }
-        }
-    }
-
-    let mut results = Vec::new();
-    for missing in &missing_paths {
-        let missing_name = std::path::Path::new(missing)
-            .file_name()
-            .map(|n| n.to_string_lossy().to_lowercase())
-            .unwrap_or_default();
-
-        // Strip extension for fuzzy matching
-        let missing_stem = std::path::Path::new(&missing_name)
-            .file_stem()
-            .map(|s| s.to_string_lossy().to_lowercase())
-            .unwrap_or_default();
-
-        let missing_info = db_context.get(&missing.to_lowercase());
-        let mut scored_candidates: HashMap<String, i32> = HashMap::new();
-
-        for scanned in &scanned_files {
-            let mut score = 0i32;
-
-            // Name-based matching (existing behavior, but now always scored)
-            if scanned.name_lower == missing_name {
-                score += 260;
-            }
-
-            if !missing_stem.is_empty() {
-                if scanned.stem_lower == missing_stem {
-                    score += 180;
-                } else if scanned.stem_lower.contains(&missing_stem)
-                    || missing_stem.contains(&scanned.stem_lower)
-                {
-                    score += 95;
-                }
-            }
-
-            // Extension hint
-            let missing_ext = missing_info
-                .map(|i| i.extension.as_str())
-                .unwrap_or_else(|| {
-                    std::path::Path::new(missing)
-                        .extension()
-                        .and_then(|e| e.to_str())
-                        .unwrap_or("")
-                })
-                .to_lowercase();
-
-            if !missing_ext.is_empty() && scanned.extension == missing_ext {
-                score += 30;
-            }
-
-            // Size-based matching from DB expected size
-            if let Some(info) = missing_info {
-                if let (Some(expected), Some(actual)) = (info.expected_size, scanned.size) {
-                    if expected == actual {
-                        score += 320;
-                    } else {
-                        let diff = expected.abs_diff(actual);
-                        let pct = (diff as f64) / (expected.max(1) as f64);
-                        if pct <= 0.01 {
-                            score += 190;
-                        } else if pct <= 0.03 {
-                            score += 120;
-                        } else if pct <= 0.08 {
-                            score += 55;
-                        }
-                    }
-                }
-
-                // Metadata hint from song title/author against full candidate path
-                if let Some(title) = &info.title_norm {
-                    if !title.is_empty() && scanned.path_norm.contains(title) {
-                        score += 90;
-                    }
-                }
-
-                if let Some(author) = &info.author_norm {
-                    if !author.is_empty() && scanned.path_norm.contains(author) {
-                        score += 70;
-                    }
-                }
-            }
-
-            if score > 0 {
-                scored_candidates
-                    .entry(scanned.path.clone())
-                    .and_modify(|existing| {
-                        if score > *existing {
-                            *existing = score;
-                        }
-                    })
-                    .or_insert(score);
-            }
-        }
-
-        // Keep compatibility: ordered string paths only
-        let mut candidates: Vec<(String, i32)> = scored_candidates.into_iter().collect();
-        candidates.sort_by(|a, b| b.1.cmp(&a.1).then_with(|| a.0.cmp(&b.0)));
-
-        // Guardrail: avoid flooding UI with huge candidate sets
-        if candidates.len() > 40 {
-            candidates.truncate(40);
-        }
-
-        if !candidates.is_empty() {
-            results.push(SimilarFileMatch {
-                missing_path: missing.clone(),
-                candidates: candidates.into_iter().map(|(path, _)| path).collect(),
-            });
-        }
-    }
-
-    Ok(results)
+    find_candidates_for_paths(&vdj_folder, &missing_paths, &[scan_folder])
 }
 
-/// Relocate a missing file: update its path in the database to a new location.
-/// Creates a timestamped backup before writing.
+/// Find candidates for one reconciliation request across deduplicated roots.
+#[tauri::command]
+pub async fn find_relink_candidates(
+    vdj_folder: String,
+    original_file_path: String,
+    scan_folders: Vec<String>,
+) -> Result<SimilarFileMatch, String> {
+    let mut matches = find_candidates_for_paths(
+        &vdj_folder,
+        std::slice::from_ref(&original_file_path),
+        &scan_folders,
+    )?;
+    Ok(matches.pop().unwrap_or(SimilarFileMatch {
+        status: SimilarFileMatchStatus::NotFound,
+        original_file_path,
+        candidates: Vec::new(),
+        message: Some("No se encontró la entrada con la ruta original".to_string()),
+    }))
+}
+
+fn typed_relink_result(
+    status: RelinkFileStatus,
+    original_file_path: &str,
+    new_file_path: &str,
+    file_size: Option<u64>,
+    message: Option<String>,
+    collision_path: Option<String>,
+) -> RelinkFileResult {
+    RelinkFileResult {
+        status,
+        original_file_path: original_file_path.to_string(),
+        new_file_path: new_file_path.to_string(),
+        file_size,
+        collision_path,
+        message,
+    }
+}
+
+/// Reconcile one missing database entry by stable original path.
+///
+/// The command performs all validation before invoking the atomic
+/// `FilePath`+`FileSize` patcher and returns a typed result for every expected
+/// user-facing outcome.
 #[tauri::command]
 pub async fn relocate_file(
     vdj_folder: String,
-    old_path: String,
-    new_path: String,
-) -> Result<(), String> {
-    let db_path = PathBuf::from(&vdj_folder).join("database.xml");
-    let mut db = parser::parse_database(&db_path)?;
-
-    // Verify new file exists
-    if !PathBuf::from(&new_path).exists() {
-        return Err(format!("El archivo destino no existe: {}", new_path));
+    original_file_path: String,
+    new_file_path: String,
+) -> Result<RelinkFileResult, String> {
+    if original_file_path.trim().is_empty() || new_file_path.trim().is_empty() {
+        return Ok(typed_relink_result(
+            RelinkFileStatus::FailedValidation,
+            &original_file_path,
+            &new_file_path,
+            None,
+            Some("La ruta original y la ruta destino son obligatorias".to_string()),
+            None,
+        ));
     }
-
-    let mut found = false;
-    for song in &mut db.songs {
-        if song.file_path == old_path {
-            song.file_path = new_path.clone();
-            // Update file size from actual file
-            if let Ok(meta) = std::fs::metadata(&new_path) {
-                song.file_size = Some(meta.len());
-            }
-            found = true;
-            break;
-        }
-    }
-
-    if !found {
-        return Err(format!(
-            "No se encontró la entrada con ruta: {}",
-            old_path
+    if parser::windows_paths_equal(&original_file_path, &new_file_path) {
+        return Ok(typed_relink_result(
+            RelinkFileStatus::FailedValidation,
+            &original_file_path,
+            &new_file_path,
+            None,
+            Some("La ruta destino debe ser distinta de la ruta original".to_string()),
+            None,
         ));
     }
 
-    safety::create_timestamped_backup(&db_path, "database")?;
+    let target_metadata = match std::fs::metadata(&new_file_path) {
+        Ok(metadata) if metadata.is_file() => metadata,
+        Ok(_) => {
+            return Ok(typed_relink_result(
+                RelinkFileStatus::FailedValidation,
+                &original_file_path,
+                &new_file_path,
+                None,
+                Some("La ruta destino no apunta a un archivo regular".to_string()),
+                None,
+            ));
+        }
+        Err(error) => {
+            return Ok(typed_relink_result(
+                RelinkFileStatus::FailedValidation,
+                &original_file_path,
+                &new_file_path,
+                None,
+                Some(format!("No se pudo leer metadata del destino: {}", error)),
+                None,
+            ));
+        }
+    };
+    let db_path = PathBuf::from(&vdj_folder).join("database.xml");
+    let db = parser::parse_database(&db_path)?;
+    let matching_count = db
+        .songs
+        .iter()
+        .filter(|song| parser::windows_paths_equal(&song.file_path, &original_file_path))
+        .count();
+    if matching_count == 0 {
+        return Ok(typed_relink_result(
+            RelinkFileStatus::NotFound,
+            &original_file_path,
+            &new_file_path,
+            Some(target_metadata.len()),
+            Some("No se encontró la entrada con la ruta original".to_string()),
+            None,
+        ));
+    }
+    if matching_count > 1 {
+        return Ok(typed_relink_result(
+            RelinkFileStatus::ManualReviewRequired,
+            &original_file_path,
+            &new_file_path,
+            Some(target_metadata.len()),
+            Some("La ruta original coincide con más de una entrada".to_string()),
+            None,
+        ));
+    }
+    if let Some(collision) = db.songs.iter().find(|song| {
+        !parser::windows_paths_equal(&song.file_path, &original_file_path)
+            && parser::windows_paths_equal(&song.file_path, &new_file_path)
+    }) {
+        return Ok(typed_relink_result(
+            RelinkFileStatus::ReferenceCollision,
+            &original_file_path,
+            &new_file_path,
+            Some(target_metadata.len()),
+            Some("La ruta destino ya pertenece a otra entrada catalogada".to_string()),
+            Some(collision.file_path.clone()),
+        ));
+    }
 
-    parser::write_database_checked(&db_path, &db)
+    match parser::patch_song_path_in_place(
+        &db_path,
+        &original_file_path,
+        &new_file_path,
+    ) {
+        Ok(result) => Ok(result),
+        Err(error) => Ok(typed_relink_result(
+            RelinkFileStatus::ManualReviewRequired,
+            &original_file_path,
+            &new_file_path,
+            Some(target_metadata.len()),
+            Some(error),
+            None,
+        )),
+    }
 }
 
 /// List all subdirectories (one level) under a given folder path.
@@ -624,4 +786,172 @@ pub async fn dry_run_rename(
         affected_count: affected,
         details,
     })
+}
+
+#[cfg(test)]
+mod tests {
+    use super::*;
+    use std::time::{SystemTime, UNIX_EPOCH};
+
+    fn unique_temp_dir(test_name: &str) -> PathBuf {
+        let nonce = SystemTime::now()
+            .duration_since(UNIX_EPOCH)
+            .expect("system time should advance")
+            .as_nanos();
+        std::env::temp_dir().join(format!(
+            "vdj-manager-files-{test_name}-{}-{nonce}",
+            std::process::id()
+        ))
+    }
+
+    #[tokio::test]
+    async fn relink_candidates_are_structured_ordered_and_dedupe_scan_roots() {
+        let dir = unique_temp_dir("candidate-order");
+        let root = dir.join("scan");
+        std::fs::create_dir_all(&root).expect("scan root should be created");
+        let candidate = root.join("Song.mp3");
+        std::fs::write(&candidate, b"1234").expect("candidate should be written");
+        let weaker = root.join("Song-copy.wav");
+        std::fs::write(&weaker, b"123").expect("weaker candidate should be written");
+
+        let missing = dir.join("missing").join("Song.mp3");
+        let vdj_folder = dir.join("VirtualDJ");
+        std::fs::create_dir_all(&vdj_folder).expect("VDJ folder should be created");
+        let db_path = vdj_folder.join("database.xml");
+        let xml = format!(
+            r#"<VirtualDJ_Database><Song FilePath="{}" FileSize="4"><Tags Title="Song"/></Song></VirtualDJ_Database>"#,
+            missing.to_string_lossy()
+        );
+        std::fs::write(&db_path, xml).expect("database fixture should be written");
+
+        let result = find_relink_candidates(
+            vdj_folder.to_string_lossy().to_string(),
+            missing.to_string_lossy().to_string(),
+            vec![
+                root.to_string_lossy().to_string(),
+                format!("{}/", root.to_string_lossy()),
+            ],
+        )
+        .await
+        .expect("candidate query should succeed");
+
+        assert_eq!(result.candidates.len(), 2);
+        assert_eq!(result.candidates[0].path, candidate.to_string_lossy());
+        assert!(result.candidates[0].same_name);
+        assert!(result.candidates[0].same_extension);
+        assert!(result.candidates[0].size_match);
+        assert!(result.candidates[0].reasons.iter().any(|reason| reason == "size_match"));
+        assert!(result.candidates[0].score > result.candidates[1].score);
+
+        std::fs::remove_dir_all(&dir).expect("temp directory should be removed");
+    }
+
+    #[tokio::test]
+    async fn relink_candidates_report_not_found_for_absent_database_path() {
+        let dir = unique_temp_dir("candidate-not-found");
+        let vdj_folder = dir.join("VirtualDJ");
+        std::fs::create_dir_all(&vdj_folder).expect("VDJ folder should be created");
+        let known = r#"D:\Music\Known.mp3"#;
+        let missing = r#"D:\Music\Missing.mp3"#;
+        std::fs::write(
+            vdj_folder.join("database.xml"),
+            format!(r#"<VirtualDJ_Database><Song FilePath="{known}" FileSize="4"/></VirtualDJ_Database>"#),
+        )
+        .expect("database fixture should be written");
+
+        let result = find_relink_candidates(
+            vdj_folder.to_string_lossy().to_string(),
+            missing.to_string(),
+            Vec::new(),
+        )
+        .await
+        .expect("absent source should be represented as a typed result");
+
+        assert!(matches!(result.status, SimilarFileMatchStatus::NotFound));
+        assert!(result.candidates.is_empty());
+        assert!(result.message.is_some());
+        std::fs::remove_dir_all(&dir).expect("temp directory should be removed");
+    }
+
+    #[tokio::test]
+    async fn relink_candidates_require_manual_review_for_ambiguous_normalized_path() {
+        let dir = unique_temp_dir("candidate-ambiguous");
+        let vdj_folder = dir.join("VirtualDJ");
+        std::fs::create_dir_all(&vdj_folder).expect("VDJ folder should be created");
+        let xml = r#"<VirtualDJ_Database><Song FilePath="D:\Music\Track.mp3" FileSize="4"/><Song FilePath="D:/music/track.mp3" FileSize="4"/></VirtualDJ_Database>"#;
+        std::fs::write(vdj_folder.join("database.xml"), xml)
+            .expect("database fixture should be written");
+
+        let result = find_relink_candidates(
+            vdj_folder.to_string_lossy().to_string(),
+            r#"d:/MUSIC/track.mp3"#.to_string(),
+            Vec::new(),
+        )
+        .await
+        .expect("ambiguous source should be represented as a typed result");
+
+        assert!(matches!(
+            result.status,
+            SimilarFileMatchStatus::ManualReviewRequired
+        ));
+        assert!(result.candidates.is_empty());
+        assert!(result.message.is_some());
+        std::fs::remove_dir_all(&dir).expect("temp directory should be removed");
+    }
+
+    #[tokio::test]
+    async fn relink_candidates_propagate_malformed_database_errors() {
+        let dir = unique_temp_dir("candidate-malformed");
+        let vdj_folder = dir.join("VirtualDJ");
+        std::fs::create_dir_all(&vdj_folder).expect("VDJ folder should be created");
+        std::fs::write(
+            vdj_folder.join("database.xml"),
+            r#"<VirtualDJ_Database><Song FilePath="D:\Music\Broken.mp3">"#,
+        )
+        .expect("malformed database fixture should be written");
+
+        let error = find_relink_candidates(
+            vdj_folder.to_string_lossy().to_string(),
+            r#"D:\Music\Broken.mp3"#.to_string(),
+            Vec::new(),
+        )
+        .await
+        .expect_err("malformed database must not be treated as an empty candidate set");
+
+        assert!(error.contains("parsear") || error.contains("XML"));
+        std::fs::remove_dir_all(&dir).expect("temp directory should be removed");
+    }
+
+    #[tokio::test]
+    async fn relocate_reports_reference_collision_before_patch() {
+        let dir = unique_temp_dir("reference-collision");
+        std::fs::create_dir_all(&dir).expect("temp dir should be created");
+        let vdj_folder = dir.join("VirtualDJ");
+        std::fs::create_dir_all(&vdj_folder).expect("VDJ folder should be created");
+        let source = dir.join("old.mp3");
+        let target = dir.join("Target.mp3");
+        std::fs::write(&target, b"target").expect("target should be written");
+        let db_path = vdj_folder.join("database.xml");
+        let xml = format!(
+            r#"<VirtualDJ_Database><Song FilePath="{}" FileSize="1"/><Song FilePath="{}" FileSize="6"/></VirtualDJ_Database>"#,
+            source.to_string_lossy(),
+            target.to_string_lossy()
+        );
+        std::fs::write(&db_path, xml).expect("database fixture should be written");
+        let before = std::fs::read(&db_path).expect("database should be readable");
+
+        let result = relocate_file(
+            vdj_folder.to_string_lossy().to_string(),
+            source.to_string_lossy().to_string().to_uppercase(),
+            target.to_string_lossy().to_string().to_lowercase(),
+        )
+        .await
+        .expect("collision should be represented as typed result");
+
+        assert!(matches!(result.status, RelinkFileStatus::ReferenceCollision));
+        assert_eq!(result.collision_path.as_deref(), Some(target.to_string_lossy().as_ref()));
+        assert_eq!(before, std::fs::read(&db_path).expect("database should remain unchanged"));
+
+        std::fs::remove_dir_all(&dir).expect("temp directory should be removed");
+    }
 }

@@ -21,6 +21,7 @@ import type {
   SongUpdate,
   InlineSongUpdate,
   UpdateSongTagsResult,
+  RelinkFileResult,
 } from "../types/database";
 import { compareDriveAwarePaths, getParentDirectory } from "./pathUtils";
 
@@ -223,9 +224,7 @@ export function formatSize(bytes: number | null): string {
 
 // ── New commands ──
 
-/**
- * Find files with similar names to missing entries, scanning a folder.
- */
+/** Find structured candidates for missing entries in one scan root. */
 export async function findSimilarFiles(
   vdjFolder: string,
   missingPaths: string[],
@@ -238,15 +237,30 @@ export async function findSimilarFiles(
   });
 }
 
-/**
- * Relocate a missing file by updating its path in the database.
- */
+/** Find one relink candidate set across deduplicated scan roots. */
+export async function findRelinkCandidates(
+  vdjFolder: string,
+  originalFilePath: string,
+  scanFolders: string[],
+): Promise<SimilarFileMatch> {
+  return invoke<SimilarFileMatch>("find_relink_candidates", {
+    vdjFolder,
+    originalFilePath,
+    scanFolders,
+  });
+}
+
+/** Relocate one missing file by stable original path. */
 export async function relocateFile(
   vdjFolder: string,
-  oldPath: string,
-  newPath: string
-): Promise<void> {
-  return invoke<void>("relocate_file", { vdjFolder, oldPath, newPath });
+  originalFilePath: string,
+  newFilePath: string,
+): Promise<RelinkFileResult> {
+  return invoke<RelinkFileResult>("relocate_file", {
+    vdjFolder,
+    originalFilePath,
+    newFilePath,
+  });
 }
 
 /**

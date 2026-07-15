@@ -200,10 +200,40 @@ export type Page =
   | "pads"
   | "mappers";
 
-/** A candidate match for relocating a missing file. */
+/** Structured candidate scored and ordered by the backend relink engine. */
+export interface SimilarFileCandidate {
+  path: string;
+  score: number;
+  reasons: string[];
+  sameExtension: boolean;
+  sameStem: boolean;
+  sameName: boolean;
+  sizeMatch: boolean;
+}
+
+/** Candidate set for one original database path. */
 export interface SimilarFileMatch {
-  missing_path: string;
-  candidates: string[];
+  status: "completed" | "not_found" | "manual_review_required";
+  originalFilePath: string;
+  candidates: SimilarFileCandidate[];
+  message: string | null;
+}
+
+export type RelinkFileStatus =
+  | "completed"
+  | "failed_validation"
+  | "reference_collision"
+  | "manual_review_required"
+  | "not_found";
+
+/** Typed outcome of a single-item path reconciliation. */
+export interface RelinkFileResult {
+  status: RelinkFileStatus;
+  originalFilePath: string;
+  newFilePath: string;
+  fileSize: number | null;
+  collisionPath: string | null;
+  message: string | null;
 }
 
 /** Preview result of a batch dry-run operation. */
