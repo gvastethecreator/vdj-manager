@@ -226,6 +226,19 @@ where
     P: FnMut(&Path, &str, &str) -> Result<(), String>,
 {
     let original = request.original_file_path.clone();
+    let _mutation_guard = match store.begin_critical_mutation(&request.vdj_folder) {
+        Ok(guard) => guard,
+        Err(error) => {
+            return RenameFileResult::new(
+                RenameFileStatus::JournalFailure,
+                original,
+                String::new(),
+                None,
+                None,
+                Some(format!("No se pudo adquirir el lease de mutación: {error}")),
+            );
+        }
+    };
     let preflight = match rename_preflight(&request) {
         Ok(paths) => paths,
         Err((status, path, message)) => {
@@ -236,7 +249,21 @@ where
     let old_path_string = old_path.to_string_lossy().to_string();
     let new_path_string = new_path.to_string_lossy().to_string();
 
-    let item = MutationJournalItem::new(&old_path_string, Some(&new_path_string));
+    let item = match MutationJournalItem::new(&old_path_string, Some(&new_path_string))
+        .with_source_identity()
+    {
+        Ok(item) => item,
+        Err(error) => {
+            return RenameFileResult::new(
+                RenameFileStatus::FailedValidation,
+                original,
+                new_path_string,
+                None,
+                None,
+                Some(error),
+            );
+        }
+    };
     let operation = match store.plan_operation(
         &request.vdj_folder,
         MutationOperationKind::Rename,
@@ -1084,6 +1111,30 @@ fn transfer_file_no_replace(
     }
 }
 
+pub(crate) fn recovery_transfer_file(
+    operation: MutationOperationKind,
+    from: &Path,
+    to: &Path,
+) -> Result<(), String> {
+    validate_regular_file(from)?;
+    let parent = to
+        .parent()
+        .ok_or_else(|| "El destino de recovery no tiene directorio padre".to_string())?;
+    validate_target_directory(parent)?;
+    if filesystem_entry_exists(to) {
+        return Err("El destino de recovery ya existe".to_string());
+    }
+    match operation {
+        MutationOperationKind::Rename => rename_without_replace(from, to),
+        MutationOperationKind::Move => transfer_file_no_replace(from, to)
+            .map(|_| ())
+            .map_err(|error| error.message),
+        MutationOperationKind::RemoveLibrary => {
+            Err("Recovery físico de remove_library no está soportado".to_string())
+        }
+    }
+}
+
 #[tauri::command]
 pub async fn move_files_op(
     app: tauri::AppHandle,
@@ -1121,34 +1172,45 @@ where
     T: FnMut(&Path, &Path) -> Result<MoveTransferMethod, MoveTransferFailure>,
     P: FnMut(&Path, &str, &str) -> Result<(), String>,
 {
+    let _mutation_guard = store
+        .begin_critical_mutation(&request.vdj_folder)
+        .map_err(|error| format!("No se pudo adquirir el lease de mutación: {error}"))?;
     let mut planned = build_move_plan(&request)?;
-    let ready_indices: Vec<usize> = planned
+    let candidate_indices: Vec<usize> = planned
         .iter()
         .enumerate()
         .filter_map(|(index, item)| (item.result.status == MoveItemStatus::Ready).then_some(index))
         .collect();
+    if candidate_indices.is_empty() {
+        return Ok(public_move_report(&planned));
+    }
+    let mut ready_indices = Vec::new();
+    let mut journal_items = Vec::new();
+    for index in candidate_indices {
+        let source = planned[index]
+                    .source_path
+                    .as_ref()
+                    .expect("ready item has source");
+        let target = planned[index]
+                        .target_path
+                        .as_ref()
+                        .expect("ready item has target");
+        match MutationJournalItem::new(source.to_string_lossy(), Some(target.to_string_lossy()))
+            .with_source_identity()
+        {
+            Ok(item) => {
+                ready_indices.push(index);
+                journal_items.push(item);
+            }
+            Err(error) => {
+                planned[index].result.status = MoveItemStatus::FailedValidation;
+                planned[index].result.message = Some(error);
+            }
+        }
+    }
     if ready_indices.is_empty() {
         return Ok(public_move_report(&planned));
     }
-    let journal_items: Vec<MutationJournalItem> = ready_indices
-        .iter()
-        .map(|index| {
-            MutationJournalItem::new(
-                planned[*index]
-                    .source_path
-                    .as_ref()
-                    .expect("ready item has source")
-                    .to_string_lossy(),
-                Some(
-                    planned[*index]
-                        .target_path
-                        .as_ref()
-                        .expect("ready item has target")
-                        .to_string_lossy(),
-                ),
-            )
-        })
-        .collect();
     let operation = match store.plan_operation(
         &request.vdj_folder,
         MutationOperationKind::Move,
@@ -1708,6 +1770,16 @@ fn typed_relink_result(
 /// user-facing outcome.
 #[tauri::command]
 pub async fn relocate_file(
+    app: tauri::AppHandle,
+    vdj_folder: String,
+    original_file_path: String,
+    new_file_path: String,
+) -> Result<RelinkFileResult, String> {
+    let _mutation_guard = super::recovery::acquire_mutation_guard(&app, &vdj_folder)?;
+    relocate_file_core(vdj_folder, original_file_path, new_file_path).await
+}
+
+async fn relocate_file_core(
     vdj_folder: String,
     original_file_path: String,
     new_file_path: String,
@@ -2055,7 +2127,7 @@ mod tests {
         std::fs::write(&db_path, xml).expect("database fixture should be written");
         let before = std::fs::read(&db_path).expect("database should be readable");
 
-        let result = relocate_file(
+        let result = relocate_file_core(
             vdj_folder.to_string_lossy().to_string(),
             source.to_string_lossy().to_string().to_uppercase(),
             target.to_string_lossy().to_string().to_lowercase(),

@@ -12,7 +12,7 @@ use sha2::{Digest, Sha256};
 use std::collections::BTreeSet;
 use std::fmt;
 use std::fs::{self, File, OpenOptions};
-use std::io::Write;
+use std::io::{Read, Write};
 use std::path::{Path, PathBuf};
 use std::sync::atomic::{AtomicU64, Ordering};
 use std::time::{SystemTime, UNIX_EPOCH};
@@ -21,6 +21,7 @@ pub const JOURNAL_SCHEMA_VERSION: u32 = 2;
 
 const JOURNAL_DIRECTORY_NAME: &str = "mutation-journal";
 const LOCK_FILE_NAME: &str = "journal.lock";
+const MUTATION_LOCK_FILE_NAME: &str = "mutation.lock";
 const REVISION_PREFIX: &str = "revision-";
 const REVISION_SUFFIX: &str = ".json";
 const REVISION_DIGITS: usize = 20;
@@ -100,6 +101,10 @@ pub struct MutationJournalItem {
     pub item_id: String,
     pub original_file_path: String,
     pub target_file_path: Option<String>,
+    #[serde(default)]
+    pub source_file_size: Option<u64>,
+    #[serde(default)]
+    pub source_sha256: Option<String>,
     pub phase: MutationJournalPhase,
     #[serde(default)]
     pub last_error: Option<String>,
@@ -124,10 +129,47 @@ impl MutationJournalItem {
             item_id: item_id.into(),
             original_file_path: original_file_path.into(),
             target_file_path: target_file_path.map(Into::into),
+            source_file_size: None,
+            source_sha256: None,
             phase: MutationJournalPhase::Planned,
             last_error: None,
             manual_review_acknowledged: false,
         }
+    }
+
+    /// Capture immutable source identity before a filesystem mutation is planned.
+    pub fn with_source_identity(self) -> Result<Self, String> {
+        let path = PathBuf::from(&self.original_file_path);
+        self.with_source_identity_from(&path)
+    }
+
+    pub fn with_source_identity_from(mut self, path: &Path) -> Result<Self, String> {
+        let metadata = fs::symlink_metadata(path)
+            .map_err(|error| format!("No se pudo identificar el archivo fuente: {error}"))?;
+        if !metadata.file_type().is_file() || metadata.file_type().is_symlink() {
+            return Err("La fuente no es un archivo regular seguro".to_string());
+        }
+        self.source_file_size = Some(metadata.len());
+        self.source_sha256 = Some(sha256_file(path)?);
+        Ok(self)
+    }
+
+    /// Recovery must refuse files from older journals or substituted paths.
+    pub fn matches_source_identity(&self, path: &Path) -> Result<bool, String> {
+        let (Some(expected_size), Some(expected_sha256)) =
+            (self.source_file_size, self.source_sha256.as_deref())
+        else {
+            return Ok(false);
+        };
+        let metadata = fs::symlink_metadata(path)
+            .map_err(|error| format!("No se pudo verificar identidad física: {error}"))?;
+        if !metadata.file_type().is_file()
+            || metadata.file_type().is_symlink()
+            || metadata.len() != expected_size
+        {
+            return Ok(false);
+        }
+        Ok(sha256_file(path)? == expected_sha256)
     }
 
     pub fn is_pending(&self) -> bool {
@@ -528,6 +570,12 @@ pub struct MutationJournalStore {
     app_data_dir: PathBuf,
 }
 
+/// Exclusive library-scoped lease held for the complete duration of an
+/// unjournaled critical mutation. Dropping it releases the OS-backed lock.
+pub struct CriticalMutationGuard {
+    _lock: LibraryLock,
+}
+
 impl MutationJournalStore {
     /// Construct a store scoped to an explicitly supplied app-data root.
     pub fn new(app_data_dir: impl AsRef<Path>) -> Self {
@@ -542,6 +590,34 @@ impl MutationJournalStore {
 
     pub fn journal_directory(&self) -> PathBuf {
         self.app_data_dir.join(JOURNAL_DIRECTORY_NAME)
+    }
+
+    pub fn begin_critical_mutation(
+        &self,
+        library_path: impl AsRef<Path>,
+    ) -> Result<CriticalMutationGuard, MutationJournalError> {
+        let library = MutationJournalLibrary::from_path(library_path)?;
+        let guard = self.acquire_mutation_lock(&library)?;
+        let document = self.load_library(&library.path)?;
+        if let Some(blocking) = document.operations.iter().find(|entry| entry.is_pending()) {
+            return Err(MutationJournalError::PendingRecoveryBlocksMutation {
+                library_key: library.key,
+                journal_id: blocking.journal_id.clone(),
+            });
+        }
+        Ok(CriticalMutationGuard { _lock: guard })
+    }
+
+    /// Recovery holds the same cross-process choreography lease as normal
+    /// mutation engines, but it is allowed to start while journals are pending.
+    pub fn begin_recovery_mutation(
+        &self,
+        library_path: impl AsRef<Path>,
+    ) -> Result<CriticalMutationGuard, MutationJournalError> {
+        let library = MutationJournalLibrary::from_path(library_path)?;
+        Ok(CriticalMutationGuard {
+            _lock: self.acquire_mutation_lock(&library)?,
+        })
     }
 
     /// Return the fixed-length per-library directory. The directory name is
@@ -751,13 +827,29 @@ impl MutationJournalStore {
         library: &MutationJournalLibrary,
         mode: LockMode,
     ) -> Result<LibraryLock, MutationJournalError> {
+        self.acquire_named_lock(library, LOCK_FILE_NAME, mode)
+    }
+
+    fn acquire_mutation_lock(
+        &self,
+        library: &MutationJournalLibrary,
+    ) -> Result<LibraryLock, MutationJournalError> {
+        self.acquire_named_lock(library, MUTATION_LOCK_FILE_NAME, LockMode::Exclusive)
+    }
+
+    fn acquire_named_lock(
+        &self,
+        library: &MutationJournalLibrary,
+        file_name: &str,
+        mode: LockMode,
+    ) -> Result<LibraryLock, MutationJournalError> {
         let directory = self.directory_for_key(&library.key);
         fs::create_dir_all(&directory).map_err(|source| MutationJournalError::Io {
             context: "crear directorio del journal",
             path: directory.clone(),
             source,
         })?;
-        let lock_path = directory.join(LOCK_FILE_NAME);
+        let lock_path = directory.join(file_name);
         let file = OpenOptions::new()
             .read(true)
             .write(true)
@@ -1355,6 +1447,24 @@ fn new_id(prefix: &str) -> String {
     )
 }
 
+fn sha256_file(path: &Path) -> Result<String, String> {
+    let file = File::open(path)
+        .map_err(|error| format!("No se pudo abrir el archivo para identificarlo: {error}"))?;
+    let mut reader = std::io::BufReader::new(file);
+    let mut digest = Sha256::new();
+    let mut buffer = [0_u8; 64 * 1024];
+    loop {
+        let read = reader
+            .read(&mut buffer)
+            .map_err(|error| format!("No se pudo calcular identidad SHA-256: {error}"))?;
+        if read == 0 {
+            break;
+        }
+        digest.update(&buffer[..read]);
+    }
+    Ok(format!("{:x}", digest.finalize()))
+}
+
 #[cfg(test)]
 mod tests {
     use super::*;
@@ -1451,6 +1561,36 @@ mod tests {
             .expect("latest generation should load");
         assert_eq!(document.operations.len(), 2);
         assert_eq!(document.revision, 2);
+        cleanup(&root);
+    }
+
+    #[test]
+    fn critical_mutation_guard_serializes_plan_check_and_write_window() {
+        let root = temp_dir("critical-guard");
+        let store = Arc::new(MutationJournalStore::new(&root));
+        let guard = store
+            .begin_critical_mutation(r"C:\VirtualDJ")
+            .expect("clean library should lease mutation window");
+        let (tx, rx) = std::sync::mpsc::channel();
+        let worker_store = Arc::clone(&store);
+        let worker = thread::spawn(move || {
+            let _worker_guard = worker_store
+                .begin_recovery_mutation(r"C:\VirtualDJ")
+                .expect("planner should acquire choreography lease");
+            let result = worker_store.plan_operation(
+                r"C:\VirtualDJ",
+                MutationOperationKind::Rename,
+                vec![rename_item(99)],
+            );
+            tx.send(result).expect("result should be observed");
+        });
+
+        assert!(rx.recv_timeout(std::time::Duration::from_millis(100)).is_err());
+        drop(guard);
+        rx.recv_timeout(std::time::Duration::from_secs(2))
+            .expect("planner should continue after the full mutation window")
+            .expect("planner should persist");
+        worker.join().expect("planner thread should finish");
         cleanup(&root);
     }
 

@@ -5,4 +5,5 @@ pub mod configs;
 pub mod duplicates;
 pub mod files;
 pub mod playlists;
+pub mod recovery;
 pub mod waveforms;

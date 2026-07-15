@@ -2,6 +2,7 @@ import type { ReactNode } from "react";
 import { Database, RotateCw, X } from "lucide-react";
 import { Sidebar } from "./Sidebar";
 import { SafetyInspector } from "./SafetyInspector";
+import { RecoveryCenter } from "./RecoveryCenter";
 import { useApp } from "../App";
 
 /** Main layout shell: sidebar + scrollable content area with error banner. */
@@ -33,6 +34,7 @@ export function Layout({ children }: { children: ReactNode }) {
                         Recargar
                     </button>
                 </header>
+                <RecoveryCenter />
                 <div className="flex min-h-0 flex-1">
                     <main className="min-w-0 flex-1 overflow-auto p-5">
                         {error && (

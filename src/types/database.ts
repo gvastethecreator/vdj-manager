@@ -310,6 +310,54 @@ export interface MoveBatchReport {
   items: MoveItemResult[];
 }
 
+export type MutationRecoveryAction = "resume" | "rollback" | "manual_review_acknowledged";
+export type MutationOperationKind = "rename" | "move" | "remove_library";
+
+export interface MutationJournalItem {
+  itemId: string;
+  originalFilePath: string;
+  targetFilePath: string | null;
+  sourceFileSize: number | null;
+  sourceSha256: string | null;
+  phase: MutationJournalPhase;
+  lastError: string | null;
+  manualReviewAcknowledged: boolean;
+}
+
+export interface MutationRecoveryEntry {
+  journal: {
+    journalId: string;
+    operation: MutationOperationKind;
+    phase: MutationJournalPhase;
+    outcomeSummary: string;
+    createdAtMs: number;
+    updatedAtMs: number;
+    items: MutationJournalItem[];
+  };
+  recommendedAction: MutationRecoveryAction | null;
+  allowedActions: MutationRecoveryAction[];
+}
+
+export interface MutationRecoveryState {
+  status: "clean" | "pending_recovery";
+  libraryKey: string;
+  recommendedAction: MutationRecoveryAction | null;
+  allowedActions: MutationRecoveryAction[];
+  entries: MutationRecoveryEntry[];
+}
+
+export interface ApplyRecoveryResult {
+  state: MutationRecoveryState;
+  outcomes: Array<{
+    journalId: string;
+    itemId: string;
+    originalFilePath: string;
+    targetFilePath: string | null;
+    status: "resolved" | "manual_review_required" | "failed";
+    message: string;
+  }>;
+}
+
 /** Preview result of a batch dry-run operation. */
 export interface DryRunResult {
   description: string;

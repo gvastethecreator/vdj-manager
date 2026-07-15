@@ -2,12 +2,21 @@ import { useState, createContext, useContext, useCallback, useEffect } from "rea
 import type { ReactNode } from "react";
 import { open } from "@tauri-apps/plugin-dialog";
 import {
+    applyMutationRecoveryAction,
+    getMutationRecoveryState,
     loadDatabase,
     getDatabaseStats,
     mergeFolderLists,
 } from "./lib/api";
 import { log } from "./lib/logger";
-import type { SongSummary, DatabaseStats, Page } from "./types/database";
+import type {
+    ApplyRecoveryResult,
+    DatabaseStats,
+    MutationRecoveryAction,
+    MutationRecoveryState,
+    Page,
+    SongSummary,
+} from "./types/database";
 import { ErrorBoundary } from "./components/ErrorBoundary";
 import { Layout } from "./components/Layout";
 import { getDemoAppState, getDemoInitialPage, isDemoMode } from "./lib/demoData";
@@ -23,6 +32,7 @@ import { Configs } from "./pages/Configs";
 import { Playlists } from "./pages/Playlists";
 import { Pads } from "./pages/Pads";
 import { Mappers } from "./pages/Mappers";
+import { getDemoRecoveryState, isMutationBlocked } from "./lib/recovery";
 
 export type Theme = "dark" | "light" | "blue" | "teal" | "green" | "amber" | "red";
 
@@ -55,6 +65,13 @@ interface AppContextType extends AppState {
     theme: Theme;
     toggleTheme: () => void;
     setTheme: (t: Theme) => void;
+    recoveryState: MutationRecoveryState | null;
+    recoveryError: string | null;
+    recoveryLoading: boolean;
+    recoveryOutcomes: ApplyRecoveryResult["outcomes"];
+    mutationsBlocked: boolean;
+    refreshRecovery: () => Promise<void>;
+    resolveRecovery: (action: MutationRecoveryAction, journalId: string) => Promise<void>;
 }
 
 const AppContext = createContext<AppContextType | null>(null);
@@ -111,6 +128,12 @@ export default function App() {
             return "dark";
         }
     });
+    const [recoveryState, setRecoveryState] = useState<MutationRecoveryState | null>(
+        demoMode ? getDemoRecoveryState() : null,
+    );
+    const [recoveryError, setRecoveryError] = useState<string | null>(null);
+    const [recoveryLoading, setRecoveryLoading] = useState(false);
+    const [recoveryOutcomes, setRecoveryOutcomes] = useState<ApplyRecoveryResult["outcomes"]>([]);
 
     useEffect(() => {
         document.documentElement.setAttribute("data-theme", theme);
@@ -160,10 +183,19 @@ export default function App() {
         log.info(`Loading database from ${folder}`);
         setState((prev) => ({ ...prev, loading: true, error: null }));
         try {
-            const [songs, stats] = await Promise.all([
+            const recoveryRequest = demoMode
+                ? Promise.resolve({ state: getDemoRecoveryState(), error: null })
+                : getMutationRecoveryState(folder)
+                    .then((next) => ({ state: next, error: null }))
+                    .catch((error: unknown) => ({ state: null, error: String(error) }));
+            const [songs, stats, recovery] = await Promise.all([
                 loadDatabase(folder),
                 getDatabaseStats(folder),
+                recoveryRequest,
             ]);
+            setRecoveryState(recovery.state);
+            setRecoveryError(recovery.error);
+            setRecoveryOutcomes([]);
             log.info(`Loaded ${songs.length} songs`);
             setState((prev) => ({
                 ...prev,
@@ -187,7 +219,57 @@ export default function App() {
                 error: String(err),
             }));
         }
-    }, []);
+    }, [demoMode]);
+
+    const refreshRecovery = useCallback(async () => {
+        if (!state.vdjFolder) return;
+        setRecoveryLoading(true);
+        try {
+            const next = demoMode ? (recoveryState ?? getDemoRecoveryState()) : await getMutationRecoveryState(state.vdjFolder);
+            setRecoveryState(next);
+            setRecoveryError(null);
+        } catch (error) {
+            setRecoveryError(String(error));
+        } finally {
+            setRecoveryLoading(false);
+        }
+    }, [demoMode, recoveryState, state.vdjFolder]);
+
+    const resolveRecovery = useCallback(async (action: MutationRecoveryAction, journalId: string) => {
+        if (!state.vdjFolder) return;
+        setRecoveryLoading(true);
+        setRecoveryError(null);
+        try {
+            if (demoMode) {
+                setRecoveryState({
+                    status: "clean",
+                    libraryKey: "demo-virtualdj",
+                    recommendedAction: null,
+                    allowedActions: [],
+                    entries: [],
+                });
+                setRecoveryOutcomes([{
+                    journalId: "demo-recovery-001",
+                    itemId: "demo-item-001",
+                    originalFilePath: "D:\\Music\\Incoming\\Demo Track.mp3",
+                    targetFilePath: "D:\\Music\\House\\Demo Track.mp3",
+                    status: "resolved",
+                    message: action === "rollback" ? "Rollback de demostración completado." : "Recuperación de demostración completada.",
+                }]);
+                return;
+            }
+            const result = await applyMutationRecoveryAction(state.vdjFolder, action, journalId);
+            setRecoveryState(result.state);
+            if (result.state.status === "clean") {
+                await loadFromFolder(state.vdjFolder, { targetPage: state.page });
+            }
+            setRecoveryOutcomes(result.outcomes);
+        } catch (error) {
+            setRecoveryError(String(error));
+        } finally {
+            setRecoveryLoading(false);
+        }
+    }, [demoMode, loadFromFolder, state.page, state.vdjFolder]);
 
     const selectFolder = useCallback(async () => {
         const selected = await open({
@@ -233,6 +315,13 @@ export default function App() {
         theme,
         toggleTheme,
         setTheme,
+        recoveryState,
+        recoveryError,
+        recoveryLoading,
+        recoveryOutcomes,
+        mutationsBlocked: isMutationBlocked(recoveryState, recoveryError),
+        refreshRecovery,
+        resolveRecovery,
     };
 
     function renderPage(): ReactNode {

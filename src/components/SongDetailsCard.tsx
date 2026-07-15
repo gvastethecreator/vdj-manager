@@ -206,7 +206,7 @@ function SectionTitle({ children }: { children: ReactNode }) {
 
 /** Dense VirtualDJ-inspired tag editor adapted to the app design system. */
 export function SongDetailsCard({ song }: { song: SongSummary }) {
-    const { vdjFolder, patchSong, setError } = useApp();
+    const { vdjFolder, patchSong, setError, refreshRecovery, mutationsBlocked } = useApp();
     const rowColor = getEffectiveColor(song);
     const [form, setForm] = useState<TagFormState>(() => formStateFromSong(song, rowColor));
     const [saving, setSaving] = useState(false);
@@ -219,7 +219,7 @@ export function SongDetailsCard({ song }: { song: SongSummary }) {
 
     const initialForm = useMemo(() => formStateFromSong(song, rowColor), [song, rowColor]);
     const dirty = JSON.stringify(form) !== JSON.stringify(initialForm);
-    const editable = song.in_database && Boolean(vdjFolder);
+    const editable = song.in_database && Boolean(vdjFolder) && !mutationsBlocked;
     const title = form.title || song.file_name;
     const artist = form.author || "Artista desconocido";
     const folderPath = song.file_path.includes("\\")
@@ -247,6 +247,7 @@ export function SongDetailsCard({ song }: { song: SongSummary }) {
             patchSong(song.index, buildSongPatch(form, includeColor));
             setStatus("Etiquetas guardadas");
         } catch (err) {
+            await refreshRecovery();
             const message = `No se pudieron guardar las etiquetas: ${String(err)}`;
             setError(message);
             setStatus(message);
@@ -282,6 +283,7 @@ export function SongDetailsCard({ song }: { song: SongSummary }) {
                     </button>
                 </div>
             </div>
+            {mutationsBlocked ? <div className="border-b border-warning/25 bg-warning/8 px-3 py-1.5 text-[10px] text-warning">Edición pausada por recuperación pendiente.</div> : null}
 
             <div className="grid gap-3 p-3 xl:grid-cols-[minmax(0,1fr)_11rem]">
                 <div className="min-w-0 space-y-3">

@@ -26,6 +26,9 @@ import type {
   LibraryRemovalMode,
   LibraryRemovalResult,
   MoveBatchReport,
+  MutationRecoveryAction,
+  MutationRecoveryState,
+  ApplyRecoveryResult,
 } from "../types/database";
 import { compareDriveAwarePaths, getParentDirectory } from "./pathUtils";
 
@@ -119,6 +122,22 @@ export async function removeLibraryEntries(
 ): Promise<LibraryRemovalResult[]> {
   return invoke<LibraryRemovalResult[]>("remove_library_entries_command", {
     request: { vdjFolder, items, mode },
+  });
+}
+
+export async function getMutationRecoveryState(
+  vdjFolder: string,
+): Promise<MutationRecoveryState> {
+  return invoke<MutationRecoveryState>("get_mutation_recovery_state", { vdjFolder });
+}
+
+export async function applyMutationRecoveryAction(
+  vdjFolder: string,
+  action: MutationRecoveryAction,
+  journalId: string,
+): Promise<ApplyRecoveryResult> {
+  return invoke<ApplyRecoveryResult>("apply_mutation_recovery_action", {
+    request: { vdjFolder, action, journalId },
   });
 }
 

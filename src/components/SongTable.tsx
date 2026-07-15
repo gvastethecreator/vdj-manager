@@ -284,7 +284,7 @@ export function SongTable({
     useEffect(() => onWaveformQueueChange((pending, active) => setWaveformQueue({ pending, active })), []);
 
     // ── Inline edit state ──
-    const { vdjFolder, patchSong, setError } = useApp();
+    const { vdjFolder, patchSong, setError, refreshRecovery, mutationsBlocked } = useApp();
     const [editState, setEditState] = useState<{ songIndex: number; columnKey: ColumnKey; value: string } | null>(null);
 
     const patchFromEditableTag = useCallback((editableTag: string, value: string): Partial<SongSummary> => {
@@ -301,6 +301,7 @@ export function SongTable({
     }, []);
 
     const onStartEdit = useCallback((songIndex: number, columnKey: ColumnKey) => {
+        if (mutationsBlocked) return;
         const song = songs.find((s) => s.index === songIndex);
         if (!song) return;
         if (!song.in_database) return;
@@ -308,14 +309,14 @@ export function SongTable({
         if (!col?.editableTag) return;
         const currentValue = (song as unknown as Record<string, unknown>)[columnKey] as string | null;
         setEditState({ songIndex, columnKey, value: currentValue ?? "" });
-    }, [songs]);
+    }, [mutationsBlocked, songs]);
 
     const onEditChange = useCallback((value: string) => {
         setEditState((prev) => prev ? { ...prev, value } : null);
     }, []);
 
     const onEditCommit = useCallback(async () => {
-        if (!editState || !vdjFolder) return;
+        if (!editState || !vdjFolder || mutationsBlocked) return;
         const col = ALL_COLUMNS.find((c) => c.key === editState.columnKey);
         if (!col?.editableTag) return;
         const song = songs.find((candidate) => candidate.index === editState.songIndex);
@@ -328,16 +329,17 @@ export function SongTable({
             patchSong(editState.songIndex, patchFromEditableTag(col.editableTag, editState.value));
             setEditState(null);
         } catch (err) {
+            await refreshRecovery();
             console.error("Error updating tag:", err);
             setError(`No se pudo actualizar el tag: ${String(err)}`);
         }
-    }, [editState, vdjFolder, patchFromEditableTag, patchSong, setError, songs]);
+    }, [editState, mutationsBlocked, vdjFolder, patchFromEditableTag, patchSong, refreshRecovery, setError, songs]);
 
     const onEditCancel = useCallback(() => setEditState(null), []);
 
     // ── Star click ──
     const onStarClick = useCallback(async (songIndex: number, stars: number) => {
-        if (!vdjFolder) return;
+        if (!vdjFolder || mutationsBlocked) return;
         const song = songs.find((s) => s.index === songIndex);
         if (!song?.in_database) return;
         try {
@@ -347,10 +349,11 @@ export function SongTable({
             }
             patchSong(songIndex, { stars: stars > 0 ? String(stars) : null });
         } catch (err) {
+            await refreshRecovery();
             console.error("Error updating stars:", err);
             setError(`No se pudo actualizar la puntuación: ${String(err)}`);
         }
-    }, [vdjFolder, patchSong, setError, songs]);
+    }, [mutationsBlocked, vdjFolder, patchSong, refreshRecovery, setError, songs]);
 
     // ── Audio playback ──
     const [playingPath, setPlayingPath] = useState<string | null>(null);
@@ -374,13 +377,14 @@ export function SongTable({
     const [colorPicker, setColorPicker] = useState<{ songIndex: number; position: { x: number; y: number } } | null>(null);
 
     const onColorClick = useCallback((songIndex: number, e: React.MouseEvent) => {
+        if (mutationsBlocked) return;
         const song = songs.find((s) => s.index === songIndex);
         if (!song?.in_database) return;
         setColorPicker({ songIndex, position: { x: e.clientX, y: e.clientY } });
-    }, [songs]);
+    }, [mutationsBlocked, songs]);
 
     const onColorSelect = useCallback(async (color: string | null) => {
-        if (!colorPicker || !vdjFolder) return;
+        if (!colorPicker || !vdjFolder || mutationsBlocked) return;
         const song = songs.find((candidate) => candidate.index === colorPicker.songIndex);
         if (!song?.in_database) return;
         try {
@@ -400,10 +404,11 @@ export function SongTable({
             patchSong(colorPicker.songIndex, { color: colorValue || null });
             setColorPicker(null);
         } catch (err) {
+            await refreshRecovery();
             console.error("Error updating color:", err);
             setError(`No se pudo actualizar el color: ${String(err)}`);
         }
-    }, [colorPicker, vdjFolder, patchSong, setError, songs]);
+    }, [colorPicker, mutationsBlocked, vdjFolder, patchSong, refreshRecovery, setError, songs]);
 
     const persistVisibleColumns = useCallback((next: Set<ColumnKey>) => {
         try {

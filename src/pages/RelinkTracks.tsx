@@ -11,6 +11,7 @@ import {
 } from "../lib/api";
 import { isRelinkMatchForPath, relinkReasonLabel } from "../lib/relink";
 import { getPathLeafName, normalizePathSeparators } from "../lib/pathUtils";
+import { MutationBlockedNotice } from "../components/MutationBlockedNotice";
 import type {
   FileVerification,
   RelinkFileResult,
@@ -54,6 +55,8 @@ export function RelinkTracks() {
     musicFolders,
     addMusicFolder,
     selectMusicFolder,
+    mutationsBlocked,
+    refreshRecovery,
   } = useApp();
   const [results, setResults] = useState<FileVerification[] | null>(null);
   const [loading, setLoading] = useState(false);
@@ -151,7 +154,7 @@ export function RelinkTracks() {
   }
 
   function requestRelink(newFilePath: string, candidate: SimilarFileCandidate | null = null) {
-    if (!selectedItem) return;
+    if (!selectedItem || mutationsBlocked) return;
     setPending({
       originalFilePath: selectedItem.verification.file_path,
       newFilePath,
@@ -160,7 +163,7 @@ export function RelinkTracks() {
   }
 
   async function confirmRelink() {
-    if (!vdjFolder || !pending) return;
+    if (!vdjFolder || !pending || mutationsBlocked) return;
     setRelocating(true);
     try {
       const result = await relocateFile(vdjFolder, pending.originalFilePath, pending.newFilePath);
@@ -174,6 +177,7 @@ export function RelinkTracks() {
     } catch (error) {
       setError(String(error));
     } finally {
+      await refreshRecovery();
       setRelocating(false);
     }
   }
@@ -264,6 +268,7 @@ export function RelinkTracks() {
       </aside>
 
       <section className="min-w-0 flex-1 overflow-auto p-4">
+        <MutationBlockedNotice />
         {!selectedItem ? (
           <div className="flex h-full items-center justify-center rounded-xl border border-dashed border-border bg-surface/40 px-6 text-center text-text-muted">
             Selecciona una entrada faltante para revisar candidatos.
@@ -294,7 +299,7 @@ export function RelinkTracks() {
                   <Search className="h-3.5 w-3.5" />
                   {searching ? "Buscando candidatos..." : "Buscar candidatos"}
                 </button>
-                <button type="button" onClick={() => void manualRelocate()} disabled={relocating} className="btn btn-ghost btn-sm">
+                <button type="button" onClick={() => void manualRelocate()} disabled={relocating || mutationsBlocked} className="btn btn-ghost btn-sm">
                   <FolderOpen className="h-3.5 w-3.5" />
                   Elegir archivo manualmente
                 </button>
@@ -323,7 +328,7 @@ export function RelinkTracks() {
                             {candidate.reasons.map((reason) => <span key={reason} className="badge bg-success/15 text-success">{relinkReasonLabel(reason)}</span>)}
                           </div>
                         </div>
-                        <button type="button" onClick={() => requestRelink(candidate.path, candidate)} disabled={relocating} className="btn btn-success btn-sm shrink-0">
+                        <button type="button" onClick={() => requestRelink(candidate.path, candidate)} disabled={relocating || mutationsBlocked} className="btn btn-success btn-sm shrink-0">
                           Confirmar ruta
                         </button>
                       </div>
@@ -343,7 +348,7 @@ export function RelinkTracks() {
                 </div>
                 <div className="mt-3 flex justify-end gap-2">
                   <button type="button" onClick={() => setPending(null)} disabled={relocating} className="btn btn-ghost btn-sm">Cancelar</button>
-                  <button type="button" onClick={() => void confirmRelink()} disabled={relocating} className="btn btn-primary btn-sm">
+                  <button type="button" onClick={() => void confirmRelink()} disabled={relocating || mutationsBlocked} className="btn btn-primary btn-sm">
                     {relocating ? "Guardando..." : "Confirmar y guardar"}
                   </button>
                 </div>

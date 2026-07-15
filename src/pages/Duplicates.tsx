@@ -5,6 +5,7 @@ import { findDuplicates, getDirectory, removeLibraryEntries, moveFilesOp } from 
 import { dedupeRemovalPaths, removalStatusLabel, summarizeRemoval } from "../lib/libraryRemoval";
 import { moveStatusLabel, transferMethodLabel } from "../lib/moveReport";
 import { SongMiniTable } from "../components/SongTable";
+import { MutationBlockedNotice } from "../components/MutationBlockedNotice";
 import type { DuplicateResult, DuplicateGroup, LibraryRemovalResult, MoveBatchReport } from "../types/database";
 
 type DupTab = "by_name" | "by_size" | "by_hash";
@@ -13,7 +14,7 @@ type DeleteModal = { open: false } | { open: true; dbOnly: boolean };
 
 /** Three-tab duplicate finder with selection, filters and bulk actions. */
 export function Duplicates() {
-    const { vdjFolder, setError, reload } = useApp();
+    const { vdjFolder, setError, reload, refreshRecovery, mutationsBlocked } = useApp();
     const [result, setResult] = useState<DuplicateResult | null>(null);
     const [loading, setLoading] = useState(false);
     const [tab, setTab] = useState<DupTab>("by_name");
@@ -30,6 +31,7 @@ export function Duplicates() {
     const [moveReport, setMoveReport] = useState<MoveBatchReport | null>(null);
 
     async function moveSelected() {
+        if (mutationsBlocked) return;
         if (!vdjFolder || selected.size === 0) return;
         const folder = await open({ directory: true, title: "Mover archivos seleccionados a…" });
         if (!folder) return;
@@ -45,6 +47,7 @@ export function Duplicates() {
         } catch (err) {
             setError(String(err));
         } finally {
+            await refreshRecovery();
             setLoading(false);
             setActionRunning(false);
         }
@@ -153,6 +156,7 @@ export function Duplicates() {
     }
 
     async function confirmDelete(deleteFiles: boolean) {
+        if (mutationsBlocked) return;
         if (!vdjFolder || selectedPaths.length === 0) return;
         setDeleteModal({ open: false });
         setActionRunning(true);
@@ -172,6 +176,7 @@ export function Duplicates() {
         } catch (err) {
             setError(String(err));
         } finally {
+            await refreshRecovery();
             setLoading(false);
             setActionRunning(false);
         }
@@ -179,6 +184,7 @@ export function Duplicates() {
 
     return (
         <div className="space-y-3">
+            <MutationBlockedNotice />
             <div className="flex items-center justify-between">
                 <h2 className="text-lg font-bold text-text">Duplicados</h2>
                 <button onClick={runScan} disabled={loading || !vdjFolder} className="btn btn-primary">
@@ -252,21 +258,21 @@ export function Duplicates() {
                             </span>
                             <button
                                 onClick={moveSelected}
-                                disabled={actionRunning}
+                                disabled={actionRunning || mutationsBlocked}
                                 className="btn btn-ghost btn-sm"
                             >
                                 Mover a directorio…
                             </button>
                             <button
                                 onClick={() => setDeleteModal({ open: true, dbOnly: true })}
-                                disabled={actionRunning}
+                                disabled={actionRunning || mutationsBlocked}
                                 className="btn btn-ghost btn-sm"
                             >
                                 Eliminar de la BD
                             </button>
                             <button
                                 onClick={() => setDeleteModal({ open: true, dbOnly: false })}
-                                disabled={actionRunning}
+                                disabled={actionRunning || mutationsBlocked}
                                 className="btn btn-danger btn-sm"
                             >
                                 Eliminar de BD + Papelera

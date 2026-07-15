@@ -9,7 +9,7 @@ pub mod database;
 pub mod mutation_journal;
 pub mod safety;
 
-use commands::{configs, database as db_commands, duplicates, files, playlists, waveforms};
+use commands::{configs, database as db_commands, duplicates, files, playlists, recovery, waveforms};
 
 /// Bootstrap and run the Tauri application with all plugins and commands.
 #[cfg_attr(mobile, tauri::mobile_entry_point)]
@@ -36,6 +36,8 @@ pub fn run() {
             files::relocate_file,
             files::list_subdirectories,
             files::dry_run_rename,
+            recovery::get_mutation_recovery_state,
+            recovery::apply_mutation_recovery_action,
             duplicates::find_duplicates,
             playlists::list_playlists,
             playlists::read_playlist,

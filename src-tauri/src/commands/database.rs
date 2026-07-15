@@ -70,7 +70,12 @@ pub async fn get_database_stats(vdj_folder: String) -> Result<DatabaseStats, Str
 
 /// Apply batch tag updates from JSON. Creates `.xml.bak` before writing.
 #[tauri::command]
-pub async fn save_database(vdj_folder: String, songs_json: String) -> Result<(), String> {
+pub async fn save_database(
+    app: tauri::AppHandle,
+    vdj_folder: String,
+    songs_json: String,
+) -> Result<(), String> {
+    let _mutation_guard = super::recovery::acquire_mutation_guard(&app, &vdj_folder)?;
     let db_path = PathBuf::from(&vdj_folder).join("database.xml");
 
     // Read the existing database
@@ -96,7 +101,11 @@ pub async fn save_database(vdj_folder: String, songs_json: String) -> Result<(),
 /// the narrow patch-in-place write; this command intentionally does not fall
 /// back to the legacy whole-document serializer.
 #[tauri::command]
-pub async fn update_song_tags(request: UpdateSongTagsRequest) -> Result<UpdateSongTagsResult, String> {
+pub async fn update_song_tags(
+    app: tauri::AppHandle,
+    request: UpdateSongTagsRequest,
+) -> Result<UpdateSongTagsResult, String> {
+    let _mutation_guard = super::recovery::acquire_mutation_guard(&app, &request.vdj_folder)?;
     let db_path = PathBuf::from(&request.vdj_folder).join("database.xml");
     match parser::patch_song_in_place(&db_path, &request.original_file_path, &request.update) {
         Ok(result) => Ok(result),
@@ -323,8 +332,10 @@ where
 /// Tauri wrapper for the typed library-removal core.
 #[tauri::command]
 pub async fn remove_library_entries_command(
+    app: tauri::AppHandle,
     request: RemoveLibraryEntriesRequest,
 ) -> Result<Vec<LibraryRemovalResult>, String> {
+    let _mutation_guard = super::recovery::acquire_mutation_guard(&app, &request.vdj_folder)?;
     let db_path = PathBuf::from(request.vdj_folder).join("database.xml");
     remove_library_entries(&db_path, &request.items, request.mode, |path| {
         trash::delete(path).map_err(|error| format!("No se pudo enviar a papelera: {}", error))

@@ -3,7 +3,7 @@ import { useApp } from "../App";
 
 /** Persistent safety context for database-writing workflows. */
 export function SafetyInspector() {
-    const { songs, stats, setPage } = useApp();
+    const { songs, stats, setPage, mutationsBlocked, recoveryState, recoveryError } = useApp();
     const missingTags = songs.filter((song) => !song.title || !song.author || !song.bpm).length;
     const externalSongs = songs.filter((song) => !song.in_database).length;
     const cueCoverage = stats && stats.total_songs > 0
@@ -34,7 +34,15 @@ export function SafetyInspector() {
                         </div>
                         <div className="flex items-center justify-between">
                             <span className="text-text-muted">writes</span>
-                            <span className="badge bg-info/12 text-info">atomic</span>
+                            <span className={`badge ${mutationsBlocked ? "bg-warning/12 text-warning" : "bg-info/12 text-info"}`}>
+                                {mutationsBlocked ? "pausadas" : "atomic"}
+                            </span>
+                        </div>
+                        <div className="flex items-center justify-between">
+                            <span className="text-text-muted">recovery</span>
+                            <span className={`badge ${mutationsBlocked ? "bg-warning/12 text-warning" : "bg-success/12 text-success"}`}>
+                                {recoveryError ? "sin verificar" : recoveryState?.status === "pending_recovery" ? "pendiente" : "limpio"}
+                            </span>
                         </div>
                     </div>
                 </section>

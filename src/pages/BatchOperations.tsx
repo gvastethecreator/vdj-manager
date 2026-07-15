@@ -3,6 +3,7 @@ import { open } from "@tauri-apps/plugin-dialog";
 import { useApp } from "../App";
 import { SongTable } from "../components/SongTable";
 import { FolderTree } from "../components/FolderTree";
+import { MutationBlockedNotice } from "../components/MutationBlockedNotice";
 import {
     moveFilesOp, renameFileOp, saveSongUpdates,
     planMoveFiles, getConfiguredMusicRoots,
@@ -14,7 +15,7 @@ type BatchAction = "move" | "rename" | "tag";
 
 /** Batch operations page: move, rename, and tag-edit selected songs. */
 export function BatchOperations() {
-    const { songs, vdjFolder, setError, reload, musicFolders, addMusicFolder, selectMusicFolder } = useApp();
+    const { songs, vdjFolder, setError, reload, refreshRecovery, musicFolders, addMusicFolder, selectMusicFolder, mutationsBlocked } = useApp();
     const [selected, setSelected] = useState<Set<number>>(new Set());
     const [action, setAction] = useState<BatchAction>("move");
     const [targetFolder, setTargetFolder] = useState("");
@@ -105,6 +106,10 @@ export function BatchOperations() {
     }
 
     async function execute() {
+        if (mutationsBlocked) {
+            setError("Operación pausada: resuelve primero la recuperación pendiente.");
+            return;
+        }
         if (!vdjFolder || selected.size === 0) return;
         setRunning(true);
         setLog([]);
@@ -144,6 +149,7 @@ export function BatchOperations() {
         } catch (err) {
             setError(String(err));
         } finally {
+            await refreshRecovery();
             setRunning(false);
         }
     }
@@ -180,6 +186,7 @@ export function BatchOperations() {
             {/* ── Right: main content ── */}
             <div className="min-w-0 flex-1 space-y-3 overflow-auto p-3">
                 <h2 className="text-lg font-bold text-text">Operaciones en Lote</h2>
+                <MutationBlockedNotice />
 
                 {/* Action tabs */}
                 <div className="tab-group">
@@ -287,7 +294,7 @@ export function BatchOperations() {
                                 disabled={running || selected.size === 0 || (action === "move" && targetFolder.length === 0) || (action === "rename" && (selected.size !== 1 || renameFileName.length === 0)) || (action === "tag" && running_tag_fields.length === 0)}
                                 className="btn btn-warning">Vista Previa</button>
                             <button type="button" onClick={execute}
-                                disabled={running || selected.size === 0 || (action === "move" && targetFolder.length === 0) || (action === "rename" && (selected.size !== 1 || renameFileName.length === 0)) || (action === "tag" && running_tag_fields.length === 0)}
+                                disabled={mutationsBlocked || running || selected.size === 0 || (action === "move" && targetFolder.length === 0) || (action === "rename" && (selected.size !== 1 || renameFileName.length === 0)) || (action === "tag" && running_tag_fields.length === 0)}
                                 className="btn btn-primary">
                                 {running ? "Ejecutando..." : "Ejecutar"}
                             </button>
