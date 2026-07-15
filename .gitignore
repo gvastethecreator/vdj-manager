@@ -40,3 +40,4 @@ src-tauri/gen/
 
 # ── Misc ──
 *.tsbuildinfo
+.scratch/
