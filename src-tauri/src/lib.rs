@@ -24,7 +24,7 @@ pub fn run() {
             db_commands::get_database_stats,
             db_commands::save_database,
             db_commands::update_song_tags,
-            db_commands::delete_songs,
+            db_commands::remove_library_entries_command,
             files::verify_files,
             files::scan_music_folder,
             files::rename_file_op,

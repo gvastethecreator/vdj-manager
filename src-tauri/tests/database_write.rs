@@ -7,7 +7,7 @@ use vdj_manager_lib::database::models::{
 };
 use vdj_manager_lib::database::parser::{
     normalize_windows_path, parse_database, patch_song_in_place, patch_song_path_in_place,
-    windows_paths_equal, write_database_checked,
+    remove_song_in_place, RemoveSongStatus, windows_paths_equal, write_database_checked,
 };
 
 fn fixture(name: &str) -> PathBuf {
@@ -423,6 +423,74 @@ fn self_closing_comments_expand_without_losing_unknown_attributes() {
             .and_then(|comment| comment.text.as_deref()),
         Some("future comment")
     );
+
+    fs::remove_dir_all(&dir).expect("temp dir should be removed");
+}
+
+#[test]
+fn remove_song_in_place_removes_direct_song_and_preserves_unknown_xml() {
+    let dir = unique_temp_dir("database-remove-in-place");
+    fs::create_dir_all(&dir).expect("temp dir should be created");
+    let db_path = dir.join("database.xml");
+    fs::copy(fixture("database_unknown_attrs.xml"), &db_path).expect("fixture should be copied");
+
+    let result = remove_song_in_place(&db_path, r"d:/music/unknown.mp3")
+        .expect("remove should return a typed result");
+    assert!(matches!(result.status, RemoveSongStatus::Completed));
+    assert_eq!(result.current_file_path.as_deref(), Some(r"D:\Music\Unknown.mp3"));
+
+    let output = fs::read_to_string(&db_path).expect("database should remain readable");
+    for marker in [
+        r#"FutureRoot="root-value""#,
+        r#"FutureSong="song-value""#,
+    ] {
+        // FutureSong belongs to the removed entry and should not survive; the
+        // root marker is the byte-preservation assertion that matters here.
+        if marker.contains("FutureSong") {
+            assert!(!output.contains(marker));
+        } else {
+            assert!(output.contains(marker));
+        }
+    }
+    assert!(!output.contains(r#"FilePath="D:\Music\Unknown.mp3""#));
+    assert_eq!(parse_database(&db_path).expect("database should reparse").songs.len(), 0);
+
+    fs::remove_dir_all(&dir).expect("temp dir should be removed");
+}
+
+#[test]
+fn remove_song_in_place_reports_not_found_without_writing() {
+    let dir = unique_temp_dir("database-remove-not-found");
+    fs::create_dir_all(&dir).expect("temp dir should be created");
+    let db_path = dir.join("database.xml");
+    fs::copy(fixture("database_unknown_attrs.xml"), &db_path).expect("fixture should be copied");
+    let before = fs::read(&db_path).expect("fixture should be readable");
+
+    let result = remove_song_in_place(&db_path, r"D:\Music\missing.mp3")
+        .expect("not-found should be represented as a typed result");
+    assert!(matches!(result.status, RemoveSongStatus::NotFound));
+    assert_eq!(before, fs::read(&db_path).expect("database should remain unchanged"));
+
+    fs::remove_dir_all(&dir).expect("temp dir should be removed");
+}
+
+#[test]
+fn remove_song_in_place_reports_ambiguous_case_insensitive_identity_without_writing() {
+    let dir = unique_temp_dir("database-remove-ambiguous");
+    fs::create_dir_all(&dir).expect("temp dir should be created");
+    let db_path = dir.join("database.xml");
+    let xml = r#"<VirtualDJ_Database FutureRoot="keep">
+<Song FilePath="D:\Music\Duplicate.mp3" FutureSong="one"/>
+<Song FilePath="d:/music/duplicate.mp3" FutureSong="two"/>
+</VirtualDJ_Database>
+"#;
+    fs::write(&db_path, xml).expect("database fixture should write");
+    let before = fs::read(&db_path).expect("fixture should be readable");
+
+    let result = remove_song_in_place(&db_path, r"D:\Music\Duplicate.mp3")
+        .expect("ambiguous match should be represented as a typed result");
+    assert!(matches!(result.status, RemoveSongStatus::Ambiguous));
+    assert_eq!(before, fs::read(&db_path).expect("database should remain unchanged"));
 
     fs::remove_dir_all(&dir).expect("temp dir should be removed");
 }

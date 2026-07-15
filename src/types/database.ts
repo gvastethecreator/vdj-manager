@@ -262,6 +262,23 @@ export interface RenameFileResult {
   message: string | null;
 }
 
+export type LibraryRemovalMode = "db_only" | "trash_then_unindex";
+
+export type LibraryRemovalStatus =
+  | "completed"
+  | "failed_validation"
+  | "trash_failed"
+  | "manual_review_required"
+  | "not_found";
+
+/** Per-item outcome of a stable-path library removal. */
+export interface LibraryRemovalResult {
+  originalFilePath: string;
+  status: LibraryRemovalStatus;
+  mode: LibraryRemovalMode;
+  message: string | null;
+}
+
 /** Preview result of a batch dry-run operation. */
 export interface DryRunResult {
   description: string;

@@ -23,6 +23,8 @@ import type {
   UpdateSongTagsResult,
   RelinkFileResult,
   RenameFileResult,
+  LibraryRemovalMode,
+  LibraryRemovalResult,
 } from "../types/database";
 import { compareDriveAwarePaths, getParentDirectory } from "./pathUtils";
 
@@ -108,19 +110,15 @@ export async function updateSongTags(
   });
 }
 
-/**
- * Remove songs from the database by index, optionally moving files to trash.
- * @param vdjFolder - VirtualDJ folder path
- * @param indices - Song indices to remove
- * @param deleteFiles - If true, move physical files to the OS recycle bin
- * @returns Array of result strings per action
- */
-export async function deleteSongs(
+/** Remove catalog entries by stable path under an explicit physical-file policy. */
+export async function removeLibraryEntries(
   vdjFolder: string,
-  indices: number[],
-  deleteFiles: boolean
-): Promise<string[]> {
-  return invoke<string[]>("delete_songs", { vdjFolder, indices, deleteFiles });
+  items: string[],
+  mode: LibraryRemovalMode,
+): Promise<LibraryRemovalResult[]> {
+  return invoke<LibraryRemovalResult[]>("remove_library_entries_command", {
+    request: { vdjFolder, items, mode },
+  });
 }
 
 /**

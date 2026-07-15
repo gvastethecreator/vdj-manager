@@ -7,10 +7,42 @@ use std::sync::{Arc, Mutex, OnceLock};
 
 use quick_xml::de::from_str;
 use quick_xml::se::to_string;
+use serde::Serialize;
 
 use crate::safety;
 
 use super::models::*;
+
+/// Machine-readable outcome for a narrow database entry removal.
+///
+/// Removal is deliberately separate from the legacy whole-document serializer:
+/// the target `<Song>` range is removed from the original bytes so unknown
+/// VirtualDJ attributes and formatting on every other node survive intact.
+#[derive(Debug, Serialize, Clone, Copy, PartialEq, Eq)]
+#[serde(rename_all = "snake_case")]
+pub enum RemoveSongStatus {
+    Completed,
+    FailedValidation,
+    NotFound,
+    Ambiguous,
+    ManualReviewRequired,
+    TrashFailed,
+}
+
+#[derive(Debug, Serialize, Clone)]
+#[serde(rename_all = "camelCase")]
+pub struct RemoveSongResult {
+    pub status: RemoveSongStatus,
+    pub original_file_path: String,
+    pub current_file_path: Option<String>,
+    pub message: Option<String>,
+}
+
+#[derive(Debug)]
+pub enum RemoveSongPreCommitError {
+    FailedValidation(String),
+    TrashFailed(String),
+}
 
 /// Basic structural checks to catch obvious corruption before writing.
 pub fn validate_database_integrity(db: &VdjDatabase) -> Result<(), String> {
@@ -540,6 +572,199 @@ pub fn patch_song_path_in_place(
         new_file_path,
         || Ok(()),
     )
+}
+
+/// Remove exactly one direct `<Song>` entry from the original XML bytes.
+///
+/// The identity is the decoded `FilePath` attribute, compared with the same
+/// Windows-friendly, case-insensitive matcher used by the other patch writers.
+/// A per-database mutex serialises read/plan/backup/atomic-write, and the
+/// source bytes are checked again immediately before commit.  The callback is
+/// invoked only after the candidate XML has validated and just before that
+/// optimistic check; callers use it for the physical trash step.  If the
+/// callback succeeds but the database cannot be committed, the result is
+/// `manual_review_required` because the physical side effect may already have
+/// happened.
+pub fn remove_song_in_place(
+    path: &Path,
+    original_file_path: &str,
+) -> Result<RemoveSongResult, String> {
+    remove_song_in_place_with_before_commit(path, original_file_path, |_| Ok(()))
+}
+
+/// Variant of [`remove_song_in_place`] that runs a pre-commit side effect while
+/// holding the database patch lock.  This is kept public so the command core
+/// can inject the platform trash operation without exposing a global serializer
+/// or making the filesystem operation part of the parser module.
+pub fn remove_song_in_place_with_before_commit<F>(
+    path: &Path,
+    original_file_path: &str,
+    before_commit: F,
+) -> Result<RemoveSongResult, String>
+where
+    F: FnOnce(&str) -> Result<(), RemoveSongPreCommitError>,
+{
+    let result = |status: RemoveSongStatus,
+                  current_file_path: Option<String>,
+                  message: Option<String>| RemoveSongResult {
+        status,
+        original_file_path: original_file_path.to_string(),
+        current_file_path,
+        message,
+    };
+
+    if original_file_path.trim().is_empty() {
+        return Ok(result(
+            RemoveSongStatus::FailedValidation,
+            None,
+            Some("La ruta original es obligatoria".to_string()),
+        ));
+    }
+
+    let patch_lock = database_patch_lock(path)?;
+    let _patch_guard = patch_lock
+        .lock()
+        .map_err(|_| "Writer de database.xml bloqueado".to_string())?;
+    let source = fs::read(path).map_err(|error| format!("No se pudo leer database.xml: {}", error))?;
+    let tags = match scan_xml_tags(&source) {
+        Ok(tags) => tags,
+        Err(error) => {
+            return Ok(result(
+                RemoveSongStatus::FailedValidation,
+                None,
+                Some(format!("XML inseguro para eliminar: {}", error)),
+            ));
+        }
+    };
+
+    let database_roots: Vec<&XmlTag> = tags
+        .iter()
+        .filter(|tag| {
+            !tag.is_end && tag.name == "VirtualDJ_Database" && tag.parent_start.is_none()
+        })
+        .collect();
+    if database_roots.len() != 1 {
+        return Ok(result(
+            RemoveSongStatus::FailedValidation,
+            None,
+            Some("La estructura de database.xml no permite una eliminación segura".to_string()),
+        ));
+    }
+
+    let direct_songs = match direct_song_file_paths(&source, &tags, database_roots[0].start) {
+        Ok(songs) => songs,
+        Err(error) => {
+            return Ok(result(
+                RemoveSongStatus::FailedValidation,
+                None,
+                Some(format!("No se pudo leer FilePath de Song: {}", error)),
+            ));
+        }
+    };
+    let matching_songs: Vec<(usize, String)> = direct_songs
+        .iter()
+        .filter(|(_, file_path)| windows_paths_equal(file_path, original_file_path))
+        .cloned()
+        .collect();
+
+    if matching_songs.is_empty() {
+        return Ok(result(
+            RemoveSongStatus::NotFound,
+            None,
+            Some("No se encontró la entrada con la ruta original".to_string()),
+        ));
+    }
+    if matching_songs.len() != 1 {
+        return Ok(result(
+            RemoveSongStatus::Ambiguous,
+            matching_songs.first().map(|(_, path)| path.clone()),
+            Some("La ruta original coincide con más de una entrada".to_string()),
+        ));
+    }
+
+    let (song_index, current_file_path) = matching_songs
+        .into_iter()
+        .next()
+        .expect("matching_songs has exactly one entry");
+    let song = &tags[song_index];
+    let remove_end = if song.is_self_closing {
+        song.end
+    } else {
+        let Some(song_end_index) = song.matching_end else {
+            return Ok(result(
+                RemoveSongStatus::FailedValidation,
+                Some(current_file_path),
+                Some("La entrada Song no tiene etiqueta de cierre".to_string()),
+            ));
+        };
+        tags[song_end_index].end
+    };
+    if remove_end <= song.start || remove_end > source.len() {
+        return Ok(result(
+            RemoveSongStatus::FailedValidation,
+            Some(current_file_path),
+            Some("El rango XML de Song no es válido".to_string()),
+        ));
+    }
+
+    let mut patched = source.clone();
+    patched.splice(song.start..remove_end, Vec::<u8>::new());
+    let patched = String::from_utf8(patched)
+        .map_err(|_| "La eliminación produciría XML no UTF-8".to_string())?;
+    let candidate = patched.trim_start_matches('\u{feff}');
+    let reparsed = from_str::<VdjDatabase>(candidate)
+        .map_err(|error| format!("XML resultante inválido: {}", error))?;
+    validate_database_integrity(&reparsed)
+        .map_err(|error| format!("XML resultante inválido: {}", error))?;
+
+    if let Err(error) = before_commit(&current_file_path) {
+        let (status, message) = match error {
+            RemoveSongPreCommitError::FailedValidation(message) => {
+                (RemoveSongStatus::FailedValidation, message)
+            }
+            RemoveSongPreCommitError::TrashFailed(message) => {
+                (RemoveSongStatus::TrashFailed, message)
+            }
+        };
+        return Ok(result(status, Some(current_file_path), Some(message)));
+    }
+
+    let current_source = match fs::read(path) {
+        Ok(source) => source,
+        Err(error) => {
+            return Ok(result(
+                RemoveSongStatus::ManualReviewRequired,
+                Some(current_file_path),
+                Some(format!(
+                    "El paso físico se completó, pero no se pudo releer database.xml: {error}"
+                )),
+            ));
+        }
+    };
+    if current_source != source {
+        return Ok(result(
+            RemoveSongStatus::ManualReviewRequired,
+            Some(current_file_path),
+            Some("database.xml cambió durante la eliminación".to_string()),
+        ));
+    }
+
+    if let Err(error) = safety::create_timestamped_backup(path, "database-remove") {
+        return Ok(result(
+            RemoveSongStatus::ManualReviewRequired,
+            Some(current_file_path),
+            Some(format!("No se pudo crear backup después del paso físico: {}", error)),
+        ));
+    }
+    if let Err(error) = safety::atomic_write_string(path, &patched) {
+        return Ok(result(
+            RemoveSongStatus::ManualReviewRequired,
+            Some(current_file_path),
+            Some(format!("No se pudo actualizar database.xml después del paso físico: {}", error)),
+        ));
+    }
+
+    Ok(result(RemoveSongStatus::Completed, Some(current_file_path), None))
 }
 
 fn patch_song_path_in_place_with_before_commit<F>(
