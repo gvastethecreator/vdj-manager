@@ -101,7 +101,7 @@ src-tauri/                  # Backend Rust
 - **Duplicados** — Detección por nombre normalizado, tamaño exacto y hash parcial MD5 (64 KB)
 - **Archivos Faltantes** — Verificación existencia/tamaño, búsqueda fuzzy, relocación
 - **Archivos Huérfanos** — Comparación disco vs BD para encontrar archivos no registrados
-- **Operaciones en Lote** — Mover, renombrar con patrón y editar tags con dry-run; las ediciones batch escriben `database.xml` una sola vez
+- **Operaciones en Lote** — Planner tipado para mover, rename literal seguro y edición batch de tags por `originalFilePath`; cada ítem conserva el XML desconocido y reporta su resultado
 - **Configuración** — Vista curada de `settings.xml` basada en opciones relevantes de VirtualDJ
 - **Pads** — Editor estructurado de documentos `.vdjpad` con árbol XML editable
 - **Mappers** — Editor estructurado de `.vdjmap` con metadata y bindings editables
@@ -120,7 +120,9 @@ BPM_real = 60 / Scan_Bpm_value
 
 ### Backups
 
-Las escrituras sobre `database.xml` crean un backup timestamped `database_<millis>.xml.bak` y además validan integridad antes y después del guardado.
+Las escrituras sobre `database.xml` crean un backup timestamped, validan el XML candidato, comprueban que la fuente no cambió y hacen un commit atómico.
+
+Las mutaciones de archivos mantienen un journal por biblioteca en app-data. Si una operación queda interrumpida, el shell abre un centro de recuperación: la biblioteca sigue disponible para lectura, pero nuevas escrituras quedan pausadas hasta que el usuario confirme `resume`, `rollback` o revisión manual. Recovery valida tamaño + SHA-256 antes de mover un archivo.
 
 Los recursos editables de VirtualDJ (por ejemplo `settings.xml`, `.vdjmap`, `.vdjpad`) también generan backup antes de sobreescribirse.
 
@@ -134,7 +136,7 @@ Un `<ErrorBoundary>` envuelve la app a nivel global y por página, previniendo q
 
 ### Movimiento cross-drive
 
-Cuando un `rename()` falla (diferente unidad), la app hace `copy()` + `remove_file()` como fallback.
+Los movimientos entre unidades usan `copy` + `delete` journalizado por ítem. Nunca sobreescriben el destino; un rollback incierto queda visible como revisión manual.
 
 ## Tareas VS Code
 

@@ -53,9 +53,9 @@ Los documentos maestros de esa dirección son:
 
 - El routing real todavía es state-based por `page: Page`.
 - La sidebar todavía expone varias páginas top-level (`Songs`, `Playlists`, `Duplicates`, etc.).
-- Muchas mutaciones críticas todavía usan índices posicionales y respuestas stringly-typed.
 - `MissingFiles` y `RelinkTracks` todavía comparten parte del territorio funcional.
-- `delete_songs`, `rename_file_op` y `move_files_op` todavía no representan el contrato objetivo acordado.
+- La edición inline y batch, reconciliación, rename, move y remoción ya usan identidad estable y contratos tipados; playlists y recursos auxiliares conservan motores separados.
+- Rename/move y recovery comparten un lease OS-backed por biblioteca durante toda la coreografía. El journal registra tamaño + SHA-256 para rechazar sustituciones físicas.
 
 ```text
 ┌──────────────────────────────────────────┐
@@ -82,7 +82,8 @@ Los documentos maestros de esa dirección son:
 2. El frontend llama `invoke("load_database", { vdjFolder })`.
 3. Rust parsea `database.xml` con `quick-xml` y devuelve `Vec<SongSummary>`.
 4. En paralelo, `get_database_stats` calcula estadísticas agregadas.
-5. El estado global (`AppContext`) se actualiza y la UI se renderiza.
+5. `get_mutation_recovery_state` consulta el journal de esa biblioteca.
+6. El estado global (`AppContext`) se actualiza y la UI se renderiza; un journal pendiente bloquea sólo mutaciones, no lectura ni navegación.
 
 El mismo contexto también conserva:
 
@@ -95,9 +96,11 @@ El mismo contexto también conserva:
 ### Módulos
 
 - **`database/models.rs`** — Structs serde que mapean el XML schema de VDJ.
-- **`database/parser.rs`** — `parse_database()` y `write_database()` con `quick-xml`.
-- **`commands/database.rs`** — Load, save, update tags, delete songs.
-- **`commands/files.rs`** — Verify, scan, rename, move, find orphans, relocate, dry-run.
+- **`database/parser.rs`** — Parseo y writers patch-in-place/atómicos que preservan XML desconocido.
+- **`commands/database.rs`** — Load/stats, tags por path y remoción explícita (`db_only` / `trash_then_unindex`).
+- **`commands/files.rs`** — Verify, scan, relink, rename y move journalizados, find orphans y planners.
+- **`commands/recovery.rs`** — Detección y acciones confirmadas de recuperación por journal.
+- **`mutation_journal.rs`** — Generaciones append-only, leases cross-process y state machine de mutación.
 - **`commands/duplicates.rs`** — Detección de duplicados por nombre/tamaño/hash (MD5 64 KB).
 - **`commands/playlists.rs`** — Parsing de playlists M3U/M3U8/VDJ (`.vdjplaylist`, `.vdjlist`).
 - **`commands/configs.rs`** — Lectura/escritura curada de `settings.xml`, mappers `.vdjmap` y pads `.vdjpad`.
@@ -105,10 +108,10 @@ El mismo contexto también conserva:
 
 ### Seguridad
 
-- Toda escritura crítica crea backup antes de modificar; `database.xml` además se reparsea y revalida tras el guardado.
+- Toda escritura de `database.xml` usa patch-in-place con backup, commit atómico, relectura optimista y validación; no existe un comando IPC de serializer global.
 - CSP habilitado en el WebView: solo recursos propios + `data:`/`asset:`/`tauri:` para imágenes.
-- El movimiento cross-drive usa copy + delete como fallback.
-- Los índices se validan contra el tamaño del vector.
+- El movimiento cross-drive usa copy + delete sin reemplazo, con journal y rollback por ítem.
+- Las identidades de escritura usan paths estables, no índices del array renderizado.
 - La extracción de waveforms limita la concurrencia en backend para no saturar CPU y dejar libres otros procesos de metadata/tagging.
 
 ## Frontend (React)

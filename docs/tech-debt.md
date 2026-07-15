@@ -13,8 +13,9 @@ inicial pero que conviene abordar a medio plazo.
 
 ### Escrituras y recálculos demasiado globales
 
-- Ya se corrigió la recarga de página en `reload()` y el batch tag ahora escribe una sola vez.
-- Sigue pendiente reducir más operaciones globales en flujos como rename/move/delete y separar refresco de `songs` frente a recálculo de `stats` cuando no haga falta.
+- Rename, move, relink, tags y remoción ya dejaron de depender del serializer global y de índices posicionales.
+- El batch tag aplica patches seguros por ítem; queda pendiente optimizar el refresco de `songs` frente al recálculo de `stats` sin debilitar reportes parciales.
+- La remoción con papelera tiene resultado tipado, pero una futura iteración puede incorporar su paso físico al journal recuperable igual que rename/move.
 
 ### Documentación viva del producto
 
@@ -23,16 +24,21 @@ inicial pero que conviene abordar a medio plazo.
 
 ### Tests unitarios y de integración
 
-- No hay tests actualmente (ni frontend ni Rust).
-- **Frontend**: añadir Vitest + Testing Library para componentes y hooks.
-- **Rust**: añadir tests con `#[cfg(test)]` para el parser XML y las
-  funciones de duplicados/verificación.
+- Ya existen pruebas frontend de helpers y suites Rust de parser, writers, journal, recovery, relink, rename, move y remoción sobre fixtures/temporales.
+- Falta incorporar un harness DOM para probar el `RecoveryCenter` como componente y automatizar navegador/visual en CI.
 
 ### Logging en Rust (backend)
 
 - El backend no emite logs estructurados.
 - Integrar `tracing` o `log` + `env_logger` para registrar operaciones
   (cargas, escrituras, errores de parsing).
+
+### Hardening residual de mutaciones
+
+- El serializer completo permanece público para las pruebas históricas de pérdida de fidelidad, aunque no tiene comando IPC ni caller de producción; aislarlo sin romper la suite de integración.
+- El patch de tags aborta de forma segura ante una entrada `<Song .../>` autocerrada. Una futura expansión controlada puede convertirla a apertura/cierre cuando necesite insertar nodos.
+- La key del journal normaliza aliases Windows de forma léxica; junctions, nombres 8.3 y otros aliases físicos extremos requieren una estrategia adicional que no dependa de que la ruta exista siempre.
+- Settings, mappers y pads conservan sus propios backups/atomic write, pero no participan del gate de recovery de `database.xml`; decidir si la política debe unificarse para todos los recursos VirtualDJ.
 
 ## Prioridad media
 
