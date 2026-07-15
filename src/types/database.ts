@@ -129,30 +129,6 @@ export interface DuplicateResult {
   by_hash: DuplicateGroup[];
 }
 
-/** Partial update payload for editing a song's tags. */
-export interface SongUpdate {
-  index: number;
-  title?: string;
-  author?: string;
-  album?: string;
-  genre?: string;
-  year?: string;
-  key?: string;
-  bpm?: string;
-  grouping?: string;
-  label?: string;
-  remix?: string;
-  remixer?: string;
-  composer?: string;
-  trackNumber?: string;
-  stars?: string;
-  user1?: string;
-  user2?: string;
-  commentText?: string;
-  color?: string;
-  gain?: string;
-}
-
 /** Partial fields accepted by the path-identified inline patch writer. */
 export interface InlineSongUpdate {
   title?: string;

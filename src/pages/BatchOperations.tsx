@@ -5,11 +5,11 @@ import { SongTable } from "../components/SongTable";
 import { FolderTree } from "../components/FolderTree";
 import { MutationBlockedNotice } from "../components/MutationBlockedNotice";
 import {
-    moveFilesOp, renameFileOp, saveSongUpdates,
+    moveFilesOp, renameFileOp, updateSongTags,
     planMoveFiles, getConfiguredMusicRoots,
 } from "../lib/api";
 import { moveStatusLabel, transferMethodLabel } from "../lib/moveReport";
-import type { DryRunResult, MoveBatchReport, RenameFileResult, SongUpdate } from "../types/database";
+import type { DryRunResult, InlineSongUpdate, MoveBatchReport, RenameFileResult } from "../types/database";
 
 type BatchAction = "move" | "rename" | "tag";
 
@@ -139,13 +139,29 @@ export function BatchOperations() {
                 ]);
                 if (result.status === "completed") await reload();
             } else if (action === "tag" && running_tag_fields.length > 0) {
-                const patch = Object.fromEntries(running_tag_fields) as Omit<SongUpdate, "index">;
-                const updates: SongUpdate[] = indices.map((index) => ({ index, ...patch }));
-                await saveSongUpdates(vdjFolder, updates);
-                const results = indices.map((idx) => `OK: ${songs.find((x) => x.index === idx)?.file_name ?? idx}`);
-                setLog(results);
+                const patch = Object.fromEntries(running_tag_fields) as InlineSongUpdate;
+                const outcomes: string[] = [];
+                let completed = 0;
+                for (const index of indices) {
+                    const song = songs.find((item) => item.index === index);
+                    if (!song?.in_database) {
+                        outcomes.push(`OMITIDO: ${song?.file_name ?? index} no pertenece a database.xml`);
+                        continue;
+                    }
+                    try {
+                        const result = await updateSongTags(vdjFolder, song.file_path, patch);
+                        outcomes.push(`${result.status === "completed" ? "OK" : "ATENCIÓN"}: ${song.file_name} · ${result.status}`);
+                        if (result.status === "completed") completed += 1;
+                    } catch (error) {
+                        outcomes.push(`ERROR: ${song.file_name} · ${String(error)}`);
+                        setError(`La edición batch se detuvo tras ${completed} cambio(s): ${String(error)}`);
+                        setLog([...outcomes]);
+                        break;
+                    }
+                    setLog([...outcomes]);
+                }
+                if (completed > 0) await reload();
             }
-            if (action === "tag") await reload();
         } catch (err) {
             setError(String(err));
         } finally {

@@ -18,7 +18,6 @@ import type {
   VdjSettingEntry,
   VdjMapperDocument,
   VdjXmlNode,
-  SongUpdate,
   InlineSongUpdate,
   UpdateSongTagsResult,
   RelinkFileResult,
@@ -70,28 +69,6 @@ export async function getDatabaseStats(
   vdjFolder: string
 ): Promise<DatabaseStats> {
   return invoke<DatabaseStats>("get_database_stats", { vdjFolder });
-}
-
-/**
- * Save batch tag updates to the database (creates `.xml.bak` backup).
- * @param vdjFolder - Absolute path to the VirtualDJ folder
- * @param songsJson - JSON-serialised array of `SongUpdate` objects
- */
-export async function saveDatabase(
-  vdjFolder: string,
-  songsJson: string
-): Promise<void> {
-  return invoke<void>("save_database", { vdjFolder, songsJson });
-}
-
-/**
- * Apply a batch of song updates in a single database write.
- */
-export async function saveSongUpdates(
-  vdjFolder: string,
-  updates: SongUpdate[]
-): Promise<void> {
-  return saveDatabase(vdjFolder, JSON.stringify(updates));
 }
 
 /**

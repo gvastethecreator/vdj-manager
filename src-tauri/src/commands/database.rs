@@ -5,38 +5,6 @@ use std::collections::HashSet;
 
 use crate::database::models::*;
 use crate::database::parser;
-use crate::safety;
-
-fn apply_song_update(song: &mut Song, update: &SongUpdate) {
-    let tags = song.tags.get_or_insert_with(Tags::default);
-
-    if let Some(v) = &update.title        { tags.title = Some(v.clone()); }
-    if let Some(v) = &update.author       { tags.author = Some(v.clone()); }
-    if let Some(v) = &update.album        { tags.album = Some(v.clone()); }
-    if let Some(v) = &update.genre        { tags.genre = Some(v.clone()); }
-    if let Some(v) = &update.year         { tags.year = Some(v.clone()); }
-    if let Some(v) = &update.key          { tags.key = Some(v.clone()); }
-    if let Some(v) = &update.bpm          { tags.bpm = Some(v.clone()); }
-    if let Some(v) = &update.grouping     { tags.grouping = Some(v.clone()); }
-    if let Some(v) = &update.label        { tags.label = Some(v.clone()); }
-    if let Some(v) = &update.remix        { tags.remix = Some(v.clone()); }
-    if let Some(v) = &update.remixer      { tags.remixer = Some(v.clone()); }
-    if let Some(v) = &update.composer     { tags.composer = Some(v.clone()); }
-    if let Some(v) = &update.track_number { tags.track_number = Some(v.clone()); }
-    if let Some(v) = &update.stars        { tags.stars = Some(v.clone()); }
-    if let Some(v) = &update.user1        { tags.user1 = Some(v.clone()); }
-    if let Some(v) = &update.user2        { tags.user2 = Some(v.clone()); }
-
-    if let Some(v) = &update.comment_text {
-        song.comment = Some(crate::database::models::CommentEl { text: Some(v.clone()) });
-    }
-
-    if update.color.is_some() || update.gain.is_some() {
-        let infos = song.infos.get_or_insert_with(Infos::default);
-        if let Some(v) = &update.color { infos.color = Some(v.clone()); }
-        if let Some(v) = &update.gain  { infos.gain  = Some(v.clone()); }
-    }
-}
 
 /// Load the database and return a vec of [`SongSummary`] for the frontend.
 #[tauri::command]
@@ -66,35 +34,6 @@ pub async fn get_database_stats(vdj_folder: String) -> Result<DatabaseStats, Str
     let db_path = PathBuf::from(&vdj_folder).join("database.xml");
     let db = parser::parse_database(&db_path)?;
     Ok(parser::compute_stats(&db))
-}
-
-/// Apply batch tag updates from JSON. Creates `.xml.bak` before writing.
-#[tauri::command]
-pub async fn save_database(
-    app: tauri::AppHandle,
-    vdj_folder: String,
-    songs_json: String,
-) -> Result<(), String> {
-    let _mutation_guard = super::recovery::acquire_mutation_guard(&app, &vdj_folder)?;
-    let db_path = PathBuf::from(&vdj_folder).join("database.xml");
-
-    // Read the existing database
-    let mut db = parser::parse_database(&db_path)?;
-
-    // Parse the incoming song updates (partial updates by index)
-    let updates: Vec<SongUpdate> =
-        serde_json::from_str(&songs_json).map_err(|e| format!("JSON inválido: {}", e))?;
-
-    for update in &updates {
-        if update.index < db.songs.len() {
-            let song = &mut db.songs[update.index];
-            apply_song_update(song, update);
-        }
-    }
-
-    safety::create_timestamped_backup(&db_path, "database")?;
-
-    parser::write_database_checked(&db_path, &db)
 }
 
 /// Update tags for one song using its stable original path.  The parser owns
@@ -340,32 +279,6 @@ pub async fn remove_library_entries_command(
     remove_library_entries(&db_path, &request.items, request.mode, |path| {
         trash::delete(path).map_err(|error| format!("No se pudo enviar a papelera: {}", error))
     })
-}
-
-#[derive(serde::Deserialize)]
-pub struct SongUpdate {
-    pub index: usize,
-    pub title: Option<String>,
-    pub author: Option<String>,
-    pub album: Option<String>,
-    pub genre: Option<String>,
-    pub year: Option<String>,
-    pub key: Option<String>,
-    pub bpm: Option<String>,
-    pub grouping: Option<String>,
-    pub label: Option<String>,
-    pub remix: Option<String>,
-    pub remixer: Option<String>,
-    pub composer: Option<String>,
-    #[serde(rename = "trackNumber")]
-    pub track_number: Option<String>,
-    pub stars: Option<String>,
-    pub user1: Option<String>,
-    pub user2: Option<String>,
-    #[serde(rename = "commentText")]
-    pub comment_text: Option<String>,
-    pub color: Option<String>,
-    pub gain: Option<String>,
 }
 
 #[derive(serde::Deserialize)]

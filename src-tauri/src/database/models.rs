@@ -223,9 +223,9 @@ pub struct SongSummary {
 
 /// Fields accepted by the single-song, patch-in-place writer.
 ///
-/// This is deliberately separate from [`SongUpdate`], which still carries the
-/// positional index used by the legacy batch save command.  The inline writer
-/// must never use that index as its identity.
+/// The writer uses the request's stable `originalFilePath` identity. Batch tag
+/// editing calls the same narrow patch path per song; there is no positional
+/// index or legacy whole-document save command.
 #[derive(Debug, Deserialize, Clone, Default)]
 #[serde(rename_all = "camelCase")]
 pub struct InlineSongUpdate {

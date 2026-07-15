@@ -22,7 +22,6 @@ pub fn run() {
         .invoke_handler(tauri::generate_handler![
             db_commands::load_database,
             db_commands::get_database_stats,
-            db_commands::save_database,
             db_commands::update_song_tags,
             db_commands::remove_library_entries_command,
             files::verify_files,
