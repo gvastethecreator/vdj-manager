@@ -6,6 +6,7 @@
 
 mod commands;
 pub mod database;
+pub mod mutation_journal;
 pub mod safety;
 
 use commands::{configs, database as db_commands, duplicates, files, playlists, waveforms};
