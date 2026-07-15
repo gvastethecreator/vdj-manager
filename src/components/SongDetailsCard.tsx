@@ -4,6 +4,7 @@ import { Clock3, Database, FolderOpen, RotateCcw, Save } from "lucide-react";
 import { useApp } from "../App";
 import type { SongSummary } from "../types/database";
 import { formatDuration, formatSize, getEffectiveColor, updateSongTags } from "../lib/api";
+import { shouldApplySongUpdate } from "../lib/songUpdateResult";
 import { WaveformPreview } from "./WaveformPreview";
 
 interface TagFormState {
@@ -238,7 +239,10 @@ export function SongDetailsCard({ song }: { song: SongSummary }) {
         try {
             const includeColor = Boolean(rowColor) || form.color !== initialForm.color;
             if (!isDemoMode() && vdjFolder) {
-                await updateSongTags(vdjFolder, song.index, buildTagUpdate(form, includeColor));
+                const result = await updateSongTags(vdjFolder, song.file_path, buildTagUpdate(form, includeColor));
+                if (!shouldApplySongUpdate(result)) {
+                    throw new Error(`Resultado de actualización: ${result.status}`);
+                }
             }
             patchSong(song.index, buildSongPatch(form, includeColor));
             setStatus("Etiquetas guardadas");

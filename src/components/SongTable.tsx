@@ -4,6 +4,7 @@ import { convertFileSrc } from "@tauri-apps/api/core";
 import type { SongSummary } from "../types/database";
 import { formatDuration, formatSize, getEffectiveColor, updateSongTags } from "../lib/api";
 import { compareDriveAwarePaths, compareSongsByDrivePath } from "../lib/pathUtils";
+import { shouldApplySongUpdate } from "../lib/songUpdateResult";
 import { WaveformPreview, onWaveformQueueChange } from "./WaveformPreview";
 import { useApp } from "../App";
 
@@ -317,15 +318,20 @@ export function SongTable({
         if (!editState || !vdjFolder) return;
         const col = ALL_COLUMNS.find((c) => c.key === editState.columnKey);
         if (!col?.editableTag) return;
+        const song = songs.find((candidate) => candidate.index === editState.songIndex);
+        if (!song?.in_database) return;
         try {
-            await updateSongTags(vdjFolder, editState.songIndex, { [col.editableTag]: editState.value });
+            const result = await updateSongTags(vdjFolder, song.file_path, { [col.editableTag]: editState.value });
+            if (!shouldApplySongUpdate(result)) {
+                throw new Error(`Resultado de actualización: ${result.status}`);
+            }
             patchSong(editState.songIndex, patchFromEditableTag(col.editableTag, editState.value));
             setEditState(null);
         } catch (err) {
             console.error("Error updating tag:", err);
             setError(`No se pudo actualizar el tag: ${String(err)}`);
         }
-    }, [editState, vdjFolder, patchFromEditableTag, patchSong, setError]);
+    }, [editState, vdjFolder, patchFromEditableTag, patchSong, setError, songs]);
 
     const onEditCancel = useCallback(() => setEditState(null), []);
 
@@ -335,7 +341,10 @@ export function SongTable({
         const song = songs.find((s) => s.index === songIndex);
         if (!song?.in_database) return;
         try {
-            await updateSongTags(vdjFolder, songIndex, { stars: stars > 0 ? String(stars) : "" });
+            const result = await updateSongTags(vdjFolder, song.file_path, { stars: stars > 0 ? String(stars) : "" });
+            if (!shouldApplySongUpdate(result)) {
+                throw new Error(`Resultado de actualización: ${result.status}`);
+            }
             patchSong(songIndex, { stars: stars > 0 ? String(stars) : null });
         } catch (err) {
             console.error("Error updating stars:", err);
@@ -372,6 +381,8 @@ export function SongTable({
 
     const onColorSelect = useCallback(async (color: string | null) => {
         if (!colorPicker || !vdjFolder) return;
+        const song = songs.find((candidate) => candidate.index === colorPicker.songIndex);
+        if (!song?.in_database) return;
         try {
             // Convert CSS hex to VDJ COLORREF (BGR)
             let colorValue = "";
@@ -382,14 +393,17 @@ export function SongTable({
                 const b = parseInt(hex.substring(4, 6), 16);
                 colorValue = String((b << 16) | (g << 8) | r);
             }
-            await updateSongTags(vdjFolder, colorPicker.songIndex, { color: colorValue });
+            const result = await updateSongTags(vdjFolder, song.file_path, { color: colorValue });
+            if (!shouldApplySongUpdate(result)) {
+                throw new Error(`Resultado de actualización: ${result.status}`);
+            }
             patchSong(colorPicker.songIndex, { color: colorValue || null });
             setColorPicker(null);
         } catch (err) {
             console.error("Error updating color:", err);
             setError(`No se pudo actualizar el color: ${String(err)}`);
         }
-    }, [colorPicker, vdjFolder, patchSong, setError]);
+    }, [colorPicker, vdjFolder, patchSong, setError, songs]);
 
     const persistVisibleColumns = useCallback((next: Set<ColumnKey>) => {
         try {

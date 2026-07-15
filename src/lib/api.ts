@@ -19,6 +19,8 @@ import type {
   VdjMapperDocument,
   VdjXmlNode,
   SongUpdate,
+  InlineSongUpdate,
+  UpdateSongTagsResult,
 } from "../types/database";
 import { compareDriveAwarePaths, getParentDirectory } from "./pathUtils";
 
@@ -87,39 +89,19 @@ export async function saveSongUpdates(
 /**
  * Update individual tag fields for a single song.
  * @param vdjFolder - Absolute path to the VirtualDJ folder
- * @param index - Song index in the database
+ * @param originalFilePath - Stable path identity from database.xml
  * @param tags - Partial tag fields to update
  */
 export async function updateSongTags(
   vdjFolder: string,
-  index: number,
-  tags: {
-    title?: string;
-    author?: string;
-    album?: string;
-    genre?: string;
-    year?: string;
-    key?: string;
-    bpm?: string;
-    grouping?: string;
-    label?: string;
-    remix?: string;
-    remixer?: string;
-    composer?: string;
-    trackNumber?: string;
-    stars?: string;
-    user1?: string;
-    user2?: string;
-    commentText?: string;
-    color?: string;
-    gain?: string;
-  }
-): Promise<void> {
-  return invoke<void>("update_song_tags", {
+  originalFilePath: string,
+  tags: InlineSongUpdate,
+): Promise<UpdateSongTagsResult> {
+  return invoke<UpdateSongTagsResult>("update_song_tags", {
     request: {
       vdjFolder,
-      index,
-      update: { index, ...tags },
+      originalFilePath,
+      update: tags,
     },
   });
 }

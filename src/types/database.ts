@@ -153,6 +153,37 @@ export interface SongUpdate {
   gain?: string;
 }
 
+/** Partial fields accepted by the path-identified inline patch writer. */
+export interface InlineSongUpdate {
+  title?: string;
+  author?: string;
+  album?: string;
+  genre?: string;
+  year?: string;
+  key?: string;
+  bpm?: string;
+  grouping?: string;
+  label?: string;
+  remix?: string;
+  remixer?: string;
+  composer?: string;
+  trackNumber?: string;
+  stars?: string;
+  user1?: string;
+  user2?: string;
+  commentText?: string;
+  color?: string;
+  gain?: string;
+}
+
+/** Machine-readable outcome of the single-song patch-in-place write. */
+export interface UpdateSongTagsResult {
+  status: "completed" | "failed_validation" | "not_found" | "unsafe_to_patch";
+  originalFilePath: string;
+  currentFilePath: string;
+  updatedFields: string[];
+}
+
 /** All navigable pages in the app. */
 
 export type Page =

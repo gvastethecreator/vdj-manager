@@ -221,6 +221,88 @@ pub struct SongSummary {
     pub has_stems: bool,
 }
 
+/// Fields accepted by the single-song, patch-in-place writer.
+///
+/// This is deliberately separate from [`SongUpdate`], which still carries the
+/// positional index used by the legacy batch save command.  The inline writer
+/// must never use that index as its identity.
+#[derive(Debug, Deserialize, Clone, Default)]
+#[serde(rename_all = "camelCase")]
+pub struct InlineSongUpdate {
+    pub title: Option<String>,
+    pub author: Option<String>,
+    pub album: Option<String>,
+    pub genre: Option<String>,
+    pub year: Option<String>,
+    pub key: Option<String>,
+    pub bpm: Option<String>,
+    pub grouping: Option<String>,
+    pub label: Option<String>,
+    pub remix: Option<String>,
+    pub remixer: Option<String>,
+    pub composer: Option<String>,
+    pub track_number: Option<String>,
+    pub stars: Option<String>,
+    pub user1: Option<String>,
+    pub user2: Option<String>,
+    pub comment_text: Option<String>,
+    pub color: Option<String>,
+    pub gain: Option<String>,
+}
+
+impl InlineSongUpdate {
+    /// Return the public field names that will be touched by this update.
+    pub fn updated_fields(&self) -> Vec<String> {
+        let mut fields = Vec::new();
+        macro_rules! push_if_some {
+            ($field:ident, $name:literal) => {
+                if self.$field.is_some() {
+                    fields.push($name.to_string());
+                }
+            };
+        }
+        push_if_some!(title, "title");
+        push_if_some!(author, "author");
+        push_if_some!(album, "album");
+        push_if_some!(genre, "genre");
+        push_if_some!(year, "year");
+        push_if_some!(key, "key");
+        push_if_some!(bpm, "bpm");
+        push_if_some!(grouping, "grouping");
+        push_if_some!(label, "label");
+        push_if_some!(remix, "remix");
+        push_if_some!(remixer, "remixer");
+        push_if_some!(composer, "composer");
+        push_if_some!(track_number, "trackNumber");
+        push_if_some!(stars, "stars");
+        push_if_some!(user1, "user1");
+        push_if_some!(user2, "user2");
+        push_if_some!(comment_text, "commentText");
+        push_if_some!(color, "color");
+        push_if_some!(gain, "gain");
+        fields
+    }
+}
+
+/// Machine-readable result for the single-song patch-in-place writer.
+#[derive(Debug, Serialize, Clone)]
+#[serde(rename_all = "snake_case")]
+pub enum UpdateSongTagsStatus {
+    Completed,
+    FailedValidation,
+    NotFound,
+    UnsafeToPatch,
+}
+
+#[derive(Debug, Serialize, Clone)]
+#[serde(rename_all = "camelCase")]
+pub struct UpdateSongTagsResult {
+    pub status: UpdateSongTagsStatus,
+    pub original_file_path: String,
+    pub current_file_path: String,
+    pub updated_fields: Vec<String>,
+}
+
 #[derive(Debug, Serialize, Clone)]
 pub struct DatabaseStats {
     pub total_songs: usize,

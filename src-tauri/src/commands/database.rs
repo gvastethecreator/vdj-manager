@@ -91,24 +91,24 @@ pub async fn save_database(vdj_folder: String, songs_json: String) -> Result<(),
     parser::write_database_checked(&db_path, &db)
 }
 
-/// Update tags for a single song by index. Creates timestamped backup before writing.
+/// Update tags for one song using its stable original path.  The parser owns
+/// the narrow patch-in-place write; this command intentionally does not fall
+/// back to the legacy whole-document serializer.
 #[tauri::command]
-pub async fn update_song_tags(
-    request: UpdateSongTagsRequest,
-) -> Result<(), String> {
+pub async fn update_song_tags(request: UpdateSongTagsRequest) -> Result<UpdateSongTagsResult, String> {
     let db_path = PathBuf::from(&request.vdj_folder).join("database.xml");
-    let mut db = parser::parse_database(&db_path)?;
-
-    if request.index >= db.songs.len() {
-        return Err("Índice fuera de rango".to_string());
+    match parser::patch_song_in_place(&db_path, &request.original_file_path, &request.update) {
+        Ok(result) => Ok(result),
+        Err(error) => {
+            eprintln!("update_song_tags aborted safely: {}", error);
+            Ok(UpdateSongTagsResult {
+                status: UpdateSongTagsStatus::UnsafeToPatch,
+                original_file_path: request.original_file_path,
+                current_file_path: String::new(),
+                updated_fields: request.update.updated_fields(),
+            })
+        }
     }
-
-    let song = &mut db.songs[request.index];
-    apply_song_update(song, &request.update);
-
-    safety::create_timestamped_backup(&db_path, "database")?;
-
-    parser::write_database_checked(&db_path, &db)
 }
 
 /// Remove songs from the database by index, optionally moving the physical files to trash.
@@ -192,6 +192,6 @@ pub struct SongUpdate {
 #[serde(rename_all = "camelCase")]
 pub struct UpdateSongTagsRequest {
     pub vdj_folder: String,
-    pub index: usize,
-    pub update: SongUpdate,
+    pub original_file_path: String,
+    pub update: InlineSongUpdate,
 }
