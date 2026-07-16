@@ -4,16 +4,20 @@ import type {
 } from "../types/database";
 
 export function getDemoRecoveryState(): MutationRecoveryState | null {
-  if (!new URLSearchParams(window.location.search).has("recovery")) return null;
+  const params = new URLSearchParams(window.location.search);
+  if (!params.has("recovery")) return null;
+  const mode = params.get("recovery") ?? "";
+  if (mode === "error") return null;
+  const manualReview = mode === "manual";
   const now = Date.now();
   return {
     status: "pending_recovery",
     libraryKey: "demo-virtualdj",
-    recommendedAction: "resume",
-    allowedActions: ["resume", "rollback"],
+    recommendedAction: manualReview ? "manual_review_acknowledged" : "resume",
+    allowedActions: manualReview ? ["manual_review_acknowledged"] : ["resume", "rollback"],
     entries: [{
-      recommendedAction: "resume",
-      allowedActions: ["resume", "rollback"],
+      recommendedAction: manualReview ? "manual_review_acknowledged" : "resume",
+      allowedActions: manualReview ? ["manual_review_acknowledged"] : ["resume", "rollback"],
       journal: {
         journalId: "demo-recovery-001",
         operation: "move",
@@ -27,8 +31,8 @@ export function getDemoRecoveryState(): MutationRecoveryState | null {
           targetFilePath: "D:\\Music\\House\\Demo Track.mp3",
           sourceFileSize: 8_421_376,
           sourceSha256: "demo-sha256-verified",
-          phase: "fs_applied",
-          lastError: null,
+          phase: manualReview ? "manual_review_required" : "fs_applied",
+          lastError: manualReview ? "El archivo destino cambió desde que se registró la operación." : null,
           manualReviewAcknowledged: false,
         }],
       },

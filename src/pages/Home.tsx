@@ -21,18 +21,18 @@ export function Home() {
   return (
     <main className="flex min-h-full items-center justify-center bg-background p-8">
       <div className="grid w-full max-w-5xl overflow-hidden rounded-xl border border-border bg-surface shadow-2xl lg:grid-cols-[1.15fr_.85fr]">
-        <section className="p-8 lg:p-10">
+        <section className="p-6 lg:p-8">
           <div className="flex items-center gap-3 text-primary-light">
             <div className="flex h-10 w-10 items-center justify-center rounded-lg border border-primary/30 bg-primary/12"><Database className="h-5 w-5" /></div>
             <span className="text-sm font-bold text-text">VDJ Manager</span>
           </div>
-          <p className="mt-10 text-xs font-semibold uppercase tracking-[0.16em] text-primary-light">Centro operativo para VirtualDJ</p>
-          <h1 className="mt-2 max-w-xl text-4xl font-bold tracking-tight text-text">Vuelve a tu biblioteca y decide el próximo paso.</h1>
-          <p className="mt-4 max-w-xl text-base leading-relaxed text-text-secondary">
+          <p className="mt-6 text-xs font-semibold uppercase tracking-[0.16em] text-primary-light">Centro operativo para VirtualDJ</p>
+          <h1 className="mt-2 max-w-xl text-3xl font-bold tracking-tight text-text">Vuelve a tu biblioteca y decide el próximo paso.</h1>
+          <p className="mt-3 max-w-xl text-sm leading-relaxed text-text-secondary">
             Navega pistas, verifica integridad y ejecuta operaciones protegidas desde un único workspace de escritorio.
           </p>
 
-          <div className="mt-8 space-y-3">
+          <div className="mt-5 space-y-2">
             {lastVdjFolder ? (
               <button type="button" onClick={() => void loadFromFolder(lastVdjFolder)} disabled={loading} className="btn btn-primary btn-lg w-full justify-start">
                 <History className="h-5 w-5" />
@@ -47,9 +47,9 @@ export function Home() {
             </button>
           </div>
 
-          {loading ? <div className="mt-4 flex items-center gap-2 text-sm text-text-muted"><div className="spinner" /> Cargando biblioteca…</div> : null}
+          {loading ? <div className="mt-3 flex items-center gap-2 text-sm text-text-muted"><div className="spinner" /> Cargando biblioteca…</div> : null}
           {uiError?.scope === currentScope ? (
-            <div className="mt-4">
+            <div className="mt-3">
               <UiErrorNotice
                 error={uiError}
                 onDismiss={clearUiError}
@@ -63,7 +63,7 @@ export function Home() {
             </div>
           ) : null}
 
-          <div className="mt-8 flex items-start gap-3 border-t border-border pt-5">
+          <div className="mt-5 flex items-start gap-3 border-t border-border pt-4">
             <ShieldCheck className="mt-0.5 h-5 w-5 shrink-0 text-success" />
             <div>
               <h2 className="text-sm font-semibold text-text">Escrituras protegidas</h2>
@@ -72,7 +72,7 @@ export function Home() {
           </div>
         </section>
 
-        <aside className="border-t border-border bg-background/55 p-8 lg:border-l lg:border-t-0">
+        <aside className="border-t border-border bg-background/55 p-6 lg:border-l lg:border-t-0 lg:p-8">
           <div className="flex items-start justify-between gap-3">
             <div>
               <h2 className="text-sm font-semibold text-text">Carpetas de música</h2>

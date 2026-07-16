@@ -164,7 +164,11 @@ export default function App() {
   const [recoveryState, setRecoveryState] = useState<MutationRecoveryState | null>(
     demoMode ? getDemoRecoveryState() : null,
   );
-  const [recoveryError, setRecoveryError] = useState<UiError | null>(null);
+  const [recoveryError, setRecoveryError] = useState<UiError | null>(() => (
+    demoMode && new URLSearchParams(window.location.search).get("recovery") === "error"
+      ? createUiError("recovery", "No se pudo comprobar el estado de recuperación.", new Error("Fixture demo de recovery no disponible."))
+      : null
+  ));
   const [recoveryLoading, setRecoveryLoading] = useState(false);
   const [recoveryOutcomes, setRecoveryOutcomes] = useState<ApplyRecoveryResult["outcomes"]>([]);
   const [integrity, setIntegrity] = useState<IntegritySnapshot>(() => (

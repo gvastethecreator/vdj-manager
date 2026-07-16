@@ -265,6 +265,7 @@ export function createDemoRuntimeServices(): RuntimeServices {
   let currentSettings = clone(DEMO_SETTINGS);
   let currentMapper = clone(DEMO_MAPPER);
   let currentPad = clone(DEMO_PAD);
+  let currentRecovery = clone(getDemoRecoveryState() ?? CLEAN_RECOVERY);
   const configContents = new Map<string, string>([
     [DEMO_CONFIG_FILES[1].path, serializeDemoMapper(currentMapper)],
     [DEMO_CONFIG_FILES[2].path, serializeDemoNode(currentPad)],
@@ -291,10 +292,11 @@ export function createDemoRuntimeServices(): RuntimeServices {
     async removeLibraryEntries(_folder, items, mode): Promise<LibraryRemovalResult[]> {
       return items.map((originalFilePath) => ({ originalFilePath, status: "completed", mode, message: null }));
     },
-    async getMutationRecoveryState() { return clone(getDemoRecoveryState() ?? CLEAN_RECOVERY); },
+    async getMutationRecoveryState() { return clone(currentRecovery); },
     async applyMutationRecoveryAction(_folder, action, journalId): Promise<ApplyRecoveryResult> {
+      currentRecovery = clone(CLEAN_RECOVERY);
       return {
-        state: clone(CLEAN_RECOVERY),
+        state: clone(currentRecovery),
         outcomes: [{
           journalId,
           itemId: "demo-item-001",
@@ -352,7 +354,10 @@ export function createDemoRuntimeServices(): RuntimeServices {
       }
       return [...directories];
     },
-    async planMoveFiles(_folder, paths, targetFolder) { return demoMoveReport(paths, targetFolder, false); },
+    async planMoveFiles(_folder, paths, targetFolder) {
+      await demoScenarioGate("preparar el movimiento");
+      return demoMoveReport(paths, targetFolder, false);
+    },
     async dryRunRename(_folder, indices, pattern): Promise<DryRunResult> {
       return { description: `Vista previa: ${pattern}`, affected_count: indices.length, details: indices.map((index) => `${demoSongs[index]?.file_name ?? index} → ${pattern}`) };
     },
