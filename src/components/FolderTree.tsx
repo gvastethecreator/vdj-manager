@@ -1,8 +1,8 @@
 import { useState, useEffect } from "react";
 import { ChevronRight, ChevronDown, Folder, FolderOpen } from "lucide-react";
-import { listSubdirectories } from "../lib/api";
 import { compareDriveAwarePaths, getPathLeafName } from "../lib/pathUtils";
 import { buildDrivePathTree } from "../lib/pathTree";
+import { useApp } from "../App";
 
 interface TreeNode {
     path: string;
@@ -26,6 +26,7 @@ export function FolderTree({
     selectedPath,
     maxHeightClass = "max-h-48",
 }: FolderTreeProps) {
+    const { services } = useApp();
     const [nodes, setNodes] = useState<TreeNode[]>([]);
 
     /* Initialise root nodes and auto-expand them so the user
@@ -56,7 +57,7 @@ export function FolderTree({
             let result: TreeNode[] = buildDrivePathTree(roots);
             for (const r of roots) {
                 try {
-                    const subdirs = await listSubdirectories(r);
+                    const subdirs = await services.listSubdirectories(r);
                     const children = subdirs
                         .sort(compareDriveAwarePaths)
                         .map((s) => ({
@@ -78,7 +79,7 @@ export function FolderTree({
             setNodes([]);
         }
         return () => { cancelled = true; };
-    }, [roots]);
+    }, [roots, services]);
 
     async function toggleNode(path: string) {
         async function updateNodes(items: TreeNode[]): Promise<TreeNode[]> {
@@ -87,7 +88,7 @@ export function FolderTree({
                 if (node.path === path) {
                     if (!node.expanded && node.children === null) {
                         try {
-                            const subdirs = await listSubdirectories(node.path);
+                            const subdirs = await services.listSubdirectories(node.path);
                             const children: TreeNode[] = subdirs.sort(compareDriveAwarePaths).map((s) => ({
                                 path: s,
                                 name: getPathLeafName(s),

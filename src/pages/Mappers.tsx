@@ -3,7 +3,7 @@ import { FileCode2, ListChecks, Plus, Save, Trash2 } from "lucide-react";
 import { useApp } from "../App";
 import { CodeEditor } from "../components/CodeEditor";
 import { TreeFileNavigator, type TreeFileItem } from "../components/TreeFileNavigator";
-import { formatSize, getVdjMapper, listVdjConfigFiles, readVdjConfigFile, updateVdjMapper, writeVdjConfigFile } from "../lib/api";
+import { formatSize } from "../lib/api";
 import type { VdjConfigFileInfo, VdjMapperBinding, VdjMapperDocument } from "../types/database";
 
 const EMPTY_BINDING: VdjMapperBinding = {
@@ -21,7 +21,7 @@ type MapperEditorMode = "bindings" | "xml";
 
 /** Competent editor for VirtualDJ controller mappings with structured binding editing for `.vdjmap`. */
 export function Mappers() {
-    const { vdjFolder, setError } = useApp();
+    const { vdjFolder, clearUiError, reportUiError, services } = useApp();
     const [files, setFiles] = useState<VdjConfigFileInfo[]>([]);
     const [loading, setLoading] = useState(false);
     const [saving, setSaving] = useState(false);
@@ -42,7 +42,7 @@ export function Mappers() {
         }
         setLoading(true);
         try {
-            const result = await listVdjConfigFiles(vdjFolder);
+            const result = await services.listVdjConfigFiles(vdjFolder);
             setFiles(result.filter((file) => {
                 const relative = file.relative_path.toLowerCase();
                 return relative.startsWith("mappers/")
@@ -52,11 +52,11 @@ export function Mappers() {
                     || relative.endsWith(".vdjmap");
             }));
         } catch (err) {
-            setError(String(err));
+            reportUiError("No se pudieron cargar los mappers.", err);
         } finally {
             setLoading(false);
         }
-    }, [setError, vdjFolder]);
+    }, [reportUiError, services, vdjFolder]);
 
     useEffect(() => {
         void loadFiles();
@@ -100,18 +100,18 @@ export function Mappers() {
 
         let cancelled = false;
 
-        readVdjConfigFile(vdjFolder, selectedFile.path)
+        services.readVdjConfigFile(vdjFolder, selectedFile.path)
             .then((content) => {
                 if (cancelled) return;
                 setRawContent(content);
                 setRawDirty(false);
             })
             .catch((err) => {
-                if (!cancelled) setError(String(err));
+                if (!cancelled) reportUiError("No se pudo abrir el XML del mapper.", err);
             });
 
         if (isMapperFile(selectedFile)) {
-            getVdjMapper(vdjFolder, selectedFile.path)
+            services.getVdjMapper(vdjFolder, selectedFile.path)
                 .then((document) => {
                     if (cancelled) return;
                     setMapper(document);
@@ -120,7 +120,7 @@ export function Mappers() {
                 .catch((err) => {
                     if (!cancelled) {
                         setMapper(null);
-                        setError(String(err));
+                        reportUiError("No se pudo interpretar el mapper.", err);
                     }
                 });
         } else {
@@ -131,7 +131,7 @@ export function Mappers() {
         return () => {
             cancelled = true;
         };
-    }, [selectedFile, setError, vdjFolder]);
+    }, [reportUiError, selectedFile, services, vdjFolder]);
 
     const filteredBindings = useMemo(() => {
         if (!mapper) return [];
@@ -173,36 +173,36 @@ export function Mappers() {
         if (!vdjFolder || !selectedFile || !rawDirty) return;
         setSaving(true);
         try {
-            const backup = await writeVdjConfigFile(vdjFolder, selectedFile.path, rawContent);
+            const backup = await services.writeVdjConfigFile(vdjFolder, selectedFile.path, rawContent);
             setLastBackup(backup || null);
             setRawDirty(false);
             await loadFiles();
-            setError(null);
+            clearUiError();
         } catch (err) {
-            setError(String(err));
+            reportUiError("No se pudo guardar el XML del mapper.", err);
         } finally {
             setSaving(false);
         }
-    }, [loadFiles, rawContent, rawDirty, selectedFile, setError, vdjFolder]);
+    }, [clearUiError, loadFiles, rawContent, rawDirty, reportUiError, selectedFile, services, vdjFolder]);
 
     const saveMapper = useCallback(async () => {
         if (!vdjFolder || !selectedFile || !mapper || !mapperDirty) return;
         setSaving(true);
         try {
-            const backup = await updateVdjMapper(vdjFolder, selectedFile.path, mapper);
+            const backup = await services.updateVdjMapper(vdjFolder, selectedFile.path, mapper);
             setLastBackup(backup || null);
             setMapperDirty(false);
-            const refreshed = await readVdjConfigFile(vdjFolder, selectedFile.path);
+            const refreshed = await services.readVdjConfigFile(vdjFolder, selectedFile.path);
             setRawContent(refreshed);
             setRawDirty(false);
             await loadFiles();
-            setError(null);
+            clearUiError();
         } catch (err) {
-            setError(String(err));
+            reportUiError("No se pudo guardar el mapper.", err);
         } finally {
             setSaving(false);
         }
-    }, [loadFiles, mapper, mapperDirty, selectedFile, setError, vdjFolder]);
+    }, [clearUiError, loadFiles, mapper, mapperDirty, reportUiError, selectedFile, services, vdjFolder]);
 
     return (
         <div className="flex h-full gap-0 code-workspace">

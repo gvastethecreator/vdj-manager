@@ -1,13 +1,10 @@
 import { useState, useCallback, useMemo } from "react";
-import { open } from "@tauri-apps/plugin-dialog";
 import { useApp } from "../App";
 import { SongTable } from "../components/SongTable";
 import { FolderTree } from "../components/FolderTree";
 import { MutationBlockedNotice } from "../components/MutationBlockedNotice";
-import {
-    moveFilesOp, renameFileOp, updateSongTags,
-    planMoveFiles, getConfiguredMusicRoots,
-} from "../lib/api";
+import { ConfirmDialog } from "../components/Dialog";
+import { getConfiguredMusicRoots } from "../lib/api";
 import { moveStatusLabel, transferMethodLabel } from "../lib/moveReport";
 import type { DryRunResult, InlineSongUpdate, MoveBatchReport, RenameFileResult } from "../types/database";
 
@@ -15,7 +12,7 @@ type BatchAction = "move" | "rename" | "tag";
 
 /** Batch operations page: move, rename, and tag-edit selected songs. */
 export function BatchOperations() {
-    const { songs, vdjFolder, setError, reload, refreshRecovery, musicFolders, addMusicFolder, selectMusicFolder, mutationsBlocked } = useApp();
+    const { songs, vdjFolder, reportUiError, reload, refreshRecovery, musicFolders, addMusicFolder, selectMusicFolder, mutationsBlocked, services } = useApp();
     const [selected, setSelected] = useState<Set<number>>(new Set());
     const [action, setAction] = useState<BatchAction>("move");
     const [targetFolder, setTargetFolder] = useState("");
@@ -33,6 +30,7 @@ export function BatchOperations() {
     const [log, setLog] = useState<string[]>([]);
     const [dryResult, setDryResult] = useState<DryRunResult | null>(null);
     const [moveReport, setMoveReport] = useState<MoveBatchReport | null>(null);
+    const [confirmOpen, setConfirmOpen] = useState(false);
 
     // Derive tree roots from actual music paths; fall back to VDJ folder
     const treeRoots = useMemo(
@@ -56,7 +54,7 @@ export function BatchOperations() {
     );
 
     async function pickTarget() {
-        const folder = await open({ directory: true, title: "Seleccionar carpeta destino" });
+        const folder = await services.selectDirectory({ purpose: "destination", title: "Seleccionar carpeta destino" });
         if (folder) {
             setTargetFolder(folder);
             addMusicFolder(folder);
@@ -72,7 +70,7 @@ export function BatchOperations() {
         const indices = Array.from(selected);
         try {
             if (action === "move" && targetFolder) {
-                setMoveReport(await planMoveFiles(vdjFolder, selectedPaths, targetFolder));
+                setMoveReport(await services.planMoveFiles(vdjFolder, selectedPaths, targetFolder));
                 setDryResult(null);
                 return;
             }
@@ -101,13 +99,13 @@ export function BatchOperations() {
             }
             setDryResult(result);
         } catch (err) {
-            setError(String(err));
+            reportUiError("No se pudo preparar la vista previa de la operación.", err);
         }
     }
 
     async function execute() {
         if (mutationsBlocked) {
-            setError("Operación pausada: resuelve primero la recuperación pendiente.");
+            reportUiError("Operación pausada por una recuperación pendiente.");
             return;
         }
         if (!vdjFolder || selected.size === 0) return;
@@ -118,7 +116,7 @@ export function BatchOperations() {
         try {
             const indices = Array.from(selected);
             if (action === "move" && targetFolder) {
-                const report = await moveFilesOp(vdjFolder, selectedPaths, targetFolder);
+                const report = await services.moveFilesOp(vdjFolder, selectedPaths, targetFolder);
                 setMoveReport(report);
                 if (report.summary.completed > 0) {
                     setSelected(new Set());
@@ -128,7 +126,7 @@ export function BatchOperations() {
                 if (selected.size !== 1 || renameFileName.length === 0) return;
                 const song = songs.find((item) => item.index === indices[0]);
                 if (!song) return;
-                const result: RenameFileResult = await renameFileOp(
+                const result: RenameFileResult = await services.renameFileOp(
                     vdjFolder,
                     song.file_path,
                     renameFileName,
@@ -149,12 +147,12 @@ export function BatchOperations() {
                         continue;
                     }
                     try {
-                        const result = await updateSongTags(vdjFolder, song.file_path, patch);
+                        const result = await services.updateSongTags(vdjFolder, song.file_path, patch);
                         outcomes.push(`${result.status === "completed" ? "OK" : "ATENCIÓN"}: ${song.file_name} · ${result.status}`);
                         if (result.status === "completed") completed += 1;
                     } catch (error) {
                         outcomes.push(`ERROR: ${song.file_name} · ${String(error)}`);
-                        setError(`La edición batch se detuvo tras ${completed} cambio(s): ${String(error)}`);
+                        reportUiError(`La edición batch se detuvo tras ${completed} cambio(s).`, error);
                         setLog([...outcomes]);
                         break;
                     }
@@ -163,10 +161,11 @@ export function BatchOperations() {
                 if (completed > 0) await reload();
             }
         } catch (err) {
-            setError(String(err));
+            reportUiError("No se pudo completar la operación en lote.", err);
         } finally {
             await refreshRecovery();
             setRunning(false);
+            setConfirmOpen(false);
         }
     }
 
@@ -309,7 +308,7 @@ export function BatchOperations() {
                             <button type="button" onClick={runDryRun}
                                 disabled={running || selected.size === 0 || (action === "move" && targetFolder.length === 0) || (action === "rename" && (selected.size !== 1 || renameFileName.length === 0)) || (action === "tag" && running_tag_fields.length === 0)}
                                 className="btn btn-warning">Vista Previa</button>
-                            <button type="button" onClick={execute}
+                            <button type="button" onClick={() => setConfirmOpen(true)}
                                 disabled={mutationsBlocked || running || selected.size === 0 || (action === "move" && targetFolder.length === 0) || (action === "rename" && (selected.size !== 1 || renameFileName.length === 0)) || (action === "tag" && running_tag_fields.length === 0)}
                                 className="btn btn-primary">
                                 {running ? "Ejecutando..." : "Ejecutar"}
@@ -374,6 +373,16 @@ export function BatchOperations() {
                 <SongTable songs={songs} selectable selected={selected}
                     onToggle={toggleSelect} onSelectAll={selectAll} onDeselectAll={deselectAll}
                     storageKey="batch" />
+                <ConfirmDialog
+                    open={confirmOpen}
+                    title="Confirmar operación en lote"
+                    description={`Se aplicará ${action === "move" ? "un movimiento" : action === "rename" ? "un renombrado" : "una edición de etiquetas"} a ${selected.size} pista(s). La operación quedará registrada y usará las protecciones de recuperación.`}
+                    confirmLabel="Ejecutar operación"
+                    destructive={action !== "tag"}
+                    busy={running}
+                    onCancel={() => setConfirmOpen(false)}
+                    onConfirm={execute}
+                />
             </div>
         </div>
     );

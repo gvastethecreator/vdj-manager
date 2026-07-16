@@ -1,9 +1,9 @@
 import { useEffect, useMemo, useState } from "react";
-import { getWaveformPreview } from "../lib/api";
 import { buildCueOverlayMarkers } from "../lib/cueOverlay";
-import { buildSyntheticWaveformPreview } from "../lib/waveformFallback";
 import { buildWaveformSegments } from "../lib/waveformRender";
 import type { WaveformPreview as WaveformPreviewData, CueMarker } from "../types/database";
+import { useApp } from "../App";
+import type { RuntimeServices } from "../lib/runtimeServices";
 
 interface WaveformPreviewProps {
     filePath: string;
@@ -53,10 +53,6 @@ function getCacheKey(filePath: string, bucketCount: number, vdjFolder?: string |
     return `${bucketCount}:${vdjFolder ?? ""}:${fileSize ?? ""}:${filePath}`;
 }
 
-function shouldUseDemoFallback(): boolean {
-    return new URLSearchParams(window.location.search).has("demo");
-}
-
 function runQueuedTask<T>(task: () => Promise<T>): Promise<T> {
     return new Promise((resolve, reject) => {
         const run = () => {
@@ -84,6 +80,7 @@ function runQueuedTask<T>(task: () => Promise<T>): Promise<T> {
 }
 
 async function loadWaveformPreview(
+    services: RuntimeServices,
     filePath: string,
     bucketCount: number,
     vdjFolder?: string | null,
@@ -102,15 +99,12 @@ async function loadWaveformPreview(
 
     const request = runQueuedTask(async () => {
         try {
-            const preview = await getWaveformPreview(filePath, bucketCount, vdjFolder, fileSize);
+            const preview = await services.getWaveformPreview(filePath, bucketCount, vdjFolder, fileSize);
             previewCache.set(cacheKey, preview);
             return preview;
         } catch {
-            const fallback = shouldUseDemoFallback()
-                ? buildSyntheticWaveformPreview(filePath, bucketCount)
-                : null;
-            previewCache.set(cacheKey, fallback);
-            return fallback;
+            previewCache.set(cacheKey, null);
+            return null;
         } finally {
             inflightCache.delete(cacheKey);
         }
@@ -136,7 +130,8 @@ export function WaveformPreview({
     heightClass = "h-6",
     svgClassName = "h-6",
 }: WaveformPreviewProps) {
-    const cacheKey = getCacheKey(filePath, bucketCount, vdjFolder, fileSize);
+    const { services } = useApp();
+    const cacheKey = `${services.mode}:${getCacheKey(filePath, bucketCount, vdjFolder, fileSize)}`;
     const [preview, setPreview] = useState<WaveformPreviewData | null | undefined>(
         () => previewCache.get(cacheKey),
     );
@@ -154,7 +149,7 @@ export function WaveformPreview({
 
         setPreview(undefined);
 
-        loadWaveformPreview(filePath, bucketCount, vdjFolder, fileSize).then((result) => {
+        loadWaveformPreview(services, filePath, bucketCount, vdjFolder, fileSize).then((result) => {
             if (!cancelled) {
                 setPreview(result);
             }
@@ -163,7 +158,7 @@ export function WaveformPreview({
         return () => {
             cancelled = true;
         };
-    }, [bucketCount, cacheKey, filePath, vdjFolder, fileSize]);
+    }, [bucketCount, cacheKey, filePath, services, vdjFolder, fileSize]);
 
     const waveformSegments = useMemo(
         () => (preview?.peaks ? buildWaveformSegments(preview.peaks, preview.colors) : []),

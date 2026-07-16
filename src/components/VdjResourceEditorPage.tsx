@@ -1,6 +1,6 @@
 import { useCallback, useEffect, useMemo, useState } from "react";
 import type { ReactNode } from "react";
-import { listVdjConfigFiles, readVdjConfigFile, writeVdjConfigFile, formatSize } from "../lib/api";
+import { formatSize } from "../lib/api";
 import { useApp } from "../App";
 import type { VdjConfigFileInfo } from "../types/database";
 import { CodeEditor } from "./CodeEditor";
@@ -19,7 +19,7 @@ export function VdjResourceEditorPage({
     filter: (file: VdjConfigFileInfo) => boolean;
     intro?: ReactNode;
 }) {
-    const { vdjFolder, setError } = useApp();
+    const { vdjFolder, clearUiError, reportUiError, services } = useApp();
     const [files, setFiles] = useState<VdjConfigFileInfo[]>([]);
     const [loading, setLoading] = useState(false);
     const [saving, setSaving] = useState(false);
@@ -37,14 +37,14 @@ export function VdjResourceEditorPage({
 
         setLoading(true);
         try {
-            const result = await listVdjConfigFiles(vdjFolder);
+            const result = await services.listVdjConfigFiles(vdjFolder);
             setFiles(result.filter(filter));
         } catch (err) {
-            setError(String(err));
+            reportUiError("No se pudo cargar el estudio de recursos.", err);
         } finally {
             setLoading(false);
         }
-    }, [filter, setError, vdjFolder]);
+    }, [filter, reportUiError, services, vdjFolder]);
 
     useEffect(() => {
         void loadFiles();
@@ -86,36 +86,36 @@ export function VdjResourceEditorPage({
         }
 
         let cancelled = false;
-        readVdjConfigFile(vdjFolder, selectedFile.path)
+        services.readVdjConfigFile(vdjFolder, selectedFile.path)
             .then((value) => {
                 if (cancelled) return;
                 setContent(value);
                 setDirty(false);
             })
             .catch((err) => {
-                if (!cancelled) setError(String(err));
+                if (!cancelled) reportUiError("No se pudo abrir el recurso seleccionado.", err);
             });
 
         return () => {
             cancelled = true;
         };
-    }, [selectedFile, setError, vdjFolder]);
+    }, [reportUiError, selectedFile, services, vdjFolder]);
 
     const save = useCallback(async () => {
         if (!vdjFolder || !selectedFile || !dirty) return;
         setSaving(true);
         try {
-            const backup = await writeVdjConfigFile(vdjFolder, selectedFile.path, content);
+            const backup = await services.writeVdjConfigFile(vdjFolder, selectedFile.path, content);
             setLastBackup(backup || null);
             setDirty(false);
-            setError(null);
+            clearUiError();
             await loadFiles();
         } catch (err) {
-            setError(String(err));
+            reportUiError("No se pudo guardar el recurso.", err);
         } finally {
             setSaving(false);
         }
-    }, [content, dirty, loadFiles, selectedFile, setError, vdjFolder]);
+    }, [clearUiError, content, dirty, loadFiles, reportUiError, selectedFile, services, vdjFolder]);
 
     return (
         <div className="flex h-full gap-0 code-workspace">

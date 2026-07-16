@@ -1,5 +1,4 @@
 import { useCallback, useEffect, useMemo, useState } from "react";
-import { getVdjSettings, updateVdjSettings } from "../lib/api";
 import { useApp } from "../App";
 import type { VdjSettingEntry } from "../types/database";
 
@@ -17,7 +16,7 @@ function looksBoolean(value: string | null): boolean {
 
 /** Focused editor for VirtualDJ `settings.xml` using a curated subset of documented options. */
 export function Configs() {
-    const { vdjFolder, setError } = useApp();
+    const { vdjFolder, clearUiError, reportUiError, services } = useApp();
     const [settings, setSettings] = useState<VdjSettingEntry[]>([]);
     const [draft, setDraft] = useState<Record<string, string>>({});
     const [loading, setLoading] = useState(false);
@@ -34,15 +33,15 @@ export function Configs() {
 
         setLoading(true);
         try {
-            const result = await getVdjSettings(vdjFolder);
+            const result = await services.getVdjSettings(vdjFolder);
             setSettings(result);
             setDraft(Object.fromEntries(result.map((entry) => [entry.key, entry.value ?? ""])));
         } catch (err) {
-            setError(String(err));
+            reportUiError("No se pudo cargar settings.xml.", err);
         } finally {
             setLoading(false);
         }
-    }, [vdjFolder, setError]);
+    }, [reportUiError, services, vdjFolder]);
 
     useEffect(() => {
         void loadSettings();
@@ -90,16 +89,16 @@ export function Configs() {
 
         setSaving(true);
         try {
-            const backup = await updateVdjSettings(vdjFolder, updates);
+            const backup = await services.updateVdjSettings(vdjFolder, updates);
             setLastBackup(backup);
             await loadSettings();
-            setError(null);
+            clearUiError();
         } catch (err) {
-            setError(String(err));
+            reportUiError("No se pudieron guardar los cambios de settings.xml.", err);
         } finally {
             setSaving(false);
         }
-    }, [dirtyCount, draft, loadSettings, settings, setError, vdjFolder]);
+    }, [clearUiError, dirtyCount, draft, loadSettings, reportUiError, services, settings, vdjFolder]);
 
     return (
         <div className="space-y-4">

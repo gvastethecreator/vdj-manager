@@ -1,7 +1,7 @@
 import { useMemo, useState } from "react";
 import { FileWarning, Link2, RefreshCw } from "lucide-react";
 import { useApp } from "../App";
-import { formatSize, verifyFiles } from "../lib/api";
+import { formatSize } from "../lib/api";
 import type { FileVerification } from "../types/database";
 
 type Filter = "all" | "missing" | "mismatch" | "ok";
@@ -11,7 +11,7 @@ type Filter = "all" | "missing" | "mismatch" | "ok";
  * diagnostic surface never writes database.xml or ranks candidates.
  */
 export function MissingFiles() {
-  const { vdjFolder, setError, setPage } = useApp();
+  const { vdjFolder, clearUiError, reportUiError, services, setNavigation } = useApp();
   const [results, setResults] = useState<FileVerification[] | null>(null);
   const [loading, setLoading] = useState(false);
   const [filter, setFilter] = useState<Filter>("missing");
@@ -19,11 +19,11 @@ export function MissingFiles() {
   async function runVerify() {
     if (!vdjFolder) return;
     setLoading(true);
-    setError(null);
+    clearUiError();
     try {
-      setResults(await verifyFiles(vdjFolder));
+      setResults(await services.verifyFiles(vdjFolder));
     } catch (error) {
-      setError(String(error));
+      reportUiError("No se pudo verificar la integridad de la biblioteca.", error);
     } finally {
       setLoading(false);
     }
@@ -63,7 +63,7 @@ export function MissingFiles() {
         </div>
         <div className="flex gap-2">
           {counts && counts.missing > 0 && (
-            <button type="button" onClick={() => setPage("relink")} className="btn btn-warning">
+            <button type="button" onClick={() => setNavigation({ workspace: "integrity", section: "relink" })} className="btn btn-warning">
               <Link2 className="h-4 w-4" />
               Abrir Reconciliación de rutas
             </button>
@@ -104,7 +104,7 @@ export function MissingFiles() {
                 <div className="text-sm font-semibold text-text">Hay referencias que necesitan reconciliación</div>
                 <div className="mt-1 text-xs text-text-muted">Selecciona una entrada en el owner dedicado para revisar candidatos y confirmar una ruta.</div>
               </div>
-              <button type="button" onClick={() => setPage("relink")} className="btn btn-warning btn-sm">
+              <button type="button" onClick={() => setNavigation({ workspace: "integrity", section: "relink" })} className="btn btn-warning btn-sm">
                 <Link2 className="h-3.5 w-3.5" />
                 Revisar faltantes
               </button>

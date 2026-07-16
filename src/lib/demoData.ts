@@ -1,13 +1,13 @@
 import type { DatabaseStats, Page, SongSummary } from "../types/database";
 
-const DEMO_FOLDER = "D:\\Users\\DJ\\Documents\\VirtualDJ";
-const DEMO_MUSIC_ROOTS = [
+export const DEMO_FOLDER = "D:\\Users\\DJ\\Documents\\VirtualDJ";
+export const DEMO_MUSIC_ROOTS = [
   "D:\\Music\\Club",
   "D:\\Music\\Latin",
   "D:\\Music\\Edits",
 ];
 
-const demoSongs: SongSummary[] = [
+export const demoSongs: SongSummary[] = [
   {
     index: 0,
     in_database: true,
@@ -229,7 +229,7 @@ const demoSongs: SongSummary[] = [
   },
 ];
 
-const demoStats: DatabaseStats = {
+export const demoStats: DatabaseStats = {
   total_songs: demoSongs.filter((song) => song.in_database).length,
   total_size_bytes: demoSongs.reduce((total, song) => total + (song.file_size ?? 0), 0),
   genres: [

@@ -1,17 +1,14 @@
 import { useEffect, useMemo, useRef, useState } from "react";
 import { FolderOpen, Link2, RefreshCw, Search } from "lucide-react";
-import { open } from "@tauri-apps/plugin-dialog";
 import { useApp } from "../App";
 import {
-  findRelinkCandidates,
   formatSize,
   mergeFolderLists,
-  relocateFile,
-  verifyFiles,
 } from "../lib/api";
 import { isRelinkMatchForPath, relinkReasonLabel } from "../lib/relink";
 import { getPathLeafName, normalizePathSeparators } from "../lib/pathUtils";
 import { MutationBlockedNotice } from "../components/MutationBlockedNotice";
+import { ConfirmDialog } from "../components/Dialog";
 import type {
   FileVerification,
   RelinkFileResult,
@@ -50,13 +47,15 @@ export function RelinkTracks() {
   const {
     vdjFolder,
     songs,
-    setError,
+    clearUiError,
+    reportUiError,
     reload,
     musicFolders,
     addMusicFolder,
     selectMusicFolder,
     mutationsBlocked,
     refreshRecovery,
+    services,
   } = useApp();
   const [results, setResults] = useState<FileVerification[] | null>(null);
   const [loading, setLoading] = useState(false);
@@ -104,9 +103,9 @@ export function RelinkTracks() {
   async function runVerify() {
     if (!vdjFolder) return;
     setLoading(true);
-    setError(null);
+    clearUiError();
     try {
-      const verification = await verifyFiles(vdjFolder);
+      const verification = await services.verifyFiles(vdjFolder);
       setResults(verification);
       setSelectedPath((current) => (
         current && verification.some((entry) => !entry.exists && pathKey(entry.file_path) === pathKey(current))
@@ -121,7 +120,7 @@ export function RelinkTracks() {
       selectedPathRef.current = nextSelected;
       setCandidateMatch(null);
     } catch (error) {
-      setError(String(error));
+      reportUiError("No se pudo verificar la biblioteca antes de reconciliar.", error);
     } finally {
       setLoading(false);
     }
@@ -137,17 +136,17 @@ export function RelinkTracks() {
       roots = [selected];
     }
     setSearching(true);
-    setError(null);
+    clearUiError();
     const requestedPath = selectedItem.verification.file_path;
     try {
-      const match = await findRelinkCandidates(vdjFolder, requestedPath, roots);
+      const match = await services.findRelinkCandidates(vdjFolder, requestedPath, roots);
       if (!isRelinkMatchForPath(match, selectedPathRef.current)) return;
       setCandidateMatch(match);
       if (match.status !== "completed") {
-        setError(match.message ?? "No se puede resolver esta referencia sin revisión manual.");
+        reportUiError("No se encontraron candidatos seguros.", match.message ?? "La referencia requiere revisión manual.");
       }
     } catch (error) {
-      setError(String(error));
+      reportUiError("No se pudieron buscar candidatos de reconciliación.", error);
     } finally {
       setSearching(false);
     }
@@ -166,16 +165,18 @@ export function RelinkTracks() {
     if (!vdjFolder || !pending || mutationsBlocked) return;
     setRelocating(true);
     try {
-      const result = await relocateFile(vdjFolder, pending.originalFilePath, pending.newFilePath);
+      const result = await services.relocateFile(vdjFolder, pending.originalFilePath, pending.newFilePath);
       if (result.status !== "completed") {
-        setError(resultMessage(result));
+        reportUiError("No se pudo reconciliar la ruta.", resultMessage(result));
+        setPending(null);
         return;
       }
       setPending(null);
       await runVerify();
       await reload();
     } catch (error) {
-      setError(String(error));
+      reportUiError("No se pudo guardar la ruta reconciliada.", error);
+      setPending(null);
     } finally {
       await refreshRecovery();
       setRelocating(false);
@@ -184,9 +185,9 @@ export function RelinkTracks() {
 
   async function manualRelocate() {
     if (!selectedItem) return;
-    const file = await open({
+    const file = await services.selectFile({
       title: `Elegir destino: ${getPathLeafName(selectedItem.verification.file_path)}`,
-      filters: [{ name: "Audio/Video", extensions: ["mp3", "wav", "flac", "aac", "ogg", "wma", "m4a", "aiff", "aif", "opus", "mp4", "avi", "mkv", "mov", "wmv", "flv", "webm"] }],
+      extensions: ["mp3", "wav", "flac", "aac", "ogg", "wma", "m4a", "aiff", "aif", "opus", "mp4", "avi", "mkv", "mov", "wmv", "flv", "webm"],
     });
     if (file) requestRelink(file);
   }
@@ -338,22 +339,22 @@ export function RelinkTracks() {
               )}
             </div>
 
-            {pending && (
-              <div role="dialog" aria-modal="true" className="card border-primary/50 bg-primary/6 p-4">
-                <h3 className="text-sm font-bold text-text">Confirmar reconciliación</h3>
-                <p className="mt-1 text-xs text-text-secondary">Se actualizarán únicamente `FilePath` y `FileSize` de esta entrada. No se reinterpretará la metadata musical.</p>
-                <div className="mt-3 space-y-2 rounded-lg border border-border bg-background px-3 py-2 text-[12px]">
+            <ConfirmDialog
+              open={pending !== null}
+              title="Confirmar reconciliación"
+              description="Se actualizarán únicamente FilePath y FileSize de esta entrada. No se reinterpretará la metadata musical."
+              confirmLabel="Confirmar y guardar"
+              busy={relocating}
+              onCancel={() => setPending(null)}
+              onConfirm={confirmRelink}
+            >
+              {pending ? (
+                <div className="space-y-2 rounded-lg border border-border bg-background px-3 py-2 text-sm">
                   <div><span className="text-text-muted">Original: </span><span className="break-all text-text">{pending.originalFilePath}</span></div>
                   <div><span className="text-text-muted">Destino: </span><span className="break-all text-text">{pending.newFilePath}</span></div>
                 </div>
-                <div className="mt-3 flex justify-end gap-2">
-                  <button type="button" onClick={() => setPending(null)} disabled={relocating} className="btn btn-ghost btn-sm">Cancelar</button>
-                  <button type="button" onClick={() => void confirmRelink()} disabled={relocating || mutationsBlocked} className="btn btn-primary btn-sm">
-                    {relocating ? "Guardando..." : "Confirmar y guardar"}
-                  </button>
-                </div>
-              </div>
-            )}
+              ) : null}
+            </ConfirmDialog>
           </div>
         )}
       </section>

@@ -1,8 +1,6 @@
-import { useRef, useEffect } from "react";
 import { FolderOpen, Disc3, Music, X, BarChart3, Copy, FileWarning, Folder, Wrench, ShieldCheck, History } from "lucide-react";
-import gsap from "gsap";
 import { useApp } from "../App";
-import { EASE, DURATION } from "../lib/animations";
+import { UiErrorNotice } from "../components/UiErrorNotice";
 
 /** Landing page — clean folder selection and quick-start with GSAP entrance. */
 export function Home() {
@@ -11,22 +9,12 @@ export function Home() {
         selectMusicFolder,
         loadFromFolder,
         loading,
-        error,
+        uiError,
+        clearUiError,
         musicFolders,
         removeMusicFolder,
         lastVdjFolder,
     } = useApp();
-    const containerRef = useRef<HTMLDivElement>(null);
-
-    useEffect(() => {
-        const ctx = gsap.context(() => {
-            gsap.from(".home-hero", { autoAlpha: 0, y: 30, duration: DURATION, ease: "back.out(1.4)" });
-            gsap.from(".home-actions > *", { autoAlpha: 0, y: 16, duration: DURATION, ease: EASE, stagger: 0.08, delay: 0.2 });
-            gsap.from(".home-features > *", { autoAlpha: 0, y: 14, duration: DURATION, ease: EASE, stagger: 0.06, delay: 0.4 });
-            gsap.from(".home-extra", { autoAlpha: 0, y: 14, duration: DURATION, ease: EASE, delay: 0.6 });
-        }, containerRef);
-        return () => ctx.revert();
-    }, []);
 
     const FEATURES = [
         { icon: BarChart3, title: "Dashboard", desc: "Estadísticas y análisis de tu colección" },
@@ -37,7 +25,7 @@ export function Home() {
     ];
 
     return (
-        <div ref={containerRef} className="flex min-h-full items-center justify-center bg-background p-6">
+        <div className="flex min-h-full items-center justify-center bg-background p-6">
             <div className="grid w-full max-w-5xl gap-5 lg:grid-cols-[1.05fr_.95fr]">
                 {/* Hero */}
                 <section className="home-hero card p-7">
@@ -95,11 +83,7 @@ export function Home() {
                         </div>
                     )}
 
-                    {error && (
-                        <div className="mt-4 rounded-lg border border-error/30 bg-error/8 px-4 py-2.5 text-sm text-error">
-                            {error}
-                        </div>
-                    )}
+                    {uiError ? <div className="mt-4"><UiErrorNotice error={uiError} onDismiss={clearUiError} /></div> : null}
 
                     <div className="mt-6 rounded-lg border border-success/20 bg-success/8 p-3">
                         <div className="flex items-center gap-2 text-success">

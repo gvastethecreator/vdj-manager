@@ -1,10 +1,9 @@
 import { useState, useCallback, useMemo, useEffect } from "react";
-import { open } from "@tauri-apps/plugin-dialog";
 import { useApp } from "../App";
 import { SongTable } from "../components/SongTable";
 import { FolderTree } from "../components/FolderTree";
 import { SongDetailsCard } from "../components/SongDetailsCard";
-import { getConfiguredMusicRoots, listPlaylists, readPlaylist, scanMusicFolder } from "../lib/api";
+import { getConfiguredMusicRoots } from "../lib/api";
 import { compareDriveAwarePaths, compareSongsByDrivePath, getPathLeafName, isPathInsideFolder } from "../lib/pathUtils";
 import type { PlaylistInfo, PlaylistEntry, SongSummary } from "../types/database";
 
@@ -12,7 +11,7 @@ type SidebarMode = "folders" | "playlists";
 
 /** Full song library view with a folder-tree sidebar for directory filtering. */
 export function Songs() {
-    const { songs, vdjFolder, musicFolders, selectMusicFolder } = useApp();
+    const { songs, vdjFolder, musicFolders, selectMusicFolder, services } = useApp();
 
     // ── Sidebar mode ──
     const [mode, setMode] = useState<SidebarMode>("folders");
@@ -36,36 +35,30 @@ export function Songs() {
     useEffect(() => {
         if (!vdjFolder) return;
         setPlaylistLoading(true);
-        listPlaylists(vdjFolder)
+        services.listPlaylists(vdjFolder)
             .then(setPlaylists)
             .catch(() => setPlaylists([]))
             .finally(() => setPlaylistLoading(false));
-    }, [vdjFolder]);
+    }, [services, vdjFolder]);
 
     const selectPlaylist = useCallback(async (pl: PlaylistInfo) => {
         setSelectedPlaylist(pl);
         setSelectedFolder("");
         try {
-            const entries = await readPlaylist(pl.path);
+            const entries = await services.readPlaylist(pl.path);
             setPlaylistEntries(entries);
         } catch {
             setPlaylistEntries([]);
         }
-    }, []);
+    }, [services]);
 
     const importPlaylist = useCallback(async () => {
-        const selected = await open({
+        const selected = await services.selectFile({
             title: "Importar playlist",
-            filters: [
-                {
-                    name: "Playlists",
-                    extensions: ["m3u", "m3u8", "vdjplaylist", "vdjlist"],
-                },
-            ],
-            multiple: false,
+            extensions: ["m3u", "m3u8", "vdjplaylist", "vdjlist"],
         });
 
-        if (!selected || Array.isArray(selected)) return;
+        if (!selected) return;
 
         const fileName = selected.split(/[/\\]/).pop() ?? selected;
         const dot = fileName.lastIndexOf(".");
@@ -80,7 +73,7 @@ export function Songs() {
         };
 
         await selectPlaylist(imported);
-    }, [selectPlaylist]);
+    }, [selectPlaylist, services]);
 
     useEffect(() => {
         if (mode !== "folders") {
@@ -107,7 +100,7 @@ export function Songs() {
 
             for (const folder of targets) {
                 try {
-                    const files = await scanMusicFolder(folder);
+                    const files = await services.scanMusicFolder(folder);
                     for (const file of files) {
                         const normalized = file.toLowerCase();
                         if (databasePathSet.has(normalized)) continue;
@@ -172,7 +165,7 @@ export function Songs() {
         return () => {
             cancelled = true;
         };
-    }, [mode, selectedFolder, songs, musicFolders, treeRoots]);
+    }, [mode, selectedFolder, songs, musicFolders, services, treeRoots]);
 
     const librarySongs = useMemo(() => {
         if (mode !== "folders") return songs;

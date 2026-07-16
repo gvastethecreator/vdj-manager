@@ -1,8 +1,7 @@
 import { type ReactNode, useCallback, useEffect, useMemo, useRef, useState } from "react";
 import { useVirtualizer } from "@tanstack/react-virtual";
-import { convertFileSrc } from "@tauri-apps/api/core";
 import type { SongSummary } from "../types/database";
-import { formatDuration, formatSize, getEffectiveColor, updateSongTags } from "../lib/api";
+import { formatDuration, formatSize, getEffectiveColor } from "../lib/api";
 import { compareDriveAwarePaths, compareSongsByDrivePath } from "../lib/pathUtils";
 import { shouldApplySongUpdate } from "../lib/songUpdateResult";
 import { WaveformPreview, onWaveformQueueChange } from "./WaveformPreview";
@@ -284,7 +283,7 @@ export function SongTable({
     useEffect(() => onWaveformQueueChange((pending, active) => setWaveformQueue({ pending, active })), []);
 
     // ── Inline edit state ──
-    const { vdjFolder, patchSong, setError, refreshRecovery, mutationsBlocked } = useApp();
+    const { vdjFolder, patchSong, reportUiError, refreshRecovery, mutationsBlocked, services } = useApp();
     const [editState, setEditState] = useState<{ songIndex: number; columnKey: ColumnKey; value: string } | null>(null);
 
     const patchFromEditableTag = useCallback((editableTag: string, value: string): Partial<SongSummary> => {
@@ -322,7 +321,7 @@ export function SongTable({
         const song = songs.find((candidate) => candidate.index === editState.songIndex);
         if (!song?.in_database) return;
         try {
-            const result = await updateSongTags(vdjFolder, song.file_path, { [col.editableTag]: editState.value });
+            const result = await services.updateSongTags(vdjFolder, song.file_path, { [col.editableTag]: editState.value });
             if (!shouldApplySongUpdate(result)) {
                 throw new Error(`Resultado de actualización: ${result.status}`);
             }
@@ -331,9 +330,9 @@ export function SongTable({
         } catch (err) {
             await refreshRecovery();
             console.error("Error updating tag:", err);
-            setError(`No se pudo actualizar el tag: ${String(err)}`);
+            reportUiError("No se pudo actualizar el tag.", err);
         }
-    }, [editState, mutationsBlocked, vdjFolder, patchFromEditableTag, patchSong, refreshRecovery, setError, songs]);
+    }, [editState, mutationsBlocked, vdjFolder, patchFromEditableTag, patchSong, refreshRecovery, reportUiError, services, songs]);
 
     const onEditCancel = useCallback(() => setEditState(null), []);
 
@@ -343,7 +342,7 @@ export function SongTable({
         const song = songs.find((s) => s.index === songIndex);
         if (!song?.in_database) return;
         try {
-            const result = await updateSongTags(vdjFolder, song.file_path, { stars: stars > 0 ? String(stars) : "" });
+            const result = await services.updateSongTags(vdjFolder, song.file_path, { stars: stars > 0 ? String(stars) : "" });
             if (!shouldApplySongUpdate(result)) {
                 throw new Error(`Resultado de actualización: ${result.status}`);
             }
@@ -351,9 +350,9 @@ export function SongTable({
         } catch (err) {
             await refreshRecovery();
             console.error("Error updating stars:", err);
-            setError(`No se pudo actualizar la puntuación: ${String(err)}`);
+            reportUiError("No se pudo actualizar la puntuación.", err);
         }
-    }, [mutationsBlocked, vdjFolder, patchSong, refreshRecovery, setError, songs]);
+    }, [mutationsBlocked, vdjFolder, patchSong, refreshRecovery, reportUiError, services, songs]);
 
     // ── Audio playback ──
     const [playingPath, setPlayingPath] = useState<string | null>(null);
@@ -365,13 +364,13 @@ export function SongTable({
             return;
         }
         if (globalAudio) { globalAudio.pause(); globalAudio = null; }
-        const audio = new Audio(convertFileSrc(filePath));
+        const audio = new Audio(services.convertFileSrc(filePath));
         audio.volume = 0.5;
         audio.play().catch(console.error);
         audio.onended = () => { setPlayingPath(null); globalAudio = null; };
         globalAudio = audio;
         setPlayingPath(filePath);
-    }, [playingPath]);
+    }, [playingPath, services]);
 
     // ── Color picker ──
     const [colorPicker, setColorPicker] = useState<{ songIndex: number; position: { x: number; y: number } } | null>(null);
@@ -397,7 +396,7 @@ export function SongTable({
                 const b = parseInt(hex.substring(4, 6), 16);
                 colorValue = String((b << 16) | (g << 8) | r);
             }
-            const result = await updateSongTags(vdjFolder, song.file_path, { color: colorValue });
+            const result = await services.updateSongTags(vdjFolder, song.file_path, { color: colorValue });
             if (!shouldApplySongUpdate(result)) {
                 throw new Error(`Resultado de actualización: ${result.status}`);
             }
@@ -406,9 +405,9 @@ export function SongTable({
         } catch (err) {
             await refreshRecovery();
             console.error("Error updating color:", err);
-            setError(`No se pudo actualizar el color: ${String(err)}`);
+            reportUiError("No se pudo actualizar el color.", err);
         }
-    }, [colorPicker, mutationsBlocked, vdjFolder, patchSong, refreshRecovery, setError, songs]);
+    }, [colorPicker, mutationsBlocked, vdjFolder, patchSong, refreshRecovery, reportUiError, services, songs]);
 
     const persistVisibleColumns = useCallback((next: Set<ColumnKey>) => {
         try {

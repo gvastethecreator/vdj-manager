@@ -1,11 +1,11 @@
 import { useMemo, useState } from "react";
 import { Music, X } from "lucide-react";
 import { useApp } from "../App";
-import { mergeFolderLists, scanMusicFolder } from "../lib/api";
+import { mergeFolderLists } from "../lib/api";
 
 /** Scans a folder for audio files not registered in the VDJ database. */
 export function OrphanFiles() {
-    const { songs, musicFolders, removeMusicFolder, selectMusicFolder, setError } = useApp();
+    const { songs, musicFolders, removeMusicFolder, selectMusicFolder, reportUiError, services } = useApp();
     const [orphans, setOrphans] = useState<string[] | null>(null);
     const [allFiles, setAllFiles] = useState<string[] | null>(null);
     const [loading, setLoading] = useState(false);
@@ -17,7 +17,7 @@ export function OrphanFiles() {
         setLoading(true);
         setOrphans(null);
         try {
-            const fileGroups = await Promise.all(scanFolders.map((folder) => scanMusicFolder(folder)));
+            const fileGroups = await Promise.all(scanFolders.map((folder) => services.scanMusicFolder(folder)));
             const uniqueFiles = Array.from(
                 new Map(
                     fileGroups
@@ -32,7 +32,7 @@ export function OrphanFiles() {
             setOrphans(orphanPaths);
             setAllFiles(uniqueFiles);
         } catch (err) {
-            setError(String(err));
+            reportUiError("No se pudo completar el escaneo de huérfanos.", err);
         } finally {
             setLoading(false);
         }

@@ -1,13 +1,13 @@
 import type { ReactNode } from "react";
-import { Database, RotateCw, X } from "lucide-react";
+import { Database, RotateCw } from "lucide-react";
 import { Sidebar } from "./Sidebar";
-import { SafetyInspector } from "./SafetyInspector";
 import { RecoveryCenter } from "./RecoveryCenter";
 import { useApp } from "../App";
+import { UiErrorNotice } from "./UiErrorNotice";
 
 /** Main layout shell: sidebar + scrollable content area with error banner. */
 export function Layout({ children }: { children: ReactNode }) {
-    const { error, setError, vdjFolder, stats, reload, loading } = useApp();
+    const { uiError, clearUiError, vdjFolder, stats, reload, loading } = useApp();
 
     return (
         <div className="flex h-full bg-background">
@@ -24,7 +24,7 @@ export function Layout({ children }: { children: ReactNode }) {
                                 <span className="badge bg-success/12 text-success">backup protegido</span>
                                 {stats ? <span className="badge bg-info/12 text-info">{stats.total_songs.toLocaleString()} tracks</span> : null}
                             </div>
-                            <p className="truncate text-[11px] text-text-muted" title={vdjFolder ?? ""}>
+                            <p className="truncate text-xs text-text-muted" title={vdjFolder ?? ""}>
                                 {vdjFolder ?? "Selecciona una carpeta de VirtualDJ para comenzar"}
                             </p>
                         </div>
@@ -37,22 +37,9 @@ export function Layout({ children }: { children: ReactNode }) {
                 <RecoveryCenter />
                 <div className="flex min-h-0 flex-1">
                     <main className="min-w-0 flex-1 overflow-auto p-5">
-                        {error && (
-                            <div className="mb-4 flex items-center justify-between rounded-lg border border-error/30 bg-error/10 px-4 py-2.5 text-sm text-error">
-                                <span>{error}</span>
-                                <button
-                                    type="button"
-                                    onClick={() => setError(null)}
-                                    className="ml-4 rounded-md px-1.5 py-0.5 opacity-75 hover:bg-error/15 hover:opacity-100"
-                                    aria-label="Cerrar error"
-                                >
-                                    <X className="h-4 w-4" />
-                                </button>
-                            </div>
-                        )}
+                        {uiError ? <UiErrorNotice error={uiError} onDismiss={clearUiError} onRetry={() => void reload()} /> : null}
                         {children}
                     </main>
-                    <SafetyInspector />
                 </div>
             </div>
         </div>

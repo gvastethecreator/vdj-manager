@@ -1,8 +1,10 @@
 import { useState } from "react";
-import { AlertOctagon, CheckCircle2, ChevronDown, ChevronUp, RefreshCw, ShieldAlert, X } from "lucide-react";
+import { CheckCircle2, ChevronDown, ChevronUp, RefreshCw, ShieldAlert } from "lucide-react";
 import { useApp } from "../App";
 import { pendingRecoveryItemCount, recoveryActionLabel } from "../lib/recovery";
 import type { MutationRecoveryAction } from "../types/database";
+import { ConfirmDialog } from "./Dialog";
+import { UiErrorNotice } from "./UiErrorNotice";
 
 function operationLabel(operation: string): string {
     return { rename: "Renombrado", move: "Movimiento", remove_library: "Remoción" }[operation] ?? operation;
@@ -54,7 +56,7 @@ export function RecoveryCenter() {
                 ) : null}
             </div>
 
-            {recoveryError ? <p className="mt-2 break-all rounded-md border border-error/25 bg-error/8 px-3 py-2 text-[11px] text-error">{recoveryError}</p> : null}
+            {recoveryError ? <div className="mt-3"><UiErrorNotice error={recoveryError} onRetry={() => void refreshRecovery()} /></div> : null}
 
             {expanded && recoveryState?.entries.map((entry) => (
                 <div key={entry.journal.journalId} className="mt-3 rounded-lg border border-border bg-background/80 p-3">
@@ -97,28 +99,22 @@ export function RecoveryCenter() {
                 </div>
             ) : null}
 
-            {pendingAction ? (
-                <div className="fixed inset-0 z-60 flex items-center justify-center bg-black/65 p-4" role="dialog" aria-modal="true" aria-labelledby="recovery-confirm-title">
-                    <div className="card w-full max-w-lg space-y-4 p-5 shadow-2xl">
-                        <div className="flex items-start gap-3">
-                            <AlertOctagon className="mt-0.5 h-5 w-5 shrink-0 text-warning" />
-                            <div className="min-w-0 flex-1">
-                                <h3 id="recovery-confirm-title" className="text-base font-bold text-text">Confirmar acción de recuperación</h3>
-                                <p className="mt-1 text-sm text-text-secondary">
-                                    Se aplicará <strong>{recoveryActionLabel(pendingAction.action)}</strong> únicamente al journal seleccionado. El journal conservará el resultado; los casos ambiguos quedarán pausados para revisión manual.
-                                </p>
-                            </div>
-                            <button type="button" className="rounded p-1 text-text-muted hover:bg-surface-hover" onClick={() => setPendingAction(null)} aria-label="Cancelar"><X className="h-4 w-4" /></button>
-                        </div>
-                        <div className="flex justify-end gap-2">
-                            <button type="button" className="btn btn-ghost" onClick={() => setPendingAction(null)}>Cancelar</button>
-                            <button type="button" className="btn btn-warning" disabled={recoveryLoading} onClick={() => { const pending = pendingAction; setPendingAction(null); void resolveRecovery(pending.action, pending.journalId); }}>
-                                Confirmar: {recoveryActionLabel(pendingAction.action)}
-                            </button>
-                        </div>
-                    </div>
-                </div>
-            ) : null}
+            <ConfirmDialog
+                open={pendingAction !== null}
+                title="Confirmar acción de recuperación"
+                description="La acción se aplicará únicamente al journal seleccionado. Los casos ambiguos seguirán pausados para revisión manual."
+                confirmLabel={pendingAction ? `Confirmar: ${recoveryActionLabel(pendingAction.action)}` : "Confirmar"}
+                busy={recoveryLoading}
+                destructive={pendingAction?.action === "rollback"}
+                onCancel={() => setPendingAction(null)}
+                onConfirm={async () => {
+                    if (!pendingAction) return;
+                    await resolveRecovery(pendingAction.action, pendingAction.journalId);
+                    setPendingAction(null);
+                }}
+            >
+                {pendingAction ? <p className="text-sm text-text-secondary">Journal: <code>{pendingAction.journalId}</code></p> : null}
+            </ConfirmDialog>
         </section>
     );
 }

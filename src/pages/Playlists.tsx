@@ -1,5 +1,4 @@
 import { useEffect, useMemo, useState } from "react";
-import { listPlaylists, readPlaylist } from "../lib/api";
 import { useApp } from "../App";
 import type { PlaylistEntry, PlaylistInfo, SongSummary } from "../types/database";
 import { TreeFileNavigator, type TreeFileItem } from "../components/TreeFileNavigator";
@@ -48,7 +47,7 @@ function createExternalSong(filePath: string, index: number): SongSummary {
 
 /** Dedicated tree view for VirtualDJ playlists and history folders. */
 export function Playlists() {
-    const { vdjFolder, songs, setError } = useApp();
+    const { vdjFolder, songs, reportUiError, services } = useApp();
     const [playlists, setPlaylists] = useState<PlaylistInfo[]>([]);
     const [selectedPlaylistPath, setSelectedPlaylistPath] = useState<string | null>(null);
     const [entries, setEntries] = useState<PlaylistEntry[]>([]);
@@ -63,24 +62,24 @@ export function Playlists() {
         }
 
         setLoading(true);
-        listPlaylists(vdjFolder)
+        services.listPlaylists(vdjFolder)
             .then((result) => {
                 setPlaylists(result);
                 setSelectedPlaylistPath((prev) => prev && result.some((item) => item.path === prev) ? prev : (result[0]?.path ?? null));
             })
-            .catch((err) => setError(String(err)))
+            .catch((err) => reportUiError("No se pudieron cargar las playlists.", err))
             .finally(() => setLoading(false));
-    }, [setError, vdjFolder]);
+    }, [reportUiError, services, vdjFolder]);
 
     useEffect(() => {
         if (!selectedPlaylistPath) {
             setEntries([]);
             return;
         }
-        readPlaylist(selectedPlaylistPath)
+        services.readPlaylist(selectedPlaylistPath)
             .then(setEntries)
-            .catch((err) => setError(String(err)));
-    }, [selectedPlaylistPath, setError]);
+            .catch((err) => reportUiError("No se pudo abrir la playlist seleccionada.", err));
+    }, [reportUiError, selectedPlaylistPath, services]);
 
     const treeItems = useMemo<TreeFileItem[]>(() => playlists.map((playlist) => ({
         id: playlist.path,

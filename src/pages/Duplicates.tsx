@@ -1,11 +1,11 @@
 import { useState, useCallback, useMemo } from "react";
-import { open } from "@tauri-apps/plugin-dialog";
 import { useApp } from "../App";
-import { findDuplicates, getDirectory, removeLibraryEntries, moveFilesOp } from "../lib/api";
+import { getDirectory } from "../lib/api";
 import { dedupeRemovalPaths, removalStatusLabel, summarizeRemoval } from "../lib/libraryRemoval";
 import { moveStatusLabel, transferMethodLabel } from "../lib/moveReport";
 import { SongMiniTable } from "../components/SongTable";
 import { MutationBlockedNotice } from "../components/MutationBlockedNotice";
+import { ConfirmDialog } from "../components/Dialog";
 import type { DuplicateResult, DuplicateGroup, LibraryRemovalResult, MoveBatchReport } from "../types/database";
 
 type DupTab = "by_name" | "by_size" | "by_hash";
@@ -14,7 +14,7 @@ type DeleteModal = { open: false } | { open: true; dbOnly: boolean };
 
 /** Three-tab duplicate finder with selection, filters and bulk actions. */
 export function Duplicates() {
-    const { vdjFolder, setError, reload, refreshRecovery, mutationsBlocked } = useApp();
+    const { vdjFolder, reportUiError, reload, refreshRecovery, mutationsBlocked, services } = useApp();
     const [result, setResult] = useState<DuplicateResult | null>(null);
     const [loading, setLoading] = useState(false);
     const [tab, setTab] = useState<DupTab>("by_name");
@@ -33,19 +33,19 @@ export function Duplicates() {
     async function moveSelected() {
         if (mutationsBlocked) return;
         if (!vdjFolder || selected.size === 0) return;
-        const folder = await open({ directory: true, title: "Mover archivos seleccionados a…" });
+        const folder = await services.selectDirectory({ purpose: "destination", title: "Mover archivos seleccionados a…" });
         if (!folder) return;
         setActionRunning(true);
         setRemovalResults([]);
         try {
-            const report = await moveFilesOp(vdjFolder, selectedPaths, folder);
+            const report = await services.moveFilesOp(vdjFolder, selectedPaths, folder);
             setMoveReport(report);
             setSelected(new Set());
             if (report.summary.completed > 0) await reload();
             setLoading(true);
-            setResult(await findDuplicates(vdjFolder));
+            setResult(await services.findDuplicates(vdjFolder));
         } catch (err) {
-            setError(String(err));
+            reportUiError("No se pudieron mover los duplicados seleccionados.", err);
         } finally {
             await refreshRecovery();
             setLoading(false);
@@ -60,10 +60,10 @@ export function Duplicates() {
         setRemovalResults([]);
         setMoveReport(null);
         try {
-            const r = await findDuplicates(vdjFolder);
+            const r = await services.findDuplicates(vdjFolder);
             setResult(r);
         } catch (err) {
-            setError(String(err));
+            reportUiError("No se pudo completar el análisis de duplicados.", err);
         } finally {
             setLoading(false);
         }
@@ -158,11 +158,10 @@ export function Duplicates() {
     async function confirmDelete(deleteFiles: boolean) {
         if (mutationsBlocked) return;
         if (!vdjFolder || selectedPaths.length === 0) return;
-        setDeleteModal({ open: false });
         setActionRunning(true);
         setMoveReport(null);
         try {
-            const outcomes = await removeLibraryEntries(
+            const outcomes = await services.removeLibraryEntries(
                 vdjFolder,
                 selectedPaths,
                 deleteFiles ? "trash_then_unindex" : "db_only",
@@ -172,13 +171,14 @@ export function Duplicates() {
             await reload();
             // Refresh duplicate groups without erasing the operation report.
             setLoading(true);
-            setResult(await findDuplicates(vdjFolder));
+            setResult(await services.findDuplicates(vdjFolder));
         } catch (err) {
-            setError(String(err));
+            reportUiError("No se pudieron eliminar las referencias seleccionadas.", err);
         } finally {
             await refreshRecovery();
             setLoading(false);
             setActionRunning(false);
+            setDeleteModal({ open: false });
         }
     }
 
@@ -339,31 +339,18 @@ export function Duplicates() {
                 </>
             )}
 
-            {/* Delete confirmation modal */}
-            {deleteModal.open && (
-                <div className="fixed inset-0 z-50 flex items-center justify-center bg-black/50">
-                    <div className="card w-105 p-5 shadow-xl space-y-3">
-                        <h3 className="text-base font-bold text-text">Confirmar eliminación</h3>
-                        <p className="text-sm text-text-secondary">
-                            {deleteModal.dbOnly
-                                ? <>Eliminar <strong>{selectedPaths.length}</strong> canciones de la base de datos.<br />Los archivos físicos <strong>no</strong> serán afectados.</>
-                                : <>Enviar <strong>{selectedPaths.length}</strong> archivos a la papelera del sistema<br />y eliminarlos de la base de datos.</>
-                            }
-                        </p>
-                        <div className="flex justify-end gap-2 pt-1">
-                            <button onClick={() => setDeleteModal({ open: false })} className="btn btn-ghost">
-                                Cancelar
-                            </button>
-                            <button
-                                onClick={() => confirmDelete(!deleteModal.dbOnly)}
-                                className="btn btn-danger"
-                            >
-                                {deleteModal.dbOnly ? "Eliminar de BD" : "Enviar a Papelera"}
-                            </button>
-                        </div>
-                    </div>
-                </div>
-            )}
+            <ConfirmDialog
+                open={deleteModal.open}
+                title="Confirmar eliminación"
+                description={deleteModal.open && deleteModal.dbOnly
+                    ? `Se quitarán ${selectedPaths.length} canciones de database.xml. Los archivos físicos no serán afectados.`
+                    : `Se enviarán ${selectedPaths.length} archivos a la papelera y también se quitarán de database.xml.`}
+                confirmLabel={deleteModal.open && deleteModal.dbOnly ? "Eliminar de la biblioteca" : "Enviar a la papelera"}
+                destructive
+                busy={actionRunning}
+                onCancel={() => setDeleteModal({ open: false })}
+                onConfirm={() => confirmDelete(deleteModal.open && !deleteModal.dbOnly)}
+            />
         </div>
     );
 }

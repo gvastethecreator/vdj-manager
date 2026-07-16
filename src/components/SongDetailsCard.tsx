@@ -3,7 +3,7 @@ import type { ReactNode } from "react";
 import { Clock3, Database, FolderOpen, RotateCcw, Save } from "lucide-react";
 import { useApp } from "../App";
 import type { SongSummary } from "../types/database";
-import { formatDuration, formatSize, getEffectiveColor, updateSongTags } from "../lib/api";
+import { formatDuration, formatSize, getEffectiveColor } from "../lib/api";
 import { shouldApplySongUpdate } from "../lib/songUpdateResult";
 import { WaveformPreview } from "./WaveformPreview";
 
@@ -150,10 +150,6 @@ function buildTagUpdate(form: TagFormState, includeColor: boolean) {
     return update;
 }
 
-function isDemoMode(): boolean {
-    return new URLSearchParams(window.location.search).has("demo");
-}
-
 function MetaBadge({ children }: { children: ReactNode }) {
     return <span className="badge border border-border/60 bg-background/80 px-2 py-0.5 text-[10px] text-text-secondary">{children}</span>;
 }
@@ -206,7 +202,7 @@ function SectionTitle({ children }: { children: ReactNode }) {
 
 /** Dense VirtualDJ-inspired tag editor adapted to the app design system. */
 export function SongDetailsCard({ song }: { song: SongSummary }) {
-    const { vdjFolder, patchSong, setError, refreshRecovery, mutationsBlocked } = useApp();
+    const { vdjFolder, patchSong, clearUiError, reportUiError, refreshRecovery, mutationsBlocked, services } = useApp();
     const rowColor = getEffectiveColor(song);
     const [form, setForm] = useState<TagFormState>(() => formStateFromSong(song, rowColor));
     const [saving, setSaving] = useState(false);
@@ -235,11 +231,11 @@ export function SongDetailsCard({ song }: { song: SongSummary }) {
         if (!editable || saving) return;
 
         setSaving(true);
-        setError(null);
+        clearUiError();
         try {
             const includeColor = Boolean(rowColor) || form.color !== initialForm.color;
-            if (!isDemoMode() && vdjFolder) {
-                const result = await updateSongTags(vdjFolder, song.file_path, buildTagUpdate(form, includeColor));
+            if (vdjFolder) {
+                const result = await services.updateSongTags(vdjFolder, song.file_path, buildTagUpdate(form, includeColor));
                 if (!shouldApplySongUpdate(result)) {
                     throw new Error(`Resultado de actualización: ${result.status}`);
                 }
@@ -249,7 +245,7 @@ export function SongDetailsCard({ song }: { song: SongSummary }) {
         } catch (err) {
             await refreshRecovery();
             const message = `No se pudieron guardar las etiquetas: ${String(err)}`;
-            setError(message);
+            reportUiError("No se pudieron guardar las etiquetas.", err);
             setStatus(message);
         } finally {
             setSaving(false);

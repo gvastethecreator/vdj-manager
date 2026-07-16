@@ -1,31 +1,18 @@
-import { useRef, useEffect } from "react";
 import { Music, Users, Disc, Tag, Bookmark, Activity } from "lucide-react";
-import gsap from "gsap";
 import { useApp } from "../App";
 import { StatsCard } from "../components/StatsCard";
 import { formatSize } from "../lib/api";
-import { EASE, DURATION } from "../lib/animations";
 
 /** Stats dashboard with cards, genre/artist charts, and quality summary. */
 export function Dashboard() {
     const { stats, songs } = useApp();
-    const containerRef = useRef<HTMLDivElement>(null);
-
-    useEffect(() => {
-        if (!stats) return;
-        const ctx = gsap.context(() => {
-            gsap.from(".dash-card", { autoAlpha: 0, y: 20, duration: DURATION, ease: EASE, stagger: 0.05 });
-            gsap.from(".dash-section", { autoAlpha: 0, y: 24, duration: DURATION, ease: EASE, stagger: 0.1, delay: 0.25 });
-        }, containerRef);
-        return () => ctx.revert();
-    }, [stats]);
 
     if (!stats) {
         return <div className="text-sm text-text-muted">No hay datos cargados.</div>;
     }
 
     return (
-        <div ref={containerRef} className="space-y-5">
+        <div className="space-y-5">
             <h2 className="text-lg font-bold text-text">Dashboard</h2>
 
             {/* Stats cards */}

@@ -3,7 +3,7 @@ import { FileCode2, LayoutGrid, Plus, Save, Trash2 } from "lucide-react";
 import { useApp } from "../App";
 import { CodeEditor } from "../components/CodeEditor";
 import { TreeFileNavigator, type TreeFileItem } from "../components/TreeFileNavigator";
-import { formatSize, getVdjPadDocument, listVdjConfigFiles, readVdjConfigFile, updateVdjPadDocument, writeVdjConfigFile } from "../lib/api";
+import { formatSize } from "../lib/api";
 import type { VdjConfigFileInfo, VdjXmlNode } from "../types/database";
 
 function isPadDocumentFile(file: VdjConfigFileInfo | null): boolean {
@@ -294,7 +294,7 @@ function PadPageEditor({
 
 /** Structured pad editor with XML tree editing for `.vdjpad` files. */
 export function Pads() {
-    const { vdjFolder, setError } = useApp();
+    const { vdjFolder, clearUiError, reportUiError, services } = useApp();
     const [files, setFiles] = useState<VdjConfigFileInfo[]>([]);
     const [loading, setLoading] = useState(false);
     const [saving, setSaving] = useState(false);
@@ -314,17 +314,17 @@ export function Pads() {
         }
         setLoading(true);
         try {
-            const result = await listVdjConfigFiles(vdjFolder);
+            const result = await services.listVdjConfigFiles(vdjFolder);
             setFiles(result.filter((file) => {
                 const relative = file.relative_path.toLowerCase();
                 return relative.startsWith("pads/") || relative.startsWith("pads\\") || relative.endsWith(".vdjpad");
             }));
         } catch (err) {
-            setError(String(err));
+            reportUiError("No se pudieron cargar los recursos de pads.", err);
         } finally {
             setLoading(false);
         }
-    }, [setError, vdjFolder]);
+    }, [reportUiError, services, vdjFolder]);
 
     useEffect(() => {
         void loadFiles();
@@ -367,18 +367,18 @@ export function Pads() {
         }
 
         let cancelled = false;
-        readVdjConfigFile(vdjFolder, selectedFile.path)
+        services.readVdjConfigFile(vdjFolder, selectedFile.path)
             .then((content) => {
                 if (cancelled) return;
                 setRawContent(content);
                 setRawDirty(false);
             })
             .catch((err) => {
-                if (!cancelled) setError(String(err));
+                if (!cancelled) reportUiError("No se pudo abrir el XML del pad.", err);
             });
 
         if (isPadDocumentFile(selectedFile)) {
-            getVdjPadDocument(vdjFolder, selectedFile.path)
+            services.getVdjPadDocument(vdjFolder, selectedFile.path)
                 .then((document) => {
                     if (cancelled) return;
                     setDocumentTree(document);
@@ -387,7 +387,7 @@ export function Pads() {
                 .catch((err) => {
                     if (!cancelled) {
                         setDocumentTree(null);
-                        setError(String(err));
+                        reportUiError("No se pudo interpretar el documento de pads.", err);
                     }
                 });
         } else {
@@ -398,7 +398,7 @@ export function Pads() {
         return () => {
             cancelled = true;
         };
-    }, [selectedFile, setError, vdjFolder]);
+    }, [reportUiError, selectedFile, services, vdjFolder]);
 
     const updateDocumentNode = (path: number[], updater: (node: VdjXmlNode) => VdjXmlNode) => {
         setDocumentTree((prev) => prev ? updateNodeAtPath(prev, path, updater) : prev);
@@ -414,36 +414,36 @@ export function Pads() {
         if (!vdjFolder || !selectedFile || !rawDirty) return;
         setSaving(true);
         try {
-            const backup = await writeVdjConfigFile(vdjFolder, selectedFile.path, rawContent);
+            const backup = await services.writeVdjConfigFile(vdjFolder, selectedFile.path, rawContent);
             setLastBackup(backup || null);
             setRawDirty(false);
             await loadFiles();
-            setError(null);
+            clearUiError();
         } catch (err) {
-            setError(String(err));
+            reportUiError("No se pudo guardar el XML del pad.", err);
         } finally {
             setSaving(false);
         }
-    }, [loadFiles, rawContent, rawDirty, selectedFile, setError, vdjFolder]);
+    }, [clearUiError, loadFiles, rawContent, rawDirty, reportUiError, selectedFile, services, vdjFolder]);
 
     const saveDocument = useCallback(async () => {
         if (!vdjFolder || !selectedFile || !documentTree || !documentDirty) return;
         setSaving(true);
         try {
-            const backup = await updateVdjPadDocument(vdjFolder, selectedFile.path, documentTree);
+            const backup = await services.updateVdjPadDocument(vdjFolder, selectedFile.path, documentTree);
             setLastBackup(backup || null);
             setDocumentDirty(false);
-            const refreshed = await readVdjConfigFile(vdjFolder, selectedFile.path);
+            const refreshed = await services.readVdjConfigFile(vdjFolder, selectedFile.path);
             setRawContent(refreshed);
             setRawDirty(false);
             await loadFiles();
-            setError(null);
+            clearUiError();
         } catch (err) {
-            setError(String(err));
+            reportUiError("No se pudo guardar el documento de pads.", err);
         } finally {
             setSaving(false);
         }
-    }, [documentDirty, documentTree, loadFiles, selectedFile, setError, vdjFolder]);
+    }, [clearUiError, documentDirty, documentTree, loadFiles, reportUiError, selectedFile, services, vdjFolder]);
 
     return (
         <div className="flex h-full gap-0 code-workspace">

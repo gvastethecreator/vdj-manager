@@ -17,6 +17,7 @@ import {
 import { useApp } from "../App";
 import type { Theme } from "../App";
 import type { Page } from "../types/database";
+import { legacyPageFromNavigation, navigationFromLegacyPage } from "../lib/navigation";
 
 const navSections: { title: string; items: { page: Page; label: string; icon: typeof Music }[] }[] = [
     {
@@ -56,16 +57,12 @@ const navSections: { title: string; items: { page: Page; label: string; icon: ty
 const ACCENT_THEMES: { theme: Theme; color: string; label: string }[] = [
     { theme: "dark", color: "#8b5cf6", label: "Violeta (oscuro)" },
     { theme: "light", color: "#7c3aed", label: "Violeta (claro)" },
-    { theme: "blue", color: "#3b82f6", label: "Azul" },
-    { theme: "teal", color: "#14b8a6", label: "Teal" },
-    { theme: "green", color: "#22c55e", label: "Verde" },
-    { theme: "amber", color: "#f59e0b", label: "Ámbar" },
-    { theme: "red", color: "#ef4444", label: "Rojo" },
 ];
 
 /** Navigation sidebar with page links, folder selector, and reload button. */
 export function Sidebar() {
-    const { page, setPage, vdjFolder, selectFolder, reload, loading, theme, setTheme } = useApp();
+    const { navigation, setNavigation, vdjFolder, selectFolder, reload, loading, theme, setTheme } = useApp();
+    const page = legacyPageFromNavigation(navigation);
 
     return (
         <aside className="flex w-56 flex-col border-r border-border bg-surface/92">
@@ -94,7 +91,7 @@ export function Sidebar() {
                         {section.items.map(({ page: p, label, icon: Icon }) => (
                             <button
                                 key={p}
-                                onClick={() => setPage(p)}
+                                onClick={() => setNavigation(navigationFromLegacyPage(p))}
                                 className={`mb-0.5 flex w-full items-center gap-2.5 rounded-md px-2.5 py-2 text-[12px] transition-all ${page === p
                                     ? "bg-primary/14 text-primary-light shadow-[inset_2px_0_0_var(--color-primary)]"
                                     : "text-text-secondary hover:bg-surface-hover/70 hover:text-text"
