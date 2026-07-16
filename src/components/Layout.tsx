@@ -34,6 +34,7 @@ export function Layout({ children }: { children: ReactNode }) {
     navigation,
   } = useApp();
   const fullBleed = navigation.workspace !== "dashboard";
+  const errorOwnedByWorkspace = navigation.workspace === "resources";
 
   return (
     <div className="flex h-full bg-background">
@@ -83,7 +84,7 @@ export function Layout({ children }: { children: ReactNode }) {
 
         <RecoveryCenter />
         <main className={`min-h-0 min-w-0 flex-1 overflow-auto ${fullBleed ? "p-0" : "p-5"}`}>
-          {uiError ? <div className={fullBleed ? "px-4 pt-4" : ""}><UiErrorNotice error={uiError} onDismiss={clearUiError} onRetry={() => void reload()} /></div> : null}
+          {uiError && !errorOwnedByWorkspace ? <div className={fullBleed ? "px-4 pt-4" : ""}><UiErrorNotice error={uiError} onDismiss={clearUiError} onRetry={() => void reload()} /></div> : null}
           {children}
         </main>
       </div>

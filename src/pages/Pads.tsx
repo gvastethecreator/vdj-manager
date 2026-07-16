@@ -1,7 +1,9 @@
 import { useCallback, useEffect, useMemo, useState } from "react";
-import { FileCode2, LayoutGrid, Plus, Save, Trash2 } from "lucide-react";
+import { FileCode2, LayoutGrid, Plus, Trash2 } from "lucide-react";
 import { useApp } from "../App";
 import { CodeEditor } from "../components/CodeEditor";
+import { ConfirmDialog } from "../components/Dialog";
+import { useResourceEditorState } from "../components/ResourceStudio";
 import { TreeFileNavigator, type TreeFileItem } from "../components/TreeFileNavigator";
 import { formatSize } from "../lib/api";
 import type { VdjConfigFileInfo, VdjXmlNode } from "../types/database";
@@ -306,6 +308,7 @@ export function Pads() {
     const [documentDirty, setDocumentDirty] = useState(false);
     const [lastBackup, setLastBackup] = useState<string | null>(null);
     const [editorMode, setEditorMode] = useState<PadEditorMode>("visual");
+    const [pendingSelectedId, setPendingSelectedId] = useState<string | null>(null);
 
     const loadFiles = useCallback(async () => {
         if (!vdjFolder) {
@@ -445,6 +448,61 @@ export function Pads() {
         }
     }, [clearUiError, documentDirty, documentTree, loadFiles, reportUiError, selectedFile, services, vdjFolder]);
 
+    const revertChanges = useCallback(async () => {
+        if (!vdjFolder || !selectedFile) return;
+        setSaving(true);
+        try {
+            const raw = await services.readVdjConfigFile(vdjFolder, selectedFile.path);
+            setRawContent(raw);
+            setRawDirty(false);
+            if (isPadDocumentFile(selectedFile)) {
+                const document = await services.getVdjPadDocument(vdjFolder, selectedFile.path);
+                setDocumentTree(document);
+            } else {
+                setDocumentTree(null);
+            }
+            setDocumentDirty(false);
+            clearUiError();
+        } catch (err) {
+            reportUiError("No se pudo restaurar la última versión del pad.", err);
+            throw err;
+        } finally {
+            setSaving(false);
+        }
+    }, [clearUiError, reportUiError, selectedFile, services, vdjFolder]);
+
+    const retryLoad = useCallback(async () => {
+        await loadFiles();
+        await revertChanges();
+    }, [loadFiles, revertChanges]);
+
+    const resourceDirty = documentDirty || rawDirty;
+    useResourceEditorState({
+        dirty: resourceDirty,
+        busy: loading || saving,
+        save: documentDirty ? saveDocument : saveRaw,
+        revert: revertChanges,
+        retry: retryLoad,
+    });
+
+    const requestFileSelection = (path: string) => {
+        if (path === selectedId) return;
+        if (resourceDirty) setPendingSelectedId(path);
+        else setSelectedId(path);
+    };
+
+    const confirmFileSelection = async () => {
+        const nextId = pendingSelectedId;
+        if (!nextId) return;
+        try {
+            await revertChanges();
+            setPendingSelectedId(null);
+            setSelectedId(nextId);
+        } catch {
+            setPendingSelectedId(null);
+        }
+    };
+
     return (
         <div className="flex h-full gap-0 code-workspace">
             <aside className="flex w-80 shrink-0 flex-col border-r border-border bg-surface/85">
@@ -470,7 +528,7 @@ export function Pads() {
                         <TreeFileNavigator
                             items={treeItems}
                             selectedId={selectedId}
-                            onSelect={(item) => setSelectedId(item.path)}
+                            onSelect={(item) => requestFileSelection(item.path)}
                             emptyLabel="No se encontraron archivos de pads en la carpeta VirtualDJ."
                         />
                     )}
@@ -489,18 +547,6 @@ export function Pads() {
                                 <h3 className="text-lg font-bold text-text">{selectedFile.name}</h3>
                                 <p className="mt-1 text-sm text-text-muted">{selectedFile.relative_path}</p>
                                 <p className="mt-1 text-xs text-text-muted">Tamaño: {formatSize(selectedFile.size_bytes)}</p>
-                            </div>
-                            <div className="flex items-center gap-2">
-                                {documentDirty || rawDirty ? <span className="rounded bg-warning/15 px-2 py-1 text-xs text-warning">Cambios pendientes</span> : null}
-                                {isPadDocumentFile(selectedFile) && documentTree ? (
-                                    <button type="button" onClick={saveDocument} disabled={saving || !documentDirty} className="btn btn-primary btn-sm">
-                                        <Save className="h-3.5 w-3.5" /> Guardar pad
-                                    </button>
-                                ) : (
-                                    <button type="button" onClick={saveRaw} disabled={saving || !rawDirty} className="btn btn-primary btn-sm">
-                                        <Save className="h-3.5 w-3.5" /> Guardar archivo
-                                    </button>
-                                )}
                             </div>
                         </div>
 
@@ -548,6 +594,15 @@ export function Pads() {
                     </div>
                 )}
             </div>
+            <ConfirmDialog
+                open={pendingSelectedId !== null}
+                title="Cambios pendientes en este pad"
+                description="Antes de abrir otro archivo se restaurará la última versión cargada del pad actual."
+                confirmLabel="Descartar y abrir"
+                destructive
+                onCancel={() => setPendingSelectedId(null)}
+                onConfirm={confirmFileSelection}
+            />
         </div>
     );
 }

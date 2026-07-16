@@ -135,7 +135,39 @@ function clone<T>(value: T): T {
   return JSON.parse(JSON.stringify(value)) as T;
 }
 
-async function demoIntegrityGate(operation: string): Promise<void> {
+function escapeDemoXml(value: string): string {
+  return value
+    .replaceAll("&", "&amp;")
+    .replaceAll('"', "&quot;")
+    .replaceAll("<", "&lt;")
+    .replaceAll(">", "&gt;");
+}
+
+function serializeDemoMapper(mapper: VdjMapperDocument): string {
+  const attributes = [
+    ["device", mapper.device],
+    ["author", mapper.author],
+    ["version", mapper.version],
+    ["date", mapper.date],
+    ["priority", mapper.priority],
+    ["info", mapper.info],
+    ...Object.entries(mapper.other_attributes),
+  ].filter((entry): entry is [string, string] => typeof entry[1] === "string" && entry[1].length > 0);
+  const header = attributes.map(([key, value]) => `${key}="${escapeDemoXml(value)}"`).join(" ");
+  const bindings = mapper.mappings.map((binding) => {
+    const extra = Object.entries(binding.other_attributes).map(([key, value]) => ` ${key}="${escapeDemoXml(value)}"`).join("");
+    return `  <map value="${escapeDemoXml(binding.value)}" action="${escapeDemoXml(binding.action)}"${extra} />`;
+  }).join("\n");
+  return `<mapper ${header}>\n${bindings}\n</mapper>`;
+}
+
+function serializeDemoNode(node: VdjXmlNode): string {
+  const attributes = Object.entries(node.attributes).map(([key, value]) => ` ${key}="${escapeDemoXml(value)}"`).join("");
+  const content = [node.text ? escapeDemoXml(node.text) : "", ...node.children.map(serializeDemoNode)].filter(Boolean).join("");
+  return content ? `<${node.name}${attributes}>${content}</${node.name}>` : `<${node.name}${attributes} />`;
+}
+
+async function demoScenarioGate(operation: string): Promise<void> {
   const scenario = demoScenario();
   if (scenario === "loading") {
     await new Promise((resolve) => setTimeout(resolve, 900));
@@ -230,6 +262,13 @@ export function createTauriRuntimeServices(): RuntimeServices {
 
 export function createDemoRuntimeServices(): RuntimeServices {
   const scenarioSongs = demoSongsForScenario(demoScenario());
+  let currentSettings = clone(DEMO_SETTINGS);
+  let currentMapper = clone(DEMO_MAPPER);
+  let currentPad = clone(DEMO_PAD);
+  const configContents = new Map<string, string>([
+    [DEMO_CONFIG_FILES[1].path, serializeDemoMapper(currentMapper)],
+    [DEMO_CONFIG_FILES[2].path, serializeDemoNode(currentPad)],
+  ]);
   return {
     mode: "demo",
     async selectDirectory({ purpose }) {
@@ -261,11 +300,11 @@ export function createDemoRuntimeServices(): RuntimeServices {
       };
     },
     async verifyFiles() {
-      await demoIntegrityGate("verificación de archivos");
+      await demoScenarioGate("verificación de archivos");
       return clone(demoVerification());
     },
     async scanMusicFolder(folderPath) {
-      await demoIntegrityGate("escaneo de carpeta");
+      await demoScenarioGate("escaneo de carpeta");
       return scenarioSongs.filter((song) => song.file_path.toLowerCase().startsWith(folderPath.toLowerCase())).map((song) => song.file_path);
     },
     async renameFileOp(_folder, originalFilePath, newFileName): Promise<RenameFileResult> {
@@ -275,7 +314,7 @@ export function createDemoRuntimeServices(): RuntimeServices {
     async moveFilesOp(_folder, paths, targetFolder) { return demoMoveReport(paths, targetFolder, true); },
     async findOrphanFiles() { return demoScenario() === "problem" ? [`${DEMO_MUSIC_ROOTS[2]}\\Uncatalogued Edit.wav`] : []; },
     async findDuplicates(): Promise<DuplicateResult> {
-      await demoIntegrityGate("análisis de duplicados");
+      await demoScenarioGate("análisis de duplicados");
       if (demoScenario() !== "problem") return { by_name: [], by_size: [], by_hash: [] };
       const pair = [clone(demoSongs[0]), { ...clone(demoSongs[0]), index: 90, file_path: `${DEMO_MUSIC_ROOTS[2]}\\Disclosure - You & Me copy.flac`, file_name: "Disclosure - You & Me copy.flac" }];
       return { by_name: [{ key: "disclosure - you & me", songs: pair }], by_size: [], by_hash: [] };
@@ -284,7 +323,7 @@ export function createDemoRuntimeServices(): RuntimeServices {
       return Promise.all(missingPaths.map((path) => createDemoRuntimeServices().findRelinkCandidates(_folder, path, [scanFolder])));
     },
     async findRelinkCandidates(_folder, originalFilePath, scanFolders): Promise<SimilarFileMatch> {
-      await demoIntegrityGate("búsqueda de candidatos");
+      await demoScenarioGate("búsqueda de candidatos");
       const target = `${scanFolders[0] ?? DEMO_MUSIC_ROOTS[0]}\\Recovered\\${originalFilePath.split(/[\\/]/).pop() ?? "track.mp3"}`;
       return {
         status: "completed",
@@ -317,19 +356,52 @@ export function createDemoRuntimeServices(): RuntimeServices {
       const count = playlist?.count ?? 2;
       return demoSongs.slice(0, count).map((song) => ({ file_path: song.file_path }));
     },
-    async listVdjConfigFiles() { return clone(DEMO_CONFIG_FILES); },
+    async listVdjConfigFiles() {
+      await demoScenarioGate("lectura de recursos");
+      return clone(DEMO_CONFIG_FILES);
+    },
     async readVdjConfigFile(_folder, filePath) {
-      if (filePath.endsWith(".vdjmap")) return `<mapper device="${DEMO_MAPPER.device}"><map value="PLAY" action="play_pause" /></mapper>`;
-      if (filePath.endsWith(".vdjpad")) return "<pad name=\"Performance\"><button index=\"1\">hot_cue 1</button></pad>";
+      await demoScenarioGate("lectura del recurso");
+      const saved = configContents.get(filePath);
+      if (saved !== undefined) return saved;
+      if (filePath.endsWith(".vdjmap")) return serializeDemoMapper(currentMapper);
+      if (filePath.endsWith(".vdjpad")) return serializeDemoNode(currentPad);
       return "<settings><autoBPMMatch>yes</autoBPMMatch></settings>";
     },
-    async writeVdjConfigFile(_folder, filePath) { return `${filePath}.demo-backup`; },
-    async getVdjSettings() { return clone(DEMO_SETTINGS); },
-    async updateVdjSettings() { return `${DEMO_FOLDER}\\Backups\\settings.demo.xml`; },
-    async getVdjMapper() { return clone(DEMO_MAPPER); },
-    async updateVdjMapper(_folder, filePath) { return `${filePath}.demo-backup`; },
-    async getVdjPadDocument() { return clone(DEMO_PAD); },
-    async updateVdjPadDocument(_folder, filePath) { return `${filePath}.demo-backup`; },
+    async writeVdjConfigFile(_folder, filePath, content) {
+      configContents.set(filePath, content);
+      return `${filePath}.demo-backup`;
+    },
+    async getVdjSettings() {
+      await demoScenarioGate("lectura de settings.xml");
+      return clone(currentSettings);
+    },
+    async updateVdjSettings(_folder, updates) {
+      currentSettings = currentSettings.map((entry) => (
+        Object.prototype.hasOwnProperty.call(updates, entry.key)
+          ? { ...entry, value: updates[entry.key] }
+          : entry
+      ));
+      return `${DEMO_FOLDER}\\Backups\\settings.demo.xml`;
+    },
+    async getVdjMapper() {
+      await demoScenarioGate("lectura del mapper");
+      return clone(currentMapper);
+    },
+    async updateVdjMapper(_folder, filePath, mapper) {
+      currentMapper = clone(mapper);
+      configContents.set(filePath, serializeDemoMapper(currentMapper));
+      return `${filePath}.demo-backup`;
+    },
+    async getVdjPadDocument() {
+      await demoScenarioGate("lectura del pad");
+      return clone(currentPad);
+    },
+    async updateVdjPadDocument(_folder, filePath, document) {
+      currentPad = clone(document);
+      configContents.set(filePath, serializeDemoNode(currentPad));
+      return `${filePath}.demo-backup`;
+    },
   };
 }
 

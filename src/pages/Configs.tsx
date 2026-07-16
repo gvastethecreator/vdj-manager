@@ -1,5 +1,6 @@
 import { useCallback, useEffect, useMemo, useState } from "react";
 import { useApp } from "../App";
+import { useResourceEditorState } from "../components/ResourceStudio";
 import type { VdjSettingEntry } from "../types/database";
 
 function normalizeBooleanInput(value: string): string {
@@ -100,30 +101,28 @@ export function Configs() {
         }
     }, [clearUiError, dirtyCount, draft, loadSettings, reportUiError, services, settings, vdjFolder]);
 
+    const revertChanges = useCallback(() => {
+        setDraft(Object.fromEntries(settings.map((entry) => [entry.key, entry.value ?? ""])));
+        clearUiError();
+    }, [clearUiError, settings]);
+
+    useResourceEditorState({
+        dirty: dirtyCount > 0,
+        busy: loading || saving,
+        save: saveChanges,
+        revert: revertChanges,
+        retry: loadSettings,
+    });
+
     return (
         <div className="space-y-4">
-            <div className="flex items-start justify-between gap-3">
+            <div>
                 <div>
                     <h2 className="text-lg font-bold text-text">Configuración de VirtualDJ</h2>
                     <p className="mt-1 max-w-3xl text-sm text-text-muted">
                         Vista enfocada en <code>settings.xml</code> con opciones curadas a partir de la documentación oficial de VirtualDJ,
                         especialmente biblioteca, playlists, waveforms, cues, seguridad y rendimiento.
                     </p>
-                </div>
-                <div className="flex items-center gap-2">
-                    {dirtyCount > 0 && (
-                        <span className="rounded bg-warning/15 px-2 py-1 text-xs text-warning">
-                            {dirtyCount} cambio(s) pendiente(s)
-                        </span>
-                    )}
-                    <button
-                        type="button"
-                        onClick={saveChanges}
-                        disabled={saving || dirtyCount === 0}
-                        className="btn btn-primary btn-sm"
-                    >
-                        {saving ? "Guardando..." : "Guardar settings.xml"}
-                    </button>
                 </div>
             </div>
 

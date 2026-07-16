@@ -1,7 +1,9 @@
 import { useCallback, useEffect, useMemo, useState } from "react";
-import { FileCode2, ListChecks, Plus, Save, Trash2 } from "lucide-react";
+import { FileCode2, ListChecks, Plus, Trash2 } from "lucide-react";
 import { useApp } from "../App";
 import { CodeEditor } from "../components/CodeEditor";
+import { ConfirmDialog } from "../components/Dialog";
+import { useResourceEditorState } from "../components/ResourceStudio";
 import { TreeFileNavigator, type TreeFileItem } from "../components/TreeFileNavigator";
 import { formatSize } from "../lib/api";
 import type { VdjConfigFileInfo, VdjMapperBinding, VdjMapperDocument } from "../types/database";
@@ -18,6 +20,9 @@ function isMapperFile(file: VdjConfigFileInfo | null): boolean {
 }
 
 type MapperEditorMode = "bindings" | "xml";
+type PendingMapperChange =
+    | { kind: "file"; id: string }
+    | { kind: "mode"; mode: MapperEditorMode };
 
 /** Competent editor for VirtualDJ controller mappings with structured binding editing for `.vdjmap`. */
 export function Mappers() {
@@ -34,6 +39,7 @@ export function Mappers() {
     const [mapperDirty, setMapperDirty] = useState(false);
     const [lastBackup, setLastBackup] = useState<string | null>(null);
     const [editorMode, setEditorMode] = useState<MapperEditorMode>("bindings");
+    const [pendingChange, setPendingChange] = useState<PendingMapperChange | null>(null);
 
     const loadFiles = useCallback(async () => {
         if (!vdjFolder) {
@@ -204,6 +210,68 @@ export function Mappers() {
         }
     }, [clearUiError, loadFiles, mapper, mapperDirty, reportUiError, selectedFile, services, vdjFolder]);
 
+    const revertChanges = useCallback(async () => {
+        if (!vdjFolder || !selectedFile) return;
+        setSaving(true);
+        try {
+            const raw = await services.readVdjConfigFile(vdjFolder, selectedFile.path);
+            setRawContent(raw);
+            setRawDirty(false);
+            if (isMapperFile(selectedFile)) {
+                const document = await services.getVdjMapper(vdjFolder, selectedFile.path);
+                setMapper(document);
+            } else {
+                setMapper(null);
+            }
+            setMapperDirty(false);
+            clearUiError();
+        } catch (err) {
+            reportUiError("No se pudo restaurar la última versión del mapper.", err);
+            throw err;
+        } finally {
+            setSaving(false);
+        }
+    }, [clearUiError, reportUiError, selectedFile, services, vdjFolder]);
+
+    const retryLoad = useCallback(async () => {
+        await loadFiles();
+        await revertChanges();
+    }, [loadFiles, revertChanges]);
+
+    const resourceDirty = mapperDirty || rawDirty;
+    useResourceEditorState({
+        dirty: resourceDirty,
+        busy: loading || saving,
+        save: mapperDirty ? saveMapper : saveRaw,
+        revert: revertChanges,
+        retry: retryLoad,
+    });
+
+    const requestFileSelection = (id: string) => {
+        if (id === selectedId) return;
+        if (resourceDirty) setPendingChange({ kind: "file", id });
+        else setSelectedId(id);
+    };
+
+    const requestEditorMode = (mode: MapperEditorMode) => {
+        if (mode === editorMode) return;
+        if (resourceDirty) setPendingChange({ kind: "mode", mode });
+        else setEditorMode(mode);
+    };
+
+    const confirmPendingChange = async () => {
+        const next = pendingChange;
+        if (!next) return;
+        try {
+            await revertChanges();
+            setPendingChange(null);
+            if (next.kind === "file") setSelectedId(next.id);
+            else setEditorMode(next.mode);
+        } catch {
+            setPendingChange(null);
+        }
+    };
+
     return (
         <div className="flex h-full gap-0 code-workspace">
             <aside className="flex w-80 shrink-0 flex-col border-r border-border bg-surface/85">
@@ -229,7 +297,7 @@ export function Mappers() {
                         <TreeFileNavigator
                             items={treeItems}
                             selectedId={selectedId}
-                            onSelect={(item) => setSelectedId(item.path)}
+                            onSelect={(item) => requestFileSelection(item.path)}
                             emptyLabel="No se encontraron archivos de mapeo/definición en la carpeta VirtualDJ."
                         />
                     )}
@@ -249,18 +317,6 @@ export function Mappers() {
                                 <p className="mt-1 text-sm text-text-muted">{selectedFile.relative_path}</p>
                                 <p className="mt-1 text-xs text-text-muted">Tamaño: {formatSize(selectedFile.size_bytes)}</p>
                             </div>
-                            <div className="flex items-center gap-2">
-                                {mapperDirty || rawDirty ? <span className="rounded bg-warning/15 px-2 py-1 text-xs text-warning">Cambios pendientes</span> : null}
-                                {isMapperFile(selectedFile) && mapper && editorMode === "bindings" ? (
-                                    <button type="button" onClick={saveMapper} disabled={saving || !mapperDirty} className="btn btn-primary btn-sm">
-                                        <Save className="h-3.5 w-3.5" /> Guardar mapper
-                                    </button>
-                                ) : (
-                                    <button type="button" onClick={saveRaw} disabled={saving || !rawDirty} className="btn btn-primary btn-sm">
-                                        <Save className="h-3.5 w-3.5" /> Guardar archivo
-                                    </button>
-                                )}
-                            </div>
                         </div>
 
                         {lastBackup ? (
@@ -273,10 +329,10 @@ export function Mappers() {
                             <div className="space-y-4">
                                 <div className="flex items-center justify-between gap-3">
                                     <div className="tab-group w-80">
-                                        <button type="button" className={`tab-item ${editorMode === "bindings" ? "tab-active" : ""}`} onClick={() => setEditorMode("bindings")}>
+                                        <button type="button" className={`tab-item ${editorMode === "bindings" ? "tab-active" : ""}`} onClick={() => requestEditorMode("bindings")}>
                                             <ListChecks className="mr-1 inline h-3.5 w-3.5" /> Bindings
                                         </button>
-                                        <button type="button" className={`tab-item ${editorMode === "xml" ? "tab-active" : ""}`} onClick={() => setEditorMode("xml")}>
+                                        <button type="button" className={`tab-item ${editorMode === "xml" ? "tab-active" : ""}`} onClick={() => requestEditorMode("xml")}>
                                             <FileCode2 className="mr-1 inline h-3.5 w-3.5" /> XML
                                         </button>
                                     </div>
@@ -417,6 +473,17 @@ export function Mappers() {
                     </div>
                 )}
             </div>
+            <ConfirmDialog
+                open={pendingChange !== null}
+                title="Cambios pendientes en este mapper"
+                description={pendingChange?.kind === "mode"
+                    ? "Antes de cambiar de editor se restaurará la última versión cargada del mapper."
+                    : "Antes de abrir otro archivo se restaurará la última versión cargada del mapper actual."}
+                confirmLabel="Descartar y continuar"
+                destructive
+                onCancel={() => setPendingChange(null)}
+                onConfirm={confirmPendingChange}
+            />
         </div>
     );
 }

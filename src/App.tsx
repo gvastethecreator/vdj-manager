@@ -1,4 +1,4 @@
-import { createContext, useCallback, useContext, useEffect, useMemo, useState } from "react";
+import { createContext, useCallback, useContext, useEffect, useMemo, useRef, useState } from "react";
 import type { ReactNode } from "react";
 import { mergeFolderLists } from "./lib/api";
 import { log } from "./lib/logger";
@@ -12,6 +12,7 @@ import type {
 import { ErrorBoundary } from "./components/ErrorBoundary";
 import { Layout } from "./components/Layout";
 import { IntegrityWorkspace } from "./components/IntegrityWorkspace";
+import { ResourceStudio } from "./components/ResourceStudio";
 import { getDemoAppState, isDemoMode } from "./lib/demoData";
 import {
   initialNavigation,
@@ -56,6 +57,7 @@ interface AppState {
 
 interface AppContextType extends AppState {
   setNavigation: (navigation: NavigationState) => void;
+  registerNavigationBlocker: (blocker: (navigation: NavigationState, proceed: () => void) => boolean) => () => void;
   currentScope: string;
   services: RuntimeServices;
   selectFolder: () => Promise<void>;
@@ -141,6 +143,7 @@ export default function App() {
       : { ...EMPTY_INTEGRITY_SNAPSHOT }
   ));
   const [relinkTargetPath, setRelinkTargetPath] = useState<string | null>(null);
+  const navigationBlockerRef = useRef<((navigation: NavigationState, proceed: () => void) => boolean) | null>(null);
 
   const currentScope = navigationScope(state.navigation);
 
@@ -165,8 +168,7 @@ export default function App() {
     setTheme((current) => current === "dark" ? "light" : "dark");
   }, []);
 
-  const setNavigation = useCallback((navigation: NavigationState) => {
-    const normalized = normalizeNavigation(navigation);
+  const commitNavigation = useCallback((normalized: NavigationState) => {
     setState((previous) => ({ ...previous, navigation: normalized }));
     if (demoMode) {
       const url = new URL(window.location.href);
@@ -174,6 +176,20 @@ export default function App() {
       window.history.replaceState(null, "", url);
     }
   }, [demoMode]);
+
+  const setNavigation = useCallback((navigation: NavigationState) => {
+    const normalized = normalizeNavigation(navigation);
+    const blocker = navigationBlockerRef.current;
+    if (blocker?.(normalized, () => commitNavigation(normalized))) return;
+    commitNavigation(normalized);
+  }, [commitNavigation]);
+
+  const registerNavigationBlocker = useCallback((blocker: (navigation: NavigationState, proceed: () => void) => boolean) => {
+    navigationBlockerRef.current = blocker;
+    return () => {
+      if (navigationBlockerRef.current === blocker) navigationBlockerRef.current = null;
+    };
+  }, []);
 
   const clearUiError = useCallback(() => setUiError(null), []);
 
@@ -316,6 +332,7 @@ export default function App() {
   const context: AppContextType = {
     ...state,
     setNavigation,
+    registerNavigationBlocker,
     currentScope,
     services,
     selectFolder,
@@ -359,9 +376,9 @@ export default function App() {
       case "relink": return <IntegrityWorkspace><RelinkTracks /></IntegrityWorkspace>;
       case "orphans": return <IntegrityWorkspace><OrphanFiles /></IntegrityWorkspace>;
       case "batch": return <BatchOperations />;
-      case "configs": return <Configs />;
-      case "pads": return <Pads />;
-      case "mappers": return <Mappers />;
+      case "configs": return <ResourceStudio><Configs /></ResourceStudio>;
+      case "pads": return <ResourceStudio><Pads /></ResourceStudio>;
+      case "mappers": return <ResourceStudio><Mappers /></ResourceStudio>;
     }
   }
 
