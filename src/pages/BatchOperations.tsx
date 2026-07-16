@@ -174,16 +174,16 @@ export function BatchOperations() {
             {/* ── Left side panel: folder tree ── */}
             <div className="flex w-56 shrink-0 flex-col border-r-2 border-border bg-surface">
                 <div className="flex items-center justify-between border-b-2 border-border px-3 py-2">
-                    <span className="text-[11px] font-semibold text-text-muted">Carpetas</span>
+                    <span className="text-xs font-semibold text-text-muted">Carpetas</span>
                     <button type="button" onClick={pickTreeRoot}
-                        className="text-[11px] text-primary-light hover:underline">
+                        className="text-xs text-primary-light hover:underline">
                         + Agregar
                     </button>
                 </div>
                 {targetFolder && (
                     <div className="border-b-2 border-border/50 px-3 py-1.5">
-                        <p className="text-[10px] text-text-muted">Destino seleccionado:</p>
-                        <p className="truncate text-[11px] text-primary-light" title={targetFolder}>
+                        <p className="text-xs text-text-muted">Destino seleccionado:</p>
+                        <p className="truncate text-xs text-primary-light" title={targetFolder}>
                             {targetFolder.split("\\").pop() ?? targetFolder}
                         </p>
                     </div>
@@ -222,7 +222,7 @@ export function BatchOperations() {
                 <div className="card p-3">
                     {action === "move" && (
                         <div>
-                            <label className="mb-1 block text-[11px] text-text-muted">Carpeta destino</label>
+                            <label className="mb-1 block text-xs text-text-muted">Carpeta destino</label>
                             <div className="flex gap-2">
                                 <input type="text" value={targetFolder}
                                     onChange={(e) => setTargetFolder(e.target.value)}
@@ -237,14 +237,14 @@ export function BatchOperations() {
 
                     {action === "rename" && (
                         <div>
-                            <label className="mb-1 block text-[11px] text-text-muted">
+                            <label className="mb-1 block text-xs text-text-muted">
                                 Nombre de archivo destino (literal, con extensión)
                             </label>
                             <input type="text" value={renameFileName}
                                 onChange={(e) => setRenameFileName(e.target.value)}
                                 placeholder="ejemplo.mp3"
                                 className="input w-full" />
-                            <p className="mt-1 text-[10px] text-text-muted">
+                            <p className="mt-1 text-xs text-text-muted">
                                 Selecciona exactamente una canción. El backend valida el nombre sin sanitizarlo.
                             </p>
                         </div>
@@ -252,7 +252,7 @@ export function BatchOperations() {
 
                     {action === "tag" && (
                         <div className="space-y-2">
-                            <p className="text-[11px] text-text-muted">
+                            <p className="text-xs text-text-muted">
                                 Deja en blanco los campos que <strong>no</strong> quieres modificar.
                             </p>
                             <div className="grid grid-cols-2 gap-2 sm:grid-cols-3">
@@ -265,15 +265,15 @@ export function BatchOperations() {
                                     ["user1", "Usuario 1"], ["user2", "Usuario 2"], ["commentText", "Comentario"],
                                 ] as [keyof typeof tagForm, string][]).map(([field, label]) => (
                                     <div key={field}>
-                                        <label className="mb-0.5 block text-[10px] text-text-muted">{label}</label>
+                                        <label className="mb-0.5 block text-xs text-text-muted">{label}</label>
                                         <input type="text" value={tagForm[field]}
                                             onChange={(e) => setTag(field, e.target.value)}
-                                            placeholder="—" className="input w-full text-[11px]" />
+                                            placeholder="—" className="input w-full text-xs" />
                                     </div>
                                 ))}
                                 {/* Color — swatch picker + hex text */}
                                 <div>
-                                    <label className="mb-0.5 block text-[10px] text-text-muted">Color</label>
+                                    <label className="mb-0.5 block text-xs text-text-muted">Color</label>
                                     <div className="flex items-center gap-1.5">
                                         <input
                                             type="color"
@@ -287,14 +287,14 @@ export function BatchOperations() {
                                             value={tagForm.color}
                                             onChange={(e) => setTag("color", e.target.value)}
                                             placeholder="—"
-                                            className="input flex-1 font-mono text-[11px]"
+                                            className="input flex-1 font-mono text-xs"
                                             maxLength={9}
                                         />
                                     </div>
                                 </div>
                             </div>
                             {running_tag_fields.length > 0 && (
-                                <p className="text-[11px] text-success">
+                                <p className="text-xs text-success">
                                     {running_tag_fields.length} campo(s) activo(s):{" "}
                                     {running_tag_fields.map(([k]) => k).join(", ")}
                                 </p>
@@ -322,14 +322,14 @@ export function BatchOperations() {
                     <div className="card space-y-1.5 border-warning/30 bg-warning/5 p-3">
                         <div className="flex items-center justify-between">
                             <h4 className="text-xs font-bold text-warning">Vista Previa (Dry Run)</h4>
-                            <span className="text-[11px] text-text-muted">
+                            <span className="text-xs text-text-muted">
                                 {dryResult.affected_count} de {dryResult.details.length} afectados
                             </span>
                         </div>
-                        <p className="text-[11px] text-text-secondary">{dryResult.description}</p>
+                        <p className="text-xs text-text-secondary">{dryResult.description}</p>
                         <div className="max-h-48 overflow-auto rounded-[5px] border-2 border-border bg-surface p-2">
                             {dryResult.details.map((line, i) => (
-                                <div key={i} className={`text-[11px] ${line.startsWith("✓") ? "text-success" : line.startsWith("⚠") ? "text-warning" : "text-text-secondary"}`}>
+                                <div key={i} className={`text-xs ${line.startsWith("✓") ? "text-success" : line.startsWith("⚠") ? "text-warning" : "text-text-secondary"}`}>
                                     {line}
                                 </div>
                             ))}
@@ -341,7 +341,7 @@ export function BatchOperations() {
                     <div className="card space-y-2 border-info/30 bg-info/5 p-3">
                         <div className="flex items-center justify-between gap-3">
                             <h4 className="text-xs font-bold text-info">Reporte de movimiento</h4>
-                            <span className="text-[11px] text-text-muted">
+                            <span className="text-xs text-text-muted">
                                 {moveReport.summary.completed} completados · {moveReport.summary.ready} listos · {moveReport.summary.blocked} bloqueados · {moveReport.summary.manualReview} revisión manual
                             </span>
                         </div>
@@ -349,7 +349,7 @@ export function BatchOperations() {
                             {moveReport.items.map((item) => {
                                 const method = transferMethodLabel(item.transferMethod);
                                 return (
-                                    <div key={`${item.originalFilePath}:${item.targetFilePath}`} className={`text-[11px] ${item.status === "db_committed" || item.status === "ready" ? "text-success" : item.status === "manual_review_required" ? "text-error" : "text-warning"}`}>
+                                    <div key={`${item.originalFilePath}:${item.targetFilePath}`} className={`text-xs ${item.status === "db_committed" || item.status === "ready" ? "text-success" : item.status === "manual_review_required" ? "text-error" : "text-warning"}`}>
                                         {moveStatusLabel(item.status)} · {item.originalFilePath} → {item.targetFilePath || "—"}{method ? ` · ${method}` : ""}{item.message ? ` — ${item.message}` : ""}
                                     </div>
                                 );
@@ -361,9 +361,9 @@ export function BatchOperations() {
                 {/* Log */}
                 {log.length > 0 && (
                     <div className="card max-h-48 overflow-auto p-2.5">
-                        <h4 className="mb-1.5 text-[11px] font-semibold text-text-muted">Resultados</h4>
+                        <h4 className="mb-1.5 text-xs font-semibold text-text-muted">Resultados</h4>
                         {log.map((line, i) => (
-                            <div key={i} className={`text-[11px] ${line.startsWith("OK") ? "text-success" : line.startsWith("Error") ? "text-error" : "text-text-secondary"}`}>
+                            <div key={i} className={`text-xs ${line.startsWith("OK") ? "text-success" : line.startsWith("Error") ? "text-error" : "text-text-secondary"}`}>
                                 {line}
                             </div>
                         ))}

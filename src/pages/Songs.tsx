@@ -234,14 +234,14 @@ export function Songs() {
                     <button
                         type="button"
                         onClick={() => { setMode("folders"); setSelectedPlaylist(null); }}
-                        className={`rounded-md py-1.5 text-[11px] font-semibold transition-colors ${mode === "folders" ? "bg-primary/14 text-primary-light" : "text-text-muted hover:bg-surface-hover hover:text-text"}`}
+                        className={`rounded-md py-1.5 text-xs font-semibold transition-colors ${mode === "folders" ? "bg-primary/14 text-primary-light" : "text-text-muted hover:bg-surface-hover hover:text-text"}`}
                     >
                         Carpetas
                     </button>
                     <button
                         type="button"
                         onClick={() => { setMode("playlists"); setSelectedFolder(""); }}
-                        className={`rounded-md py-1.5 text-[11px] font-semibold transition-colors ${mode === "playlists" ? "bg-primary/14 text-primary-light" : "text-text-muted hover:bg-surface-hover hover:text-text"}`}
+                        className={`rounded-md py-1.5 text-xs font-semibold transition-colors ${mode === "playlists" ? "bg-primary/14 text-primary-light" : "text-text-muted hover:bg-surface-hover hover:text-text"}`}
                     >
                         Playlists
                     </button>
@@ -250,11 +250,11 @@ export function Songs() {
                 {mode === "folders" && (
                     <>
                         <div className="flex items-center justify-between border-b border-border px-3 py-2">
-                            <span className="text-[11px] font-semibold text-text-muted">Carpetas</span>
+                            <span className="text-xs font-semibold text-text-muted">Carpetas</span>
                             <button
                                 type="button"
                                 onClick={addRoot}
-                                className="text-[11px] text-primary-light hover:underline"
+                                className="text-xs text-primary-light hover:underline"
                             >
                                 + Agregar
                             </button>
@@ -270,7 +270,7 @@ export function Songs() {
                                 }`}
                         >
                             <span>Todas las canciones</span>
-                            <span className="ml-auto text-[10px] tabular-nums text-text-muted">
+                            <span className="ml-auto text-xs tabular-nums text-text-muted">
                                 {librarySongs.length}
                             </span>
                         </button>
@@ -289,12 +289,12 @@ export function Songs() {
                 {mode === "playlists" && (
                     <div className="flex-1 overflow-auto">
                         {playlistLoading && (
-                            <div className="flex items-center gap-2 p-3 text-[11px] text-text-muted">
+                            <div className="flex items-center gap-2 p-3 text-xs text-text-muted">
                                 <div className="spinner" /> Cargando playlists...
                             </div>
                         )}
                         {!playlistLoading && playlists.length === 0 && (
-                            <div className="p-3 text-[11px] text-text-muted">
+                            <div className="p-3 text-xs text-text-muted">
                                 No se encontraron playlists en la carpeta VDJ.
                             </div>
                         )}
@@ -308,14 +308,14 @@ export function Songs() {
                                 }`}
                         >
                             <span>Todas las canciones</span>
-                            <span className="ml-auto text-[10px] tabular-nums text-text-muted">
+                            <span className="ml-auto text-xs tabular-nums text-text-muted">
                                 {songs.length}
                             </span>
                         </button>
                         {[...playlistFolders.entries()].sort(([a], [b]) => a.localeCompare(b)).map(([folder, pls]) => (
                             <div key={folder}>
                                 {folder && (
-                                    <div className="px-3 pt-2 pb-0.5 text-[10px] font-bold uppercase tracking-wider text-text-muted">
+                                    <div className="px-3 pt-2 pb-0.5 text-xs font-bold uppercase tracking-wider text-text-muted">
                                         {folder}
                                     </div>
                                 )}
@@ -330,10 +330,10 @@ export function Songs() {
                                             }`}
                                     >
                                         <span className="truncate">{pl.name}</span>
-                                        <span className="rounded bg-surface-hover px-1 py-0 text-[9px] uppercase tracking-wide text-text-muted">
+                                        <span className="rounded bg-surface-hover px-1 py-0 text-xs uppercase tracking-wide text-text-muted">
                                             {pl.format}
                                         </span>
-                                        <span className="ml-auto shrink-0 text-[10px] tabular-nums text-text-muted">
+                                        <span className="ml-auto shrink-0 text-xs tabular-nums text-text-muted">
                                             {pl.count}
                                         </span>
                                     </button>
@@ -344,7 +344,7 @@ export function Songs() {
                             <button
                                 type="button"
                                 onClick={importPlaylist}
-                                className="w-full rounded border border-border/70 px-2 py-1 text-[11px] text-text-secondary hover:bg-surface-hover"
+                                className="w-full rounded border border-border/70 px-2 py-1 text-xs text-text-secondary hover:bg-surface-hover"
                             >
                                 Importar playlist externa…
                             </button>
@@ -364,7 +364,7 @@ export function Songs() {
                         </span>
                     </h2>
                     {mode === "folders" && externalLoading && (
-                        <span className="text-[11px] text-text-muted">Escaneando archivos externos…</span>
+                        <span className="text-xs text-text-muted">Escaneando archivos externos…</span>
                     )}
                 </div>
                 {selectedSong && (

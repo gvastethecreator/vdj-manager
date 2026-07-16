@@ -132,7 +132,7 @@ export function TreeFileNavigator({
             >
                 <FileText className="h-3.5 w-3.5 shrink-0 text-text-muted" />
                 <span className="truncate">{item.label}</span>
-                {item.meta ? <span className="ml-auto shrink-0 text-[10px] text-text-muted">{item.meta}</span> : null}
+                {item.meta ? <span className="ml-auto shrink-0 text-xs text-text-muted">{item.meta}</span> : null}
             </button>
         );
     });
@@ -140,7 +140,7 @@ export function TreeFileNavigator({
     return (
         <div className="rounded-[5px] border-2 border-border bg-background p-1">
             {tree.length === 0 ? (
-                <div className="py-4 text-center text-[11px] text-text-muted">{emptyLabel}</div>
+                <div className="py-4 text-center text-xs text-text-muted">{emptyLabel}</div>
             ) : (
                 renderNodes(tree, 0)
             )}

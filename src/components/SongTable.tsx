@@ -56,8 +56,8 @@ export const ALL_COLUMNS: ColumnDef[] = [
                 title="Reproducir"
             >
                 {playingPath === s.file_path
-                    ? <span className="text-primary-light text-[11px]">⏸</span>
-                    : <span className="text-[11px]">▶</span>}
+                    ? <span className="text-primary-light text-xs">⏸</span>
+                    : <span className="text-xs">▶</span>}
             </button>
         ),
     },
@@ -100,9 +100,9 @@ export const ALL_COLUMNS: ColumnDef[] = [
     { key: "comment", label: "Comentario", width: 100, defaultVisible: false, cellClass: "overflow-hidden truncate", editableTag: "commentText", render: (s, h) => <EditableCell song={s} columnKey="comment" value={s.comment} helpers={h} /> },
     { key: "user1", label: "User 1", width: 80, defaultVisible: false, cellClass: "overflow-hidden truncate", editableTag: "user1", render: (s, h) => <EditableCell song={s} columnKey="user1" value={s.user1} helpers={h} /> },
     { key: "user2", label: "User 2", width: 80, defaultVisible: false, cellClass: "overflow-hidden truncate", editableTag: "user2", render: (s, h) => <EditableCell song={s} columnKey="user2" value={s.user2} helpers={h} /> },
-    { key: "first_seen", label: "1ra vez", width: 86, defaultVisible: false, cellClass: "tabular-nums text-[10px] text-text-muted", render: (s) => s.first_seen ?? "—" },
-    { key: "first_play", label: "1er play", width: 86, defaultVisible: false, cellClass: "tabular-nums text-[10px] text-text-muted", render: (s) => s.first_play ?? "—" },
-    { key: "last_play", label: "Último play", width: 86, defaultVisible: false, cellClass: "tabular-nums text-[10px] text-text-muted", render: (s) => s.last_play ?? "—" },
+    { key: "first_seen", label: "1ra vez", width: 86, defaultVisible: false, cellClass: "tabular-nums text-xs text-text-muted", render: (s) => s.first_seen ?? "—" },
+    { key: "first_play", label: "1er play", width: 86, defaultVisible: false, cellClass: "tabular-nums text-xs text-text-muted", render: (s) => s.first_play ?? "—" },
+    { key: "last_play", label: "Último play", width: 86, defaultVisible: false, cellClass: "tabular-nums text-xs text-text-muted", render: (s) => s.last_play ?? "—" },
 ];
 
 const DEFAULT_VISIBLE = new Set(ALL_COLUMNS.filter((c) => c.defaultVisible).map((c) => c.key));
@@ -208,7 +208,7 @@ function ColorPickerPopup({ position, currentColor, onSelect, onClose }: {
             className="fixed z-50 rounded-lg border-2 border-border bg-surface p-2.5 shadow-xl"
             style={{ left: position.x, top: position.y }}
         >
-            <div className="mb-1.5 text-[10px] font-bold uppercase tracking-wider text-text-muted">Color</div>
+            <div className="mb-1.5 text-xs font-bold uppercase tracking-wider text-text-muted">Color</div>
             <div className="grid grid-cols-5 gap-1">
                 {PRESET_COLORS.map((c) => (
                     <button
@@ -228,10 +228,10 @@ function ColorPickerPopup({ position, currentColor, onSelect, onClose }: {
                     onChange={(e) => setCustom(e.target.value)}
                     className="h-6 w-6 cursor-pointer rounded border border-border/60 bg-transparent p-0"
                 />
-                <button type="button" className="btn btn-ghost btn-sm flex-1 text-[10px]" onClick={() => onSelect(custom)}>
+                <button type="button" className="btn btn-ghost btn-sm flex-1 text-xs" onClick={() => onSelect(custom)}>
                     Aplicar
                 </button>
-                <button type="button" className="btn btn-ghost btn-sm text-[10px] text-error" onClick={() => onSelect(null)}>
+                <button type="button" className="btn btn-ghost btn-sm text-xs text-error" onClick={() => onSelect(null)}>
                     Quitar
                 </button>
             </div>
@@ -560,9 +560,9 @@ export function SongTable({
                     placeholder="Buscar por nombre, título, artista, álbum, género, sello, compositor..."
                     className="input flex-1"
                 />
-                <span className="text-[11px] tabular-nums text-text-muted">{filtered.length} resultados</span>
+                <span className="text-xs tabular-nums text-text-muted">{filtered.length} resultados</span>
                 {(waveformQueue.pending > 0 || waveformQueue.active > 0) && (
-                    <span className="flex items-center gap-1.5 rounded-md bg-primary/10 px-2 py-0.5 text-[10px] tabular-nums text-primary-light">
+                    <span className="flex items-center gap-1.5 rounded-md bg-primary/10 px-2 py-0.5 text-xs tabular-nums text-primary-light">
                         <span className="inline-block h-1.5 w-1.5 animate-pulse rounded-full bg-primary-light" />
                         Waveforms: {waveformQueue.active} procesando, {waveformQueue.pending} en cola
                     </span>
@@ -593,7 +593,7 @@ export function SongTable({
                                 return (
                                     <th
                                         key={c.key}
-                                        className={`select-none whitespace-nowrap px-2.5 py-1.5 text-left text-[11px] font-semibold ${columnSortKey ? "cursor-pointer text-text-muted hover:text-text" : "text-text-muted/80"}`}
+                                        className={`select-none whitespace-nowrap px-2.5 py-1.5 text-left text-xs font-semibold ${columnSortKey ? "cursor-pointer text-text-muted hover:text-text" : "text-text-muted/80"}`}
                                         onClick={columnSortKey ? () => toggleSort(columnSortKey) : undefined}
                                         onContextMenu={handleHeaderContext}
                                     >
@@ -670,13 +670,13 @@ export function SongTable({
                     className="fixed z-50 max-h-80 overflow-auto rounded-lg border-2 border-border bg-surface p-1.5 shadow-xl"
                     style={{ left: ctxMenu.x, top: ctxMenu.y }}
                 >
-                    <div className="mb-1 px-2 text-[10px] font-bold uppercase tracking-wider text-text-muted">
+                    <div className="mb-1 px-2 text-xs font-bold uppercase tracking-wider text-text-muted">
                         Columnas visibles
                     </div>
                     {ALL_COLUMNS.map((c) => (
                         <label
                             key={c.key}
-                            className="flex cursor-pointer items-center gap-2 rounded px-2 py-0.5 text-[11px] text-text-secondary hover:bg-surface-hover"
+                            className="flex cursor-pointer items-center gap-2 rounded px-2 py-0.5 text-xs text-text-secondary hover:bg-surface-hover"
                         >
                             <input
                                 type="checkbox"
@@ -690,7 +690,7 @@ export function SongTable({
                     <div className="mt-1 flex gap-1 border-t border-border pt-1">
                         <button
                             type="button"
-                            className="btn btn-ghost btn-sm flex-1 text-[10px]"
+                            className="btn btn-ghost btn-sm flex-1 text-xs"
                             onClick={() => {
                                 const all = new Set<ColumnKey>(ALL_COLUMNS.map((c) => c.key));
                                 setVisibleCols(all);
@@ -701,7 +701,7 @@ export function SongTable({
                         </button>
                         <button
                             type="button"
-                            className="btn btn-ghost btn-sm flex-1 text-[10px]"
+                            className="btn btn-ghost btn-sm flex-1 text-xs"
                             onClick={() => {
                                 const defaults = new Set<ColumnKey>(DEFAULT_VISIBLE);
                                 setVisibleCols(defaults);
@@ -858,7 +858,7 @@ export function SongMiniTable({
     }, [visibleKeys]);
 
     return (
-        <table className="w-full table-fixed text-[11px]">
+        <table className="w-full table-fixed text-xs">
             <colgroup>
                 {selectable && <col className="w-8" />}
                 {cols.map((c) => <col key={c.key} style={{ width: c.width }} />)}

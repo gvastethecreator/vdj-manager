@@ -24,9 +24,9 @@ export function CodeEditor({
                 <div className="flex min-w-0 items-center gap-2">
                     <FileCode2 className="h-4 w-4 shrink-0 text-primary-light" />
                     <span className="truncate text-[12px] font-semibold text-text">{label}</span>
-                    <span className="badge bg-background px-2 py-0.5 text-[10px] text-text-muted">{language}</span>
+                    <span className="badge bg-background px-2 py-0.5 text-xs text-text-muted">{language}</span>
                 </div>
-                <span className={`badge px-2 py-0.5 text-[10px] ${dirty ? "bg-warning/15 text-warning" : "bg-success/12 text-success"}`}>
+                <span className={`badge px-2 py-0.5 text-xs ${dirty ? "bg-warning/15 text-warning" : "bg-success/12 text-success"}`}>
                     {dirty ? "Cambios pendientes" : (
                         <>
                             <CheckCircle2 className="mr-1 h-3 w-3" />
@@ -36,7 +36,7 @@ export function CodeEditor({
                 </span>
             </div>
             <div className={`grid ${minHeightClass} grid-cols-[3.25rem_1fr] overflow-hidden`}>
-                <div className="select-none overflow-hidden border-r border-border bg-surface/55 py-3 text-right font-mono text-[11px] leading-5 text-text-muted">
+                <div className="select-none overflow-hidden border-r border-border bg-surface/55 py-3 text-right font-mono text-xs leading-5 text-text-muted">
                     {lineNumbers.map((line) => (
                         <div key={line} className="px-3">{line}</div>
                     ))}

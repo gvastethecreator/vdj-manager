@@ -17,7 +17,7 @@ export function StatsCard({ label, value, icon, color = "text-primary" }: StatsC
             </div>
             <div className="min-w-0">
                 <p className="text-xl font-bold text-text tabular-nums leading-none">{value}</p>
-                <p className="truncate text-[11px] text-text-muted">{label}</p>
+                <p className="truncate text-xs text-text-muted">{label}</p>
             </div>
         </div>
     );

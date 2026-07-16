@@ -5,7 +5,7 @@ import { mergeFolderLists } from "../lib/api";
 
 /** Scans a folder for audio files not registered in the VDJ database. */
 export function OrphanFiles() {
-    const { songs, musicFolders, removeMusicFolder, selectMusicFolder, reportUiError, services } = useApp();
+    const { songs, musicFolders, removeMusicFolder, selectMusicFolder, reportUiError, services, updateIntegrity } = useApp();
     const [orphans, setOrphans] = useState<string[] | null>(null);
     const [allFiles, setAllFiles] = useState<string[] | null>(null);
     const [loading, setLoading] = useState(false);
@@ -31,6 +31,7 @@ export function OrphanFiles() {
 
             setOrphans(orphanPaths);
             setAllFiles(uniqueFiles);
+            updateIntegrity({ orphans: orphanPaths.length });
         } catch (err) {
             reportUiError("No se pudo completar el escaneo de huérfanos.", err);
         } finally {
@@ -48,8 +49,8 @@ export function OrphanFiles() {
             <div className="card space-y-3 p-3">
                 <div className="flex items-center justify-between gap-3">
                     <div>
-                        <label className="mb-1 block text-[11px] text-text-muted">Carpetas a escanear</label>
-                        <p className="text-[11px] text-text-secondary">
+                        <label className="mb-1 block text-xs text-text-muted">Carpetas a escanear</label>
+                        <p className="text-xs text-text-secondary">
                             Se usan las carpetas musicales persistentes configuradas desde el inicio de la app.
                         </p>
                     </div>
@@ -60,7 +61,7 @@ export function OrphanFiles() {
                 </div>
 
                 {scanFolders.length === 0 ? (
-                    <div className="rounded-[5px] border border-dashed border-border/70 bg-surface-hover/30 px-3 py-2 text-[11px] text-text-muted">
+                    <div className="rounded-[5px] border border-dashed border-border/70 bg-surface-hover/30 px-3 py-2 text-xs text-text-muted">
                         No hay carpetas de música configuradas todavía.
                     </div>
                 ) : (
@@ -68,7 +69,7 @@ export function OrphanFiles() {
                         {scanFolders.map((folder) => (
                             <div key={folder} className="flex items-center gap-2 rounded-[5px] border border-border/70 bg-surface-hover/35 px-2.5 py-2">
                                 <Music className="h-3.5 w-3.5 shrink-0 text-primary-light" />
-                                <span className="min-w-0 flex-1 truncate text-[11px] text-text" title={folder}>
+                                <span className="min-w-0 flex-1 truncate text-xs text-text" title={folder}>
                                     {folder}
                                 </span>
                                 <button
@@ -107,15 +108,15 @@ export function OrphanFiles() {
                     <div className="grid grid-cols-3 gap-2.5">
                         <div className="card p-2.5 text-center">
                             <div className="text-lg font-bold text-text">{allFiles.length}</div>
-                            <div className="text-[11px] text-text-muted">Archivos en disco</div>
+                            <div className="text-xs text-text-muted">Archivos en disco</div>
                         </div>
                         <div className="card p-2.5 text-center">
                             <div className="text-lg font-bold text-success">{allFiles.length - orphans.length}</div>
-                            <div className="text-[11px] text-text-muted">En la base de datos</div>
+                            <div className="text-xs text-text-muted">En la base de datos</div>
                         </div>
                         <div className="card p-2.5 text-center">
                             <div className="text-lg font-bold text-warning">{orphans.length}</div>
-                            <div className="text-[11px] text-text-muted">Huérfanos</div>
+                            <div className="text-xs text-text-muted">Huérfanos</div>
                         </div>
                     </div>
 
@@ -123,10 +124,10 @@ export function OrphanFiles() {
                         <table className="w-full text-[12px]">
                             <thead className="sticky top-0 bg-surface-hover">
                                 <tr>
-                                    <th className="px-2.5 py-1.5 text-left text-[11px] font-medium text-text-muted">#</th>
-                                    <th className="px-2.5 py-1.5 text-left text-[11px] font-medium text-text-muted">Archivo</th>
-                                    <th className="px-2.5 py-1.5 text-left text-[11px] font-medium text-text-muted">Formato</th>
-                                    <th className="px-2.5 py-1.5 text-left text-[11px] font-medium text-text-muted">Carpeta</th>
+                                    <th className="px-2.5 py-1.5 text-left text-xs font-medium text-text-muted">#</th>
+                                    <th className="px-2.5 py-1.5 text-left text-xs font-medium text-text-muted">Archivo</th>
+                                    <th className="px-2.5 py-1.5 text-left text-xs font-medium text-text-muted">Formato</th>
+                                    <th className="px-2.5 py-1.5 text-left text-xs font-medium text-text-muted">Carpeta</th>
                                 </tr>
                             </thead>
                             <tbody>
@@ -154,7 +155,7 @@ export function OrphanFiles() {
                                                 {fileName}
                                             </td>
                                             <td className="px-2.5 py-1">
-                                                <span className={`badge text-[10px] ${extColor[ext] ?? "bg-surface-hover text-text-muted"}`}>
+                                                <span className={`badge text-xs ${extColor[ext] ?? "bg-surface-hover text-text-muted"}`}>
                                                     {ext}
                                                 </span>
                                             </td>

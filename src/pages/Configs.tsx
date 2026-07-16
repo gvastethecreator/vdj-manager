@@ -112,7 +112,7 @@ export function Configs() {
                 </div>
                 <div className="flex items-center gap-2">
                     {dirtyCount > 0 && (
-                        <span className="rounded bg-warning/15 px-2 py-1 text-[11px] text-warning">
+                        <span className="rounded bg-warning/15 px-2 py-1 text-xs text-warning">
                             {dirtyCount} cambio(s) pendiente(s)
                         </span>
                     )}
@@ -142,7 +142,7 @@ export function Configs() {
                         value={search}
                         onChange={(e) => setSearch(e.target.value)}
                     />
-                    <div className="text-[11px] text-text-muted">
+                    <div className="text-xs text-text-muted">
                         {loading ? "Cargando settings.xml..." : `${filteredSettings.length} opción(es) visibles`}
                     </div>
                 </div>
@@ -159,7 +159,7 @@ export function Configs() {
                     <section key={category} className="card p-4">
                         <div className="mb-3 flex items-center justify-between gap-2">
                             <h3 className="text-sm font-semibold text-text">{category}</h3>
-                            <span className="text-[10px] uppercase tracking-wider text-text-muted">
+                            <span className="text-xs uppercase tracking-wider text-text-muted">
                                 {entries.length} opción(es)
                             </span>
                         </div>
@@ -175,9 +175,9 @@ export function Configs() {
                                         <div className="flex flex-wrap items-start justify-between gap-2">
                                             <div>
                                                 <div className="text-sm font-medium text-text">{entry.label}</div>
-                                                <div className="mt-0.5 text-[11px] text-text-muted">{entry.description}</div>
+                                                <div className="mt-0.5 text-xs text-text-muted">{entry.description}</div>
                                             </div>
-                                            <span className="rounded bg-background px-2 py-0.5 font-mono text-[10px] text-text-muted">
+                                            <span className="rounded bg-background px-2 py-0.5 font-mono text-xs text-text-muted">
                                                 {entry.key}
                                             </span>
                                         </div>
@@ -205,11 +205,11 @@ export function Configs() {
                                         </div>
 
                                         {entry.value !== null ? (
-                                            <div className="mt-2 text-[10px] text-text-muted">
+                                            <div className="mt-2 text-xs text-text-muted">
                                                 Valor actual cargado: <span className="font-mono text-text-secondary">{entry.value}</span>
                                             </div>
                                         ) : (
-                                            <div className="mt-2 text-[10px] text-text-muted">
+                                            <div className="mt-2 text-xs text-text-muted">
                                                 Esta opción no aparece en el <span className="font-mono">settings.xml</span> actual.
                                             </div>
                                         )}

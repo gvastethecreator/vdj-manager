@@ -120,13 +120,13 @@ export function Playlists() {
             <aside className="flex w-80 shrink-0 flex-col border-r-2 border-border bg-surface">
                 <div className="border-b-2 border-border px-3 py-2">
                     <h2 className="text-sm font-semibold text-text">Playlists</h2>
-                    <p className="mt-0.5 text-[11px] text-text-muted">
+                    <p className="mt-0.5 text-xs text-text-muted">
                         Árbol estructurado de listas VirtualDJ, incluyendo historial y subcarpetas.
                     </p>
                 </div>
                 <div className="flex-1 overflow-auto p-1.5">
                     {loading ? (
-                        <div className="p-2 text-[11px] text-text-muted">Cargando playlists...</div>
+                        <div className="p-2 text-xs text-text-muted">Cargando playlists...</div>
                     ) : (
                         <TreeFileNavigator
                             items={treeItems}
@@ -150,12 +150,12 @@ export function Playlists() {
                                 <div>
                                     <h3 className="text-lg font-bold text-text">{selectedPlaylist.name}</h3>
                                     <p className="mt-1 text-sm text-text-muted">{selectedPlaylist.folder || "Raíz de Playlists"}</p>
-                                    <p className="mt-1 text-[11px] text-text-muted font-mono">{selectedPlaylist.path}</p>
+                                    <p className="mt-1 text-xs text-text-muted font-mono">{selectedPlaylist.path}</p>
                                 </div>
                                 <div className="flex gap-2">
-                                    <span className="rounded bg-background px-2 py-1 text-[11px] text-text-secondary">{selectedPlaylist.format}</span>
-                                    <span className="rounded bg-background px-2 py-1 text-[11px] text-text-secondary">{selectedPlaylist.count} entrada(s)</span>
-                                    {unmatchedCount > 0 ? <span className="rounded bg-warning/15 px-2 py-1 text-[11px] text-warning">{unmatchedCount} fuera de DB</span> : null}
+                                    <span className="rounded bg-background px-2 py-1 text-xs text-text-secondary">{selectedPlaylist.format}</span>
+                                    <span className="rounded bg-background px-2 py-1 text-xs text-text-secondary">{selectedPlaylist.count} entrada(s)</span>
+                                    {unmatchedCount > 0 ? <span className="rounded bg-warning/15 px-2 py-1 text-xs text-warning">{unmatchedCount} fuera de DB</span> : null}
                                 </div>
                             </div>
                         </div>

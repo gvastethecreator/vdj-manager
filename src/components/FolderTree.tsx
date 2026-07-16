@@ -151,7 +151,7 @@ export function FolderTree({
             className={`${maxHeightClass} overflow-auto rounded-[5px] border-2 border-border bg-background p-1`}
         >
             {nodes.length === 0 ? (
-                <div className="py-4 text-center text-[11px] text-text-muted">
+                <div className="py-4 text-center text-xs text-text-muted">
                     Selecciona una carpeta para navegar
                 </div>
             ) : (

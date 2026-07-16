@@ -14,7 +14,7 @@ type DeleteModal = { open: false } | { open: true; dbOnly: boolean };
 
 /** Three-tab duplicate finder with selection, filters and bulk actions. */
 export function Duplicates() {
-    const { vdjFolder, reportUiError, reload, refreshRecovery, mutationsBlocked, services } = useApp();
+    const { vdjFolder, reportUiError, reload, refreshRecovery, mutationsBlocked, services, updateIntegrity } = useApp();
     const [result, setResult] = useState<DuplicateResult | null>(null);
     const [loading, setLoading] = useState(false);
     const [tab, setTab] = useState<DupTab>("by_name");
@@ -43,7 +43,9 @@ export function Duplicates() {
             setSelected(new Set());
             if (report.summary.completed > 0) await reload();
             setLoading(true);
-            setResult(await services.findDuplicates(vdjFolder));
+            const nextResult = await services.findDuplicates(vdjFolder);
+            setResult(nextResult);
+            updateIntegrity({ duplicateGroups: nextResult.by_name.length + nextResult.by_size.length + nextResult.by_hash.length });
         } catch (err) {
             reportUiError("No se pudieron mover los duplicados seleccionados.", err);
         } finally {
@@ -62,6 +64,7 @@ export function Duplicates() {
         try {
             const r = await services.findDuplicates(vdjFolder);
             setResult(r);
+            updateIntegrity({ duplicateGroups: r.by_name.length + r.by_size.length + r.by_hash.length });
         } catch (err) {
             reportUiError("No se pudo completar el análisis de duplicados.", err);
         } finally {
@@ -171,7 +174,9 @@ export function Duplicates() {
             await reload();
             // Refresh duplicate groups without erasing the operation report.
             setLoading(true);
-            setResult(await services.findDuplicates(vdjFolder));
+            const nextResult = await services.findDuplicates(vdjFolder);
+            setResult(nextResult);
+            updateIntegrity({ duplicateGroups: nextResult.by_name.length + nextResult.by_size.length + nextResult.by_hash.length });
         } catch (err) {
             reportUiError("No se pudieron eliminar las referencias seleccionadas.", err);
         } finally {
@@ -213,29 +218,29 @@ export function Duplicates() {
 
                     {/* Filters & selection */}
                     <div className="card flex flex-wrap items-center gap-2.5 p-2.5">
-                        <span className="text-[11px] font-semibold text-text-muted">Filtrar:</span>
+                        <span className="text-xs font-semibold text-text-muted">Filtrar:</span>
                         <select value={filterLocation} onChange={(e) => setFilterLocation(e.target.value)}>
                             <option value="">Todas las ubicaciones</option>
                             {allLocations.map((loc) => <option key={loc} value={loc}>{loc}</option>)}
                         </select>
-                        <label className="flex items-center gap-1.5 text-[11px] text-text-secondary">
+                        <label className="flex items-center gap-1.5 text-xs text-text-secondary">
                             <input type="checkbox" checked={filterHotcues}
                                 onChange={(e) => { setFilterHotcues(e.target.checked); if (e.target.checked) setFilterNoCues(false); }} />
                             Con hotcues
                         </label>
-                        <label className="flex items-center gap-1.5 text-[11px] text-text-secondary">
+                        <label className="flex items-center gap-1.5 text-xs text-text-secondary">
                             <input type="checkbox" checked={filterNoCues}
                                 onChange={(e) => { setFilterNoCues(e.target.checked); if (e.target.checked) setFilterHotcues(false); }} />
                             Sin hotcues
                         </label>
-                        <label className="flex items-center gap-1.5 text-[11px] text-text-secondary">
+                        <label className="flex items-center gap-1.5 text-xs text-text-secondary">
                             <input type="checkbox" checked={filterStems}
                                 onChange={(e) => setFilterStems(e.target.checked)} />
                             Con stems
                         </label>
 
                         <div className="ml-auto flex items-center gap-1.5">
-                            <span className="text-[11px] font-semibold text-text-muted">Sel.:</span>
+                            <span className="text-xs font-semibold text-text-muted">Sel.:</span>
                             {filterLocation && (
                                 <button onClick={() => selectByLocation(filterLocation)} className="btn btn-ghost btn-sm">
                                     En ubicación
@@ -277,19 +282,19 @@ export function Duplicates() {
                             >
                                 Eliminar de BD + Papelera
                             </button>
-                            {actionRunning && <span className="text-[11px] text-text-muted">Procesando...</span>}
+                            {actionRunning && <span className="text-xs text-text-muted">Procesando...</span>}
                         </div>
                     )}
 
                     {moveReport && (
                         <div className="max-h-48 overflow-auto rounded-lg border border-border bg-surface p-2.5">
-                            <div className="mb-2 text-[11px] font-semibold text-text">
+                            <div className="mb-2 text-xs font-semibold text-text">
                                 Movimiento: {moveReport.summary.completed} completados · {moveReport.summary.blocked} bloqueados · {moveReport.summary.manualReview} revisión manual
                             </div>
                             {moveReport.items.map((item) => {
                                 const method = transferMethodLabel(item.transferMethod);
                                 return (
-                                    <div key={`${item.originalFilePath}:${item.targetFilePath}`} className={`text-[11px] ${item.status === "db_committed" ? "text-success" : item.status === "manual_review_required" ? "text-error" : "text-warning"}`}>
+                                    <div key={`${item.originalFilePath}:${item.targetFilePath}`} className={`text-xs ${item.status === "db_committed" ? "text-success" : item.status === "manual_review_required" ? "text-error" : "text-warning"}`}>
                                         {moveStatusLabel(item.status)} · {item.originalFilePath} → {item.targetFilePath || "—"}{method ? ` · ${method}` : ""}{item.message ? ` — ${item.message}` : ""}
                                     </div>
                                 );
@@ -299,13 +304,13 @@ export function Duplicates() {
 
                     {removalResults.length > 0 && (
                         <div className="max-h-48 overflow-auto rounded-lg border border-border bg-surface p-2.5">
-                            <div className="mb-2 text-[11px] font-semibold text-text">
+                            <div className="mb-2 text-xs font-semibold text-text">
                                 Remoción: {removalSummary.completed} completadas · {removalSummary.attention} requieren atención
                             </div>
                             {removalResults.map((item) => (
                                 <div
                                     key={`${item.mode}:${item.originalFilePath}`}
-                                    className={`text-[11px] ${item.status === "completed" ? "text-success" : item.status === "trash_failed" ? "text-error" : "text-warning"}`}
+                                    className={`text-xs ${item.status === "completed" ? "text-success" : item.status === "trash_failed" ? "text-error" : "text-warning"}`}
                                 >
                                     {item.mode === "db_only" ? "Sólo biblioteca" : "Papelera + biblioteca"} · {removalStatusLabel(item.status)} · {item.originalFilePath}{item.message ? ` — ${item.message}` : ""}
                                 </div>

@@ -122,7 +122,7 @@ export function VdjResourceEditorPage({
             <aside className="flex w-80 shrink-0 flex-col border-r border-border bg-surface/85">
                 <div className="border-b border-border px-3 py-3">
                     <h2 className="text-sm font-semibold text-text">{title}</h2>
-                    <p className="mt-0.5 text-[11px] text-text-muted">{subtitle}</p>
+                    <p className="mt-0.5 text-xs text-text-muted">{subtitle}</p>
                 </div>
                 <div className="border-b border-border/70 p-2">
                     <input
@@ -135,7 +135,7 @@ export function VdjResourceEditorPage({
                 </div>
                 <div className="flex-1 overflow-auto p-1.5">
                     {loading ? (
-                        <div className="p-2 text-[11px] text-text-muted">Cargando archivos...</div>
+                        <div className="p-2 text-xs text-text-muted">Cargando archivos...</div>
                     ) : (
                         <TreeFileNavigator
                             items={treeItems}
@@ -155,7 +155,7 @@ export function VdjResourceEditorPage({
                             <p className="mt-1 text-sm text-text-muted">{subtitle}</p>
                         </div>
                         <div className="flex items-center gap-2">
-                            {dirty ? <span className="rounded bg-warning/15 px-2 py-1 text-[11px] text-warning">Cambios pendientes</span> : null}
+                            {dirty ? <span className="rounded bg-warning/15 px-2 py-1 text-xs text-warning">Cambios pendientes</span> : null}
                             <button type="button" onClick={save} disabled={!dirty || saving || !selectedFile} className="btn btn-primary btn-sm">
                                 {saving ? "Guardando..." : "Guardar"}
                             </button>
@@ -178,8 +178,8 @@ export function VdjResourceEditorPage({
                         <>
                             <div className="card p-3">
                                 <div className="text-sm font-semibold text-text">{selectedFile.name}</div>
-                                <div className="mt-1 text-[11px] text-text-muted">{selectedFile.relative_path}</div>
-                                <div className="mt-2 text-[11px] text-text-muted">Tamaño: {formatSize(selectedFile.size_bytes)}</div>
+                                <div className="mt-1 text-xs text-text-muted">{selectedFile.relative_path}</div>
+                                <div className="mt-2 text-xs text-text-muted">Tamaño: {formatSize(selectedFile.size_bytes)}</div>
                             </div>
                             <CodeEditor
                                 label={selectedFile.name}

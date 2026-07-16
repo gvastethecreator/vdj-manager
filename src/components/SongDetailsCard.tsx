@@ -151,7 +151,7 @@ function buildTagUpdate(form: TagFormState, includeColor: boolean) {
 }
 
 function MetaBadge({ children }: { children: ReactNode }) {
-    return <span className="badge border border-border/60 bg-background/80 px-2 py-0.5 text-[10px] text-text-secondary">{children}</span>;
+    return <span className="badge border border-border/60 bg-background/80 px-2 py-0.5 text-xs text-text-secondary">{children}</span>;
 }
 
 function Field({
@@ -194,7 +194,7 @@ function ReadonlyField({ label, value }: { label: string; value: string | null |
 
 function SectionTitle({ children }: { children: ReactNode }) {
     return (
-        <div className="relative -mb-px ml-4 inline-flex rounded-t-[3px] border border-border bg-background px-3 py-1 text-[11px] font-bold uppercase tracking-wide text-text">
+        <div className="relative -mb-px ml-4 inline-flex rounded-t-[3px] border border-border bg-background px-3 py-1 text-xs font-bold uppercase tracking-wide text-text">
             {children}
         </div>
     );
@@ -268,7 +268,7 @@ export function SongDetailsCard({ song }: { song: SongSummary }) {
                         <MetaBadge><FolderOpen className="mr-1 inline h-3 w-3" /> externo</MetaBadge>
                     )}
                     {dirty && <MetaBadge>sin guardar</MetaBadge>}
-                    {status && <span className="truncate text-[11px] text-text-muted">{status}</span>}
+                    {status && <span className="truncate text-xs text-text-muted">{status}</span>}
                 </div>
                 <div className="flex shrink-0 items-center gap-1.5">
                     <button type="button" className="btn btn-ghost btn-sm" disabled={!dirty || saving} onClick={reset}>
@@ -279,7 +279,7 @@ export function SongDetailsCard({ song }: { song: SongSummary }) {
                     </button>
                 </div>
             </div>
-            {mutationsBlocked ? <div className="border-b border-warning/25 bg-warning/8 px-3 py-1.5 text-[10px] text-warning">Edición pausada por recuperación pendiente.</div> : null}
+            {mutationsBlocked ? <div className="border-b border-warning/25 bg-warning/8 px-3 py-1.5 text-xs text-warning">Edición pausada por recuperación pendiente.</div> : null}
 
             <div className="grid gap-3 p-3 xl:grid-cols-[minmax(0,1fr)_11rem]">
                 <div className="min-w-0 space-y-3">
@@ -309,7 +309,7 @@ export function SongDetailsCard({ song }: { song: SongSummary }) {
                                         onChange={(event) => setField("color", event.target.value)}
                                         className="h-5 w-8 cursor-pointer rounded border-0 bg-transparent p-0 disabled:cursor-not-allowed"
                                     />
-                                    <span className="truncate font-mono text-[11px] text-text">{form.color.toUpperCase()}</span>
+                                    <span className="truncate font-mono text-xs text-text">{form.color.toUpperCase()}</span>
                                 </div>
                             </label>
                             <Field label="BPM" value={form.bpm} disabled={!editable} onChange={(value) => setField("bpm", value)} />
@@ -374,17 +374,17 @@ export function SongDetailsCard({ song }: { song: SongSummary }) {
 
             {song.cue_markers.length > 0 && (
                 <div className="border-t border-border px-3 py-2">
-                    <div className="mb-1.5 flex items-center gap-2 text-[10px] font-semibold uppercase text-text-muted">
+                    <div className="mb-1.5 flex items-center gap-2 text-xs font-semibold uppercase text-text-muted">
                         <Clock3 className="h-3.5 w-3.5" /> cue markers
                     </div>
                     <div className="grid gap-1.5 md:grid-cols-2 xl:grid-cols-4">
                         {song.cue_markers.map((cue, index) => (
-                            <div key={`${cue.pos}-${index}`} className="rounded-[4px] border border-border bg-background/45 px-2 py-1.5 text-[11px] text-text">
+                            <div key={`${cue.pos}-${index}`} className="rounded-[4px] border border-border bg-background/45 px-2 py-1.5 text-xs text-text">
                                 <div className="flex items-center justify-between gap-2">
                                     <span className="font-medium">{cue.name || `Cue ${cue.num ?? index + 1}`}</span>
-                                    <span className="font-mono text-[11px] text-text-muted">{cue.pos.toFixed(2)}s</span>
+                                    <span className="font-mono text-xs text-text-muted">{cue.pos.toFixed(2)}s</span>
                                 </div>
-                                <div className="mt-1 flex items-center gap-2 text-[11px] text-text-muted">
+                                <div className="mt-1 flex items-center gap-2 text-xs text-text-muted">
                                     <span>{cue.poi_type ?? "cue"}</span>
                                     {cue.color && <span className="inline-block h-3 w-3 rounded border border-border/60" style={{ backgroundColor: cue.color }} />}
                                     {cue.color && <span className="font-mono">{cue.color}</span>}

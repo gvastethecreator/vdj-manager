@@ -25,10 +25,10 @@ export function RecoveryCenter() {
     const pendingCount = pendingRecoveryItemCount(recoveryState);
     const blocked = recoveryError !== null || recoveryState?.status === "pending_recovery";
 
-    if (!blocked && recoveryOutcomes.length === 0) return null;
+    if (!blocked) return null;
 
     return (
-        <section className={`shrink-0 border-b px-5 py-3 ${blocked ? "border-warning/35 bg-warning/10" : "border-success/30 bg-success/8"}`} aria-live="polite">
+        <section id="recovery-center" className={`shrink-0 border-b px-5 py-3 ${blocked ? "border-warning/35 bg-warning/10" : "border-success/30 bg-success/8"}`} aria-live="polite">
             <div className="flex flex-wrap items-center gap-3">
                 <div className={`flex h-9 w-9 shrink-0 items-center justify-center rounded-lg ${blocked ? "bg-warning/15 text-warning" : "bg-success/15 text-success"}`}>
                     {blocked ? <ShieldAlert className="h-5 w-5" /> : <CheckCircle2 className="h-5 w-5" />}
@@ -37,7 +37,7 @@ export function RecoveryCenter() {
                     <h2 className="text-sm font-bold text-text">
                         {recoveryError ? "No se pudo verificar el estado de recuperación" : blocked ? "Mutaciones pausadas: recuperación pendiente" : "Recuperación resuelta"}
                     </h2>
-                    <p className="text-[11px] text-text-secondary">
+                    <p className="text-xs text-text-secondary">
                         {recoveryError
                             ? "La biblioteca sigue disponible en modo lectura. Reintenta la verificación antes de modificar archivos o database.xml."
                             : blocked
@@ -63,8 +63,8 @@ export function RecoveryCenter() {
                     <div className="flex flex-wrap items-center justify-between gap-2">
                         <div>
                             <span className="text-[12px] font-semibold text-text">{operationLabel(entry.journal.operation)}</span>
-                            <span className="ml-2 font-mono text-[10px] text-text-muted">{entry.journal.journalId}</span>
-                            <p className="mt-0.5 text-[11px] text-text-secondary">{entry.journal.outcomeSummary}</p>
+                            <span className="ml-2 font-mono text-xs text-text-muted">{entry.journal.journalId}</span>
+                            <p className="mt-0.5 text-xs text-text-secondary">{entry.journal.outcomeSummary}</p>
                         </div>
                         <div className="flex flex-wrap gap-2">
                             {entry.allowedActions.map((action) => (
@@ -82,7 +82,7 @@ export function RecoveryCenter() {
                     </div>
                     <div className="mt-2 space-y-1">
                         {entry.journal.items.map((item) => (
-                            <div key={item.itemId} className="rounded-md border border-border/70 bg-surface px-2.5 py-2 text-[10px] text-text-secondary">
+                            <div key={item.itemId} className="rounded-md border border-border/70 bg-surface px-2.5 py-2 text-xs text-text-secondary">
                                 <div className="flex flex-wrap items-center gap-2"><span className="badge bg-info/12 text-info">{item.phase}</span><span className="font-mono">{item.originalFilePath}</span></div>
                                 {item.targetFilePath ? <div className="mt-1 truncate font-mono text-text-muted" title={item.targetFilePath}>→ {item.targetFilePath}</div> : null}
                                 {item.lastError ? <div className="mt-1 text-error">{item.lastError}</div> : null}
@@ -95,7 +95,7 @@ export function RecoveryCenter() {
             {expanded && recoveryOutcomes.length > 0 ? (
                 <div className="mt-3 rounded-lg border border-success/25 bg-background/80 p-3">
                     <h3 className="text-[12px] font-semibold text-success">Último resultado</h3>
-                    {recoveryOutcomes.map((outcome) => <p key={`${outcome.journalId}:${outcome.itemId}`} className={`mt-1 text-[11px] ${outcome.status === "resolved" ? "text-text-secondary" : "text-error"}`}>{outcome.message}</p>)}
+                    {recoveryOutcomes.map((outcome) => <p key={`${outcome.journalId}:${outcome.itemId}`} className={`mt-1 text-xs ${outcome.status === "resolved" ? "text-text-secondary" : "text-error"}`}>{outcome.message}</p>)}
                 </div>
             ) : null}
 

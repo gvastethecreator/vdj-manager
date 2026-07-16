@@ -22,6 +22,11 @@ import {
 import { createRuntimeServices, type RuntimeServices } from "./lib/runtimeServices";
 import { createUiError, errorForScope, type UiError } from "./lib/uiError";
 import { persistTheme, readStoredTheme, type Theme } from "./lib/theme";
+import {
+  demoIntegritySnapshot,
+  EMPTY_INTEGRITY_SNAPSHOT,
+  type IntegritySnapshot,
+} from "./lib/operationalState";
 import { Home } from "./pages/Home";
 import { Dashboard } from "./pages/Dashboard";
 import { Songs } from "./pages/Songs";
@@ -34,7 +39,7 @@ import { Configs } from "./pages/Configs";
 import { Playlists } from "./pages/Playlists";
 import { Pads } from "./pages/Pads";
 import { Mappers } from "./pages/Mappers";
-import { isMutationBlocked } from "./lib/recovery";
+import { getDemoRecoveryState, isMutationBlocked } from "./lib/recovery";
 
 export type { Theme } from "./lib/theme";
 
@@ -76,6 +81,8 @@ interface AppContextType extends AppState {
   mutationsBlocked: boolean;
   refreshRecovery: () => Promise<void>;
   resolveRecovery: (action: MutationRecoveryAction, journalId: string) => Promise<void>;
+  integrity: IntegritySnapshot;
+  updateIntegrity: (patch: Partial<IntegritySnapshot>) => void;
 }
 
 const AppContext = createContext<AppContextType | null>(null);
@@ -119,10 +126,17 @@ export default function App() {
     }
   });
   const [theme, setTheme] = useState<Theme>(() => readStoredTheme());
-  const [recoveryState, setRecoveryState] = useState<MutationRecoveryState | null>(null);
+  const [recoveryState, setRecoveryState] = useState<MutationRecoveryState | null>(
+    demoMode ? getDemoRecoveryState() : null,
+  );
   const [recoveryError, setRecoveryError] = useState<UiError | null>(null);
   const [recoveryLoading, setRecoveryLoading] = useState(false);
   const [recoveryOutcomes, setRecoveryOutcomes] = useState<ApplyRecoveryResult["outcomes"]>([]);
+  const [integrity, setIntegrity] = useState<IntegritySnapshot>(() => (
+    demoMode
+      ? demoIntegritySnapshot(new URLSearchParams(window.location.search).get("state") ?? "healthy")
+      : { ...EMPTY_INTEGRITY_SNAPSHOT }
+  ));
 
   const currentScope = navigationScope(state.navigation);
 
@@ -203,6 +217,7 @@ export default function App() {
       setRecoveryState(recovery.state);
       setRecoveryError(recovery.error);
       setRecoveryOutcomes([]);
+      if (!demoMode) setIntegrity({ ...EMPTY_INTEGRITY_SNAPSHOT });
       log.info(`Loaded ${songs.length} songs`);
       setState((previous) => ({
         ...previous,
@@ -223,7 +238,7 @@ export default function App() {
       setState((previous) => ({ ...previous, loading: false }));
       setUiError(createUiError(currentScope, "No se pudo abrir esta Biblioteca VirtualDJ.", error));
     }
-  }, [currentScope, services]);
+  }, [currentScope, demoMode, services]);
 
   const refreshRecovery = useCallback(async () => {
     if (!state.vdjFolder) return;
@@ -279,6 +294,14 @@ export default function App() {
     }));
   }, []);
 
+  const updateIntegrity = useCallback((patch: Partial<IntegritySnapshot>) => {
+    setIntegrity((previous) => ({
+      ...previous,
+      ...patch,
+      updatedAt: patch.updatedAt ?? new Date().toISOString(),
+    }));
+  }, []);
+
   const context: AppContextType = {
     ...state,
     setNavigation,
@@ -307,6 +330,8 @@ export default function App() {
     mutationsBlocked: isMutationBlocked(recoveryState, recoveryError?.summary ?? null),
     refreshRecovery,
     resolveRecovery,
+    integrity,
+    updateIntegrity,
   };
 
   function renderPage(): ReactNode {

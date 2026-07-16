@@ -209,7 +209,7 @@ export function Mappers() {
             <aside className="flex w-80 shrink-0 flex-col border-r border-border bg-surface/85">
                 <div className="border-b border-border px-3 py-3">
                     <h2 className="text-sm font-semibold text-text">Mappers</h2>
-                    <p className="mt-0.5 text-[11px] text-text-muted">
+                    <p className="mt-0.5 text-xs text-text-muted">
                         Editor de mappings y definiciones de controladores usando la estructura real de <code>Mappers/</code> y <code>Devices/</code>.
                     </p>
                 </div>
@@ -224,7 +224,7 @@ export function Mappers() {
                 </div>
                 <div className="flex-1 overflow-auto p-1.5">
                     {loading ? (
-                        <div className="p-2 text-[11px] text-text-muted">Cargando archivos...</div>
+                        <div className="p-2 text-xs text-text-muted">Cargando archivos...</div>
                     ) : (
                         <TreeFileNavigator
                             items={treeItems}
@@ -247,10 +247,10 @@ export function Mappers() {
                             <div>
                                 <h3 className="text-lg font-bold text-text">{selectedFile.name}</h3>
                                 <p className="mt-1 text-sm text-text-muted">{selectedFile.relative_path}</p>
-                                <p className="mt-1 text-[11px] text-text-muted">Tamaño: {formatSize(selectedFile.size_bytes)}</p>
+                                <p className="mt-1 text-xs text-text-muted">Tamaño: {formatSize(selectedFile.size_bytes)}</p>
                             </div>
                             <div className="flex items-center gap-2">
-                                {mapperDirty || rawDirty ? <span className="rounded bg-warning/15 px-2 py-1 text-[11px] text-warning">Cambios pendientes</span> : null}
+                                {mapperDirty || rawDirty ? <span className="rounded bg-warning/15 px-2 py-1 text-xs text-warning">Cambios pendientes</span> : null}
                                 {isMapperFile(selectedFile) && mapper && editorMode === "bindings" ? (
                                     <button type="button" onClick={saveMapper} disabled={saving || !mapperDirty} className="btn btn-primary btn-sm">
                                         <Save className="h-3.5 w-3.5" /> Guardar mapper
@@ -280,7 +280,7 @@ export function Mappers() {
                                             <FileCode2 className="mr-1 inline h-3.5 w-3.5" /> XML
                                         </button>
                                     </div>
-                                    <span className="text-[11px] text-text-muted">Edita controles y acciones; XML queda como respaldo.</span>
+                                    <span className="text-xs text-text-muted">Edita controles y acciones; XML queda como respaldo.</span>
                                 </div>
                                 {editorMode === "xml" ? (
                                     <CodeEditor
@@ -302,27 +302,27 @@ export function Mappers() {
                                         </p>
                                     </div>
                                     <div className="grid gap-3 md:grid-cols-2 xl:grid-cols-3">
-                                        <label className="space-y-1 text-[11px] text-text-muted">
+                                        <label className="space-y-1 text-xs text-text-muted">
                                             <span>Device</span>
                                             <input className="input w-full" value={mapper.device} onChange={(e) => updateMapperMeta("device", e.target.value)} />
                                         </label>
-                                        <label className="space-y-1 text-[11px] text-text-muted">
+                                        <label className="space-y-1 text-xs text-text-muted">
                                             <span>Author</span>
                                             <input className="input w-full" value={mapper.author ?? ""} onChange={(e) => updateMapperMeta("author", e.target.value)} />
                                         </label>
-                                        <label className="space-y-1 text-[11px] text-text-muted">
+                                        <label className="space-y-1 text-xs text-text-muted">
                                             <span>Version</span>
                                             <input className="input w-full" value={mapper.version ?? ""} onChange={(e) => updateMapperMeta("version", e.target.value)} />
                                         </label>
-                                        <label className="space-y-1 text-[11px] text-text-muted">
+                                        <label className="space-y-1 text-xs text-text-muted">
                                             <span>Date</span>
                                             <input className="input w-full" value={mapper.date ?? ""} onChange={(e) => updateMapperMeta("date", e.target.value)} />
                                         </label>
-                                        <label className="space-y-1 text-[11px] text-text-muted">
+                                        <label className="space-y-1 text-xs text-text-muted">
                                             <span>Priority</span>
                                             <input className="input w-full" value={mapper.priority ?? ""} onChange={(e) => updateMapperMeta("priority", e.target.value)} />
                                         </label>
-                                        <label className="space-y-1 text-[11px] text-text-muted md:col-span-2 xl:col-span-3">
+                                        <label className="space-y-1 text-xs text-text-muted md:col-span-2 xl:col-span-3">
                                             <span>Info / manual</span>
                                             <input className="input w-full" value={mapper.info ?? ""} onChange={(e) => updateMapperMeta("info", e.target.value)} />
                                         </label>
@@ -355,7 +355,7 @@ export function Mappers() {
                                             return (
                                                 <div key={`${binding.value}-${index}`} className="rounded-lg border border-border/60 bg-background/45 p-3">
                                                     <div className="grid gap-3 xl:grid-cols-[240px_1fr_auto] xl:items-start">
-                                                        <label className="space-y-1 text-[11px] text-text-muted">
+                                                        <label className="space-y-1 text-xs text-text-muted">
                                                             <span>Control / value</span>
                                                             <input
                                                                 className="input w-full font-mono"
@@ -363,7 +363,7 @@ export function Mappers() {
                                                                 onChange={(e) => updateBinding(index, { value: e.target.value })}
                                                             />
                                                         </label>
-                                                        <label className="space-y-1 text-[11px] text-text-muted">
+                                                        <label className="space-y-1 text-xs text-text-muted">
                                                             <span>Action</span>
                                                             <textarea
                                                                 className="min-h-20 w-full rounded-lg border border-border bg-background p-2 font-mono text-[12px] text-text outline-none focus:border-primary/60"
@@ -380,7 +380,7 @@ export function Mappers() {
                                                     </div>
 
                                                     {Object.keys(binding.other_attributes).length > 0 ? (
-                                                        <div className="mt-2 text-[10px] text-text-muted">
+                                                        <div className="mt-2 text-xs text-text-muted">
                                                             Atributos extra preservados: {Object.entries(binding.other_attributes).map(([key, value]) => `${key}=${value}`).join(" · ")}
                                                         </div>
                                                     ) : null}

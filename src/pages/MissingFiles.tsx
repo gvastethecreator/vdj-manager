@@ -11,7 +11,7 @@ type Filter = "all" | "missing" | "mismatch" | "ok";
  * diagnostic surface never writes database.xml or ranks candidates.
  */
 export function MissingFiles() {
-  const { vdjFolder, clearUiError, reportUiError, services, setNavigation } = useApp();
+  const { vdjFolder, clearUiError, reportUiError, services, setNavigation, updateIntegrity } = useApp();
   const [results, setResults] = useState<FileVerification[] | null>(null);
   const [loading, setLoading] = useState(false);
   const [filter, setFilter] = useState<Filter>("missing");
@@ -21,7 +21,12 @@ export function MissingFiles() {
     setLoading(true);
     clearUiError();
     try {
-      setResults(await services.verifyFiles(vdjFolder));
+      const verification = await services.verifyFiles(vdjFolder);
+      setResults(verification);
+      updateIntegrity({
+        missing: verification.filter((entry) => !entry.exists).length,
+        mismatched: verification.filter((entry) => entry.exists && !entry.size_match).length,
+      });
     } catch (error) {
       reportUiError("No se pudo verificar la integridad de la biblioteca.", error);
     } finally {
@@ -115,12 +120,12 @@ export function MissingFiles() {
             <table className="w-full text-[13px]">
               <thead className="bg-surface-hover">
                 <tr>
-                  <th className="px-3 py-2 text-left text-[11px] font-medium text-text-muted">Estado</th>
-                  <th className="px-3 py-2 text-left text-[11px] font-medium text-text-muted">Archivo</th>
-                  <th className="px-3 py-2 text-left text-[11px] font-medium text-text-muted">Título</th>
-                  <th className="px-3 py-2 text-left text-[11px] font-medium text-text-muted">Artista</th>
-                  <th className="px-3 py-2 text-right text-[11px] font-medium text-text-muted">Esperado</th>
-                  <th className="px-3 py-2 text-right text-[11px] font-medium text-text-muted">Real</th>
+                  <th className="px-3 py-2 text-left text-xs font-medium text-text-muted">Estado</th>
+                  <th className="px-3 py-2 text-left text-xs font-medium text-text-muted">Archivo</th>
+                  <th className="px-3 py-2 text-left text-xs font-medium text-text-muted">Título</th>
+                  <th className="px-3 py-2 text-left text-xs font-medium text-text-muted">Artista</th>
+                  <th className="px-3 py-2 text-right text-xs font-medium text-text-muted">Esperado</th>
+                  <th className="px-3 py-2 text-right text-xs font-medium text-text-muted">Real</th>
                 </tr>
               </thead>
               <tbody>

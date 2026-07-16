@@ -102,7 +102,7 @@ function XmlNodeEditor({
             <div className="mb-3 flex items-center justify-between gap-2">
                 <div className="text-sm font-semibold text-text">
                     {isRoot ? "Nodo raíz" : "Nodo"}
-                    <span className="ml-2 rounded bg-background px-2 py-0.5 font-mono text-[10px] text-text-muted">{node.name}</span>
+                    <span className="ml-2 rounded bg-background px-2 py-0.5 font-mono text-xs text-text-muted">{node.name}</span>
                 </div>
                 <div className="flex items-center gap-1">
                     <button type="button" onClick={addChild} className="btn btn-ghost btn-sm">
@@ -117,7 +117,7 @@ function XmlNodeEditor({
             </div>
 
             <div className="grid gap-3 md:grid-cols-2">
-                <label className="space-y-1 text-[11px] text-text-muted">
+                <label className="space-y-1 text-xs text-text-muted">
                     <span>Nombre del nodo</span>
                     <input
                         className="input w-full font-mono"
@@ -125,7 +125,7 @@ function XmlNodeEditor({
                         onChange={(e) => onChange(path, (current) => ({ ...current, name: e.target.value }))}
                     />
                 </label>
-                <label className="space-y-1 text-[11px] text-text-muted md:col-span-2">
+                <label className="space-y-1 text-xs text-text-muted md:col-span-2">
                     <span>Texto</span>
                     <textarea
                         className="min-h-20 w-full rounded border-2 border-border bg-background p-2 font-mono text-[12px] text-text outline-none focus:border-primary/60"
@@ -138,13 +138,13 @@ function XmlNodeEditor({
 
             <div className="mt-3 space-y-2">
                 <div className="flex items-center justify-between gap-2">
-                    <div className="text-[11px] font-medium uppercase tracking-wide text-text-muted">Atributos</div>
+                    <div className="text-xs font-medium uppercase tracking-wide text-text-muted">Atributos</div>
                     <button type="button" onClick={addAttribute} className="btn btn-ghost btn-sm">
                         <Plus className="h-3.5 w-3.5" /> Atributo
                     </button>
                 </div>
                 {attributeEntries.length === 0 ? (
-                    <div className="text-[11px] text-text-muted">Este nodo no tiene atributos.</div>
+                    <div className="text-xs text-text-muted">Este nodo no tiene atributos.</div>
                 ) : attributeEntries.map(([key, value]) => (
                     <div key={`${path.join("-")}-${key}`} className="grid gap-2 md:grid-cols-[220px_1fr_auto] md:items-center">
                         <input className="input w-full font-mono" value={key} onChange={(e) => renameAttribute(key, e.target.value)} />
@@ -158,7 +158,7 @@ function XmlNodeEditor({
 
             {node.children.length > 0 ? (
                 <div className="mt-4 space-y-3 border-t border-border/50 pt-3">
-                    <div className="text-[11px] font-medium uppercase tracking-wide text-text-muted">Hijos ({node.children.length})</div>
+                    <div className="text-xs font-medium uppercase tracking-wide text-text-muted">Hijos ({node.children.length})</div>
                     {node.children.map((child, index) => (
                         <XmlNodeEditor
                             key={`${path.join("-")}-${child.name}-${index}`}
@@ -209,16 +209,16 @@ function PadPageEditor({
                     {padButtons.map(({ node, path, index }) => (
                         <article key={`${node.name}-${index}`} className="rounded-lg border border-border/60 bg-background/45 p-3">
                             <div className="mb-3 flex items-center justify-between gap-2">
-                                <span className="badge bg-surface px-2 py-0.5 font-mono text-[10px] text-text-muted">{node.name}</span>
+                                <span className="badge bg-surface px-2 py-0.5 font-mono text-xs text-text-muted">{node.name}</span>
                                 <input
                                     type="text"
-                                    className="input max-w-38 font-mono text-[11px]"
+                                    className="input max-w-38 font-mono text-xs"
                                     value={node.attributes.color ?? ""}
                                     onChange={(event) => setNodeAttribute(path, "color", event.target.value)}
                                     placeholder="color"
                                 />
                             </div>
-                            <label className="space-y-1 text-[11px] text-text-muted">
+                            <label className="space-y-1 text-xs text-text-muted">
                                 <span>Etiqueta</span>
                                 <input
                                     className="input w-full"
@@ -227,7 +227,7 @@ function PadPageEditor({
                                     placeholder="Nombre visible"
                                 />
                             </label>
-                            <label className="mt-3 block space-y-1 text-[11px] text-text-muted">
+                            <label className="mt-3 block space-y-1 text-xs text-text-muted">
                                 <span>Acción VDJScript</span>
                                 <textarea
                                     className="min-h-24 w-full rounded-lg border border-border bg-background p-2 font-mono text-[12px] text-text outline-none focus:border-primary/60"
@@ -251,12 +251,12 @@ function PadPageEditor({
                 <section className="card p-4">
                     <h4 className="text-sm font-semibold text-text">Página</h4>
                     <div className="mt-3 grid gap-2">
-                        <label className="space-y-1 text-[11px] text-text-muted">
+                        <label className="space-y-1 text-xs text-text-muted">
                             <span>Nodo raíz</span>
                             <input className="input w-full font-mono" value={documentTree.name} onChange={(event) => onChange([], (current) => ({ ...current, name: event.target.value }))} />
                         </label>
                         {Object.entries(documentTree.attributes).map(([key, value]) => (
-                            <label key={key} className="space-y-1 text-[11px] text-text-muted">
+                            <label key={key} className="space-y-1 text-xs text-text-muted">
                                 <span className="font-mono">{key}</span>
                                 <input className="input w-full font-mono" value={value} onChange={(event) => setNodeAttribute([], key, event.target.value)} />
                             </label>
@@ -269,7 +269,7 @@ function PadPageEditor({
                     <div className="mt-3 space-y-2">
                         {params.map(({ node, path, index }) => (
                             <div key={`${node.name}-${index}`} className="rounded-lg border border-border/60 bg-background/45 p-2">
-                                <div className="mb-2 font-mono text-[11px] text-primary-light">{node.name}</div>
+                                <div className="mb-2 font-mono text-xs text-primary-light">{node.name}</div>
                                 <input
                                     className="input mb-2 w-full"
                                     value={node.attributes.name ?? ""}
@@ -277,7 +277,7 @@ function PadPageEditor({
                                     placeholder="Nombre"
                                 />
                                 <textarea
-                                    className="min-h-16 w-full rounded-lg border border-border bg-background p-2 font-mono text-[11px] text-text outline-none focus:border-primary/60"
+                                    className="min-h-16 w-full rounded-lg border border-border bg-background p-2 font-mono text-xs text-text outline-none focus:border-primary/60"
                                     value={node.text ?? ""}
                                     onChange={(event) => onChange(path, (current) => ({ ...current, text: event.target.value || null }))}
                                     spellCheck={false}
@@ -450,7 +450,7 @@ export function Pads() {
             <aside className="flex w-80 shrink-0 flex-col border-r border-border bg-surface/85">
                 <div className="border-b border-border px-3 py-3">
                     <h2 className="text-sm font-semibold text-text">Pads</h2>
-                    <p className="mt-0.5 text-[11px] text-text-muted">
+                    <p className="mt-0.5 text-xs text-text-muted">
                         Editor visual para páginas y recursos de pads. Para opciones globales como <code>padsPagesOrder</code> o <code>padsSkinIndependent</code>, usa Configuración.
                     </p>
                 </div>
@@ -465,7 +465,7 @@ export function Pads() {
                 </div>
                 <div className="flex-1 overflow-auto p-1.5">
                     {loading ? (
-                        <div className="p-2 text-[11px] text-text-muted">Cargando archivos...</div>
+                        <div className="p-2 text-xs text-text-muted">Cargando archivos...</div>
                     ) : (
                         <TreeFileNavigator
                             items={treeItems}
@@ -488,10 +488,10 @@ export function Pads() {
                             <div>
                                 <h3 className="text-lg font-bold text-text">{selectedFile.name}</h3>
                                 <p className="mt-1 text-sm text-text-muted">{selectedFile.relative_path}</p>
-                                <p className="mt-1 text-[11px] text-text-muted">Tamaño: {formatSize(selectedFile.size_bytes)}</p>
+                                <p className="mt-1 text-xs text-text-muted">Tamaño: {formatSize(selectedFile.size_bytes)}</p>
                             </div>
                             <div className="flex items-center gap-2">
-                                {documentDirty || rawDirty ? <span className="rounded bg-warning/15 px-2 py-1 text-[11px] text-warning">Cambios pendientes</span> : null}
+                                {documentDirty || rawDirty ? <span className="rounded bg-warning/15 px-2 py-1 text-xs text-warning">Cambios pendientes</span> : null}
                                 {isPadDocumentFile(selectedFile) && documentTree ? (
                                     <button type="button" onClick={saveDocument} disabled={saving || !documentDirty} className="btn btn-primary btn-sm">
                                         <Save className="h-3.5 w-3.5" /> Guardar pad
@@ -521,7 +521,7 @@ export function Pads() {
                                             <FileCode2 className="mr-1 inline h-3.5 w-3.5" /> XML
                                         </button>
                                     </div>
-                                    <span className="text-[11px] text-text-muted">El modo XML queda como respaldo avanzado.</span>
+                                    <span className="text-xs text-text-muted">El modo XML queda como respaldo avanzado.</span>
                                 </div>
                                 {editorMode === "visual" ? (
                                     <PadPageEditor documentTree={documentTree} onChange={updateDocumentNode} />

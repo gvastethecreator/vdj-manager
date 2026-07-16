@@ -56,6 +56,7 @@ export function RelinkTracks() {
     mutationsBlocked,
     refreshRecovery,
     services,
+    updateIntegrity,
   } = useApp();
   const [results, setResults] = useState<FileVerification[] | null>(null);
   const [loading, setLoading] = useState(false);
@@ -107,6 +108,10 @@ export function RelinkTracks() {
     try {
       const verification = await services.verifyFiles(vdjFolder);
       setResults(verification);
+      updateIntegrity({
+        missing: verification.filter((entry) => !entry.exists).length,
+        mismatched: verification.filter((entry) => entry.exists && !entry.size_match).length,
+      });
       setSelectedPath((current) => (
         current && verification.some((entry) => !entry.exists && pathKey(entry.file_path) === pathKey(current))
           ? current
@@ -214,7 +219,7 @@ export function RelinkTracks() {
             <Link2 className="h-4 w-4 text-primary-light" />
             <h2 className="text-sm font-bold text-text">Reconciliación de rutas</h2>
           </div>
-          <p className="mt-1 text-[11px] text-text-muted">
+          <p className="mt-1 text-xs text-text-muted">
             Revisa una entrada faltante, elige un candidato y confirma el cambio de ruta y tamaño físico.
           </p>
         </div>
@@ -222,11 +227,11 @@ export function RelinkTracks() {
         <div className="grid grid-cols-2 gap-2 border-b-2 border-border px-3 py-3">
           <div className="rounded-lg border border-border bg-background px-2.5 py-2 text-center">
             <div className="text-lg font-bold text-error">{counts.missing}</div>
-            <div className="text-[10px] text-text-muted">Pendientes</div>
+            <div className="text-xs text-text-muted">Pendientes</div>
           </div>
           <div className="rounded-lg border border-border bg-background px-2.5 py-2 text-center">
             <div className="text-lg font-bold text-warning">{counts.candidates}</div>
-            <div className="text-[10px] text-text-muted">Candidatos</div>
+            <div className="text-xs text-text-muted">Candidatos</div>
           </div>
         </div>
 
@@ -258,8 +263,8 @@ export function RelinkTracks() {
                     className={`w-full rounded-lg border p-2.5 text-left transition-colors ${isSelected ? "border-primary bg-primary/10" : "border-border bg-background hover:bg-surface-hover"}`}
                   >
                     <div className="truncate text-[12px] font-semibold text-text">{song?.title ?? verification.title ?? getPathLeafName(verification.file_path)}</div>
-                    <div className="truncate text-[11px] text-text-secondary">{song?.author ?? verification.author ?? "Artista desconocido"}</div>
-                    <div className="mt-1 truncate text-[10px] text-text-muted" title={verification.file_path}>{verification.file_path}</div>
+                    <div className="truncate text-xs text-text-secondary">{song?.author ?? verification.author ?? "Artista desconocido"}</div>
+                    <div className="mt-1 truncate text-xs text-text-muted" title={verification.file_path}>{verification.file_path}</div>
                   </button>
                 );
               })}
@@ -282,16 +287,16 @@ export function RelinkTracks() {
                 <p className="mt-1 text-sm text-text-secondary">{selectedItem.song?.author ?? selectedItem.verification.author ?? "Artista desconocido"}</p>
               </div>
               <div className="rounded-lg border border-error/30 bg-error/6 px-3 py-2.5 text-[12px] text-text" title={selectedItem.verification.file_path}>
-                <div className="text-[10px] uppercase tracking-wide text-error">Ruta original faltante</div>
+                <div className="text-xs uppercase tracking-wide text-error">Ruta original faltante</div>
                 <div className="mt-1 break-all">{selectedItem.verification.file_path}</div>
               </div>
               <div className="grid grid-cols-2 gap-2">
                 <div className="rounded-lg border border-border bg-background px-3 py-2">
-                  <div className="text-[10px] uppercase tracking-wide text-text-muted">Tamaño registrado</div>
+                  <div className="text-xs uppercase tracking-wide text-text-muted">Tamaño registrado</div>
                   <div className="mt-1 text-[12px] font-medium text-text">{formatSize(selectedItem.verification.expected_size)}</div>
                 </div>
                 <div className="rounded-lg border border-border bg-background px-3 py-2">
-                  <div className="text-[10px] uppercase tracking-wide text-text-muted">Carpetas consultadas</div>
+                  <div className="text-xs uppercase tracking-wide text-text-muted">Carpetas consultadas</div>
                   <div className="mt-1 text-[12px] font-medium text-text">{configuredSearchFolders.length}</div>
                 </div>
               </div>
@@ -310,7 +315,7 @@ export function RelinkTracks() {
             <div className="card space-y-3 p-4">
               <div>
                 <h3 className="text-sm font-bold text-text">Candidatos del backend</h3>
-                <p className="mt-1 text-[11px] text-text-muted">Ordenados por señales de nombre, extensión, tamaño y metadata. La app no recalcula ni reordena el score.</p>
+                <p className="mt-1 text-xs text-text-muted">Ordenados por señales de nombre, extensión, tamaño y metadata. La app no recalcula ni reordena el score.</p>
               </div>
               {candidates.length === 0 ? (
                 <div className="rounded-lg border border-dashed border-border px-3 py-8 text-center text-[12px] text-text-muted">
@@ -323,7 +328,7 @@ export function RelinkTracks() {
                       <div className="flex items-start justify-between gap-3">
                         <div className="min-w-0 flex-1">
                           <div className="break-all text-[13px] font-semibold text-text">{getPathLeafName(candidate.path)}</div>
-                          <div className="mt-0.5 break-all text-[11px] text-text-secondary">{candidate.path}</div>
+                          <div className="mt-0.5 break-all text-xs text-text-secondary">{candidate.path}</div>
                           <div className="mt-2 flex flex-wrap gap-1.5">
                             <span className="badge bg-primary/12 text-primary-light">score {candidate.score}</span>
                             {candidate.reasons.map((reason) => <span key={reason} className="badge bg-success/15 text-success">{relinkReasonLabel(reason)}</span>)}
