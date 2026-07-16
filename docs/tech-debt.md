@@ -1,99 +1,59 @@
-# Deuda técnica y mejoras pendientes
+# Deuda técnica
 
-Listado priorizado de mejoras que quedan fuera del alcance de la puesta a punto
-inicial pero que conviene abordar a medio plazo.
+Actualizado: 2026-07-15, después del rediseño de workspaces.
+
+No quedan blockers ni P1 conocidos del rediseño. Esta lista contiene mejoras posteriores que no invalidan los contratos actuales.
 
 ## Prioridad alta
 
-### Refactor de componentes monolíticos
+### Descomponer superficies grandes
 
-- `src/components/SongTable.tsx` concentra demasiadas responsabilidades: virtualización, inline edit, rating, color picker, audio preview, columnas y estado UI.
-- `src/pages/Songs.tsx`, `src/pages/Pads.tsx` y `src/pages/Mappers.tsx` también están creciendo hacia pantallas “todoterreno”.
-- Prioridad: partir por hooks/helpers/subcomponentes antes de seguir agregando features.
+- `SongTable.tsx` todavía reúne virtualización, columnas, audio, edición, rating y color.
+- `Songs.tsx`, `Pads.tsx` y `Mappers.tsx` combinan carga, navegación y editor.
+- Extraer hooks y subcomponentes sólo con pruebas de comportamiento; no duplicar estado ni romper la identidad por `originalFilePath`.
 
-### Escrituras y recálculos demasiado globales
+### Automatizar navegador en CI
 
-- Rename, move, relink, tags y remoción ya dejaron de depender del serializer global y de índices posicionales.
-- El batch tag aplica patches seguros por ítem; queda pendiente optimizar el refresco de `songs` frente al recálculo de `stats` sin debilitar reportes parciales.
-- La remoción con papelera tiene resultado tipado, pero una futura iteración puede incorporar su paso físico al journal recuperable igual que rename/move.
+- El harness DOM cubre Dialog, errores, navegación, tema, paneles y teclado de tabla.
+- La verificación browser real existe como misión local y evidencia PNG, pero aún no corre en CI.
+- Añadir una matriz representativa 1180/1280/1440, dark/light y reduced motion sin convertir cada combinación en una captura redundante.
 
-### Documentación viva del producto
+### Observabilidad del backend
 
-- `README.md` y `docs/architecture.md` deben mantenerse alineados con nuevas vistas y capacidades.
-- Conviene institucionalizar esto en PR checklist o CI para que no vuelvan a quedarse atrás.
-
-### Tests unitarios y de integración
-
-- Ya existen pruebas frontend de helpers y suites Rust de parser, writers, journal, recovery, relink, rename, move y remoción sobre fixtures/temporales.
-- Falta incorporar un harness DOM para probar el `RecoveryCenter` como componente y automatizar navegador/visual en CI.
-
-### Logging en Rust (backend)
-
-- El backend no emite logs estructurados.
-- Integrar `tracing` o `log` + `env_logger` para registrar operaciones
-  (cargas, escrituras, errores de parsing).
+- Rust todavía carece de logging estructurado de cargas, parsing y mutaciones.
+- Adoptar `tracing` o `log` sin registrar rutas sensibles ni contenido XML completo.
 
 ### Hardening residual de mutaciones
 
-- El serializer completo permanece público para las pruebas históricas de pérdida de fidelidad, aunque no tiene comando IPC ni caller de producción; aislarlo sin romper la suite de integración.
-- El patch de tags aborta de forma segura ante una entrada `<Song .../>` autocerrada. Una futura expansión controlada puede convertirla a apertura/cierre cuando necesite insertar nodos.
-- La key del journal normaliza aliases Windows de forma léxica; junctions, nombres 8.3 y otros aliases físicos extremos requieren una estrategia adicional que no dependa de que la ruta exista siempre.
-- Settings, mappers y pads conservan sus propios backups/atomic write, pero no participan del gate de recovery de `database.xml`; decidir si la política debe unificarse para todos los recursos VirtualDJ.
+- Aislar el serializer histórico completo, mantenido sólo para pruebas de pérdida de fidelidad.
+- Definir soporte controlado para insertar tags en entradas `<Song .../>` autocerradas; hoy se aborta de forma segura.
+- Evaluar aliases físicos extremos de Windows (junctions y nombres 8.3) más allá de la normalización léxica.
+- Decidir si settings, mappers y pads deben compartir el mismo gate de recovery que `database.xml`.
 
 ## Prioridad media
 
-### Validaciones semánticas de recursos VirtualDJ
+### Invalidación y tareas asíncronas
 
-- `Mappers.tsx` ya edita `.vdjmap` de forma estructurada, pero aún faltan validaciones de negocio sobre bindings, acciones vacías o atributos inconsistentes.
-- `Pads.tsx` ya no es solo texto, pero todavía usa un editor XML genérico; falta subirlo a editor semántico de pads.
+- Integridad conserva resultados por biblioteca activa y los invalida al recargar o cambiar alcance.
+- Playlists, carga de biblioteca y previews Batch descartan respuestas tardías, pero conviene extraer un helper común de request tokens y ampliar pruebas de carrera con servicios controlados.
+- Reducir recargas globales después de mutaciones sin perder stats, reportes parciales ni evidencia de recovery.
 
-### CRUD de playlists
+### Recursos y playlists
 
-- La app ya lista y lee playlists/History en árbol.
-- Falta crear, renombrar, mover y borrar playlists desde la UI, además de editar su contenido.
+- Añadir validaciones semánticas de bindings de Mappers y un editor de Pads más específico que el árbol XML genérico.
+- Implementar CRUD de playlists y edición de contenido; hoy el Browser sólo lista, importa y lee.
 
-### CI / CD
+### Accesibilidad continua
 
-- No hay pipeline.
-- Configurar GitHub Actions con:
-  - `cargo check` + `cargo clippy`
-  - `bun run typecheck` + `bun run lint`
-  - `bun run build`
-  - (Opcional) `tauri-action` para builds multiplataforma.
+- La base actual incluye foco visible, diálogos con trap/restauración, filas y edición inline por teclado, splitters Home/End y contraste ≥4.5:1.
+- Siguiente paso: automatizar auditoría semántica/contraste en CI y probar screen readers sobre las tablas virtualizadas.
 
-### Internacionalización (i18n)
+### Internacionalización
 
-- Todo el UI está en español hardcoded.
-- Si se necesita soporte multiidioma, extraer cadenas a archivos de
-  traducción con `react-i18next` u otra librería ligera.
-
-### Accesibilidad (a11y)
-
-- Revisar contraste de la paleta sobre fondos oscuros (especialmente temas claros).
-- Añadir `aria-label` / `role` donde falten (sidebar, modales, tablas).
-- Asegurar navegación completa por teclado.
+- El producto está en español hardcoded. Extraer strings sólo si aparece un requisito real de segundo idioma.
 
 ## Prioridad baja
 
-### Caché de resultados IPC
-
-- `AppState` ya cachea `songs` y `stats`, y las ediciones inline ya parchean canciones en memoria.
-- Aún falta definir invalidación más fina para stats/duplicados/verificaciones sin depender tanto de recargas completas.
-
-### Animaciones en páginas secundarias
-
-- GSAP solo anima Home y Dashboard actualmente.
-- Se podrían añadir transiciones de entrada sutiles a Songs, Duplicates,
-  etc., reutilizando los presets de `animations.ts`.
-
-### Bundle size
-
-- GSAP (~50 KB gzip) es el paquete más pesado del frontend.
-- Si las animaciones se mantienen simples, valorar reemplazarlo por
-  CSS animations o la Web Animations API.
-
-### Actualización de dependencias Rust
-
-- `quick-xml 0.37` funciona bien pero no es la última major.
-- Revisar periódicamente actualizaciones de quick-xml, serde, tokio y
-  las dependencias de Tauri.
+- Revisar periódicamente dependencias Rust/JS y presupuesto de bundle.
+- Añadir telemetría local opt-in para tiempos de scans si puede hacerse sin exponer rutas.
+- Evaluar una caché persistente de waveforms/resultados con invalidación por identidad física.

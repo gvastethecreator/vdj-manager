@@ -1,155 +1,103 @@
-# VDJ Database Manager
+# VDJ Manager
 
-Aplicación de escritorio para analizar, gestionar y limpiar la base de datos XML de **VirtualDJ 8+**.
+Centro operativo de escritorio para explorar, verificar y mantener una biblioteca de **VirtualDJ 8+** sin debilitar sus contratos de escritura.
 
-Construida con **Tauri 2** (Rust) + **React 19** + **Vite 8** + **Tailwind CSS 4**.
+Construido con **Tauri 2 + Rust**, **React 19**, **TypeScript 5**, **Vite 8** y **Tailwind CSS 4**. La ventana mínima soportada es 1180×720; móvil queda fuera de alcance.
 
-## Stack
+## Workspaces
 
-| Capa | Tecnología |
-| ---- | ---------- |
-| Backend | Rust · Tauri 2 · quick-xml · serde · walkdir · md-5 · symphonia · realfft |
-| Frontend | React 19 · TypeScript 5 · Vite 8 · Tailwind CSS 4 · GSAP 3 · lucide-react |
-| Virtualización | @tanstack/react-virtual |
-| Package manager | Bun |
-| Lint | OXC (oxlint) |
+- **Dashboard**: cola de atención priorizada, próxima acción y métricas secundarias. Un análisis no ejecutado dice `Sin verificar`, nunca cero.
+- **Biblioteca**: Browser unificado de Canciones y Playlists con árbol, tabla virtualizada y detalle. Usa tres paneles desde 1200 px y drawer por debajo.
+- **Resolver problemas**: Faltantes, Tracks movidos, Duplicados y Huérfanos comparten resultados dentro de la biblioteca activa.
+- **Operaciones**: move, rename literal y edición de tags por lote. Ejecutar exige una vista previa vigente para la selección y parámetros actuales.
+- **Recursos**: Configuración, Pads y Mappers en un estudio común con dirty/save/revert y protección frente a pérdida de cambios.
 
-## Requisitos
-
-- [Bun](https://bun.sh/) ≥ 1.x
-- [Rust](https://www.rust-lang.org/) ≥ 1.75 (con `cargo`)
-- Sistema operativo: Windows (la app trabaja con rutas Windows de VirtualDJ)
+La identidad visual conserva el violeta en dos temas: oscuro y claro.
 
 ## Inicio rápido
 
-```bash
-# Instalar dependencias frontend
+Requisitos: Bun 1.x, Rust con toolchain MSVC y Windows.
+
+```powershell
 bun install
-
-# Desarrollo con Tauri (abre la ventana nativa)
 bun run tauri dev
+```
 
-# Solo frontend (sin backend Rust)
+Para trabajar sólo con el frontend:
+
+```powershell
 bun run dev
 ```
 
-## Scripts disponibles
-
-| Script               | Descripción                                  |
-| -------------------- | -------------------------------------------- |
-| `bun run dev`        | Servidor de desarrollo Vite (puerto 3000)    |
-| `bun run build`      | TypeScript check + build producción          |
-| `bun run typecheck`  | Solo verificación de tipos (`tsc --noEmit`)  |
-| `bun run lint`       | Lint + autofix con OXC (oxlint)              |
-| `bun run check`      | Typecheck + lint sin fix (CI-friendly)       |
-| `bun run tauri dev`  | Desarrollo Tauri completo                    |
-| `bun run tauri build`| Build del binario nativo                     |
-
-## Estructura del proyecto
+El modo visual determinista se abre con URLs como:
 
 ```text
-src/                        # Frontend React
-├── components/             # Componentes reutilizables
-│   ├── ErrorBoundary.tsx   # Captura errores de render
-│   ├── FolderTree.tsx      # Árbol de carpetas lazy-load
-│   ├── Layout.tsx          # Shell principal (sidebar + content)
-│   ├── Sidebar.tsx         # Navegación + selector de tema
-│   ├── SongTable.tsx       # Tabla virtualizada (30 columnas)
-│   ├── SongDetailsCard.tsx # Ficha detallada de la canción seleccionada
-│   ├── StatsCard.tsx       # Card compacta de estadística
-│   ├── TreeFileNavigator.tsx # Árbol reutilizable para playlists/pads/mappers
-│   └── WaveformPreview.tsx # Miniatura SVG de forma de onda
-├── pages/                  # Vistas/páginas principales
-│   ├── Home.tsx            # Landing: selección de carpeta
-│   ├── Dashboard.tsx       # Estadísticas y gráficos
-│   ├── Songs.tsx           # Biblioteca con filtros
-│   ├── Playlists.tsx       # Playlists e historial en árbol
-│   ├── Duplicates.tsx      # Detección duplicados
-│   ├── MissingFiles.tsx    # Verificación y relocación
-│   ├── OrphanFiles.tsx     # Archivos no registrados
-│   ├── BatchOperations.tsx # Operaciones en lote
-│   ├── Configs.tsx         # Editor curado de settings.xml
-│   ├── Pads.tsx            # Editor estructurado de pads (.vdjpad)
-│   └── Mappers.tsx         # Editor estructurado de mappers (.vdjmap)
-├── lib/                    # Utilidades
-│   ├── api.ts              # Wrappers IPC Tauri
-│   ├── animations.ts       # Presets GSAP
-│   └── logger.ts           # Logger con prefijo [VDJ]
-├── types/database.ts       # Interfaces TypeScript
-├── App.tsx                 # Root + contexto global
-├── main.tsx                # Entry point React
-└── index.css               # Tailwind + design tokens + temas
-
-src-tauri/                  # Backend Rust
-└── src/
-    ├── lib.rs              # Tauri builder + command registry
-    ├── database/           # XML models + parser (quick-xml)
-    └── commands/           # Handlers IPC
-        ├── database.rs     # Load, save, update, delete
-        ├── files.rs        # Verify, scan, rename, move, orphans
-        ├── duplicates.rs   # Detección por nombre/tamaño/hash
-        ├── playlists.rs    # Parsing M3U/M3U8/VDJ playlists
-        ├── configs.rs      # Settings.xml + recursos VDJ editables
-        └── waveforms.rs    # Extracción peaks + FFT, cache 3 niveles
+http://127.0.0.1:3000/?demo&page=dashboard&state=problem
+http://127.0.0.1:3000/?demo&page=songs&state=dense
+http://127.0.0.1:3000/?demo&page=dashboard&recovery=manual
 ```
 
-## Funcionalidades
+`?demo` usa un adaptador en memoria: no invoca Tauri ni consulta archivos reales.
 
-- **Dashboard** — 8 cards de estadísticas, top géneros/artistas, distribución por año, calidad
-- **Canciones** — Tabla virtualizada con 30+ columnas configurables, carpetas externas, waveform con cue markers y ficha detallada de la canción seleccionada
-- **Playlists** — Navegación en árbol por `Playlists/`, incluyendo historial y soporte para `.m3u`, `.m3u8`, `.vdjplaylist` y `.vdjlist`
-- **Duplicados** — Detección por nombre normalizado, tamaño exacto y hash parcial MD5 (64 KB)
-- **Archivos Faltantes** — Verificación existencia/tamaño, búsqueda fuzzy, relocación
-- **Archivos Huérfanos** — Comparación disco vs BD para encontrar archivos no registrados
-- **Operaciones en Lote** — Planner tipado para mover, rename literal seguro y edición batch de tags por `originalFilePath`; cada ítem conserva el XML desconocido y reporta su resultado
-- **Configuración** — Vista curada de `settings.xml` basada en opciones relevantes de VirtualDJ
-- **Pads** — Editor estructurado de documentos `.vdjpad` con árbol XML editable
-- **Mappers** — Editor estructurado de `.vdjmap` con metadata y bindings editables
-- **Waveform** — Extracción de peaks + FFT con cache de 3 niveles (memoria → disco → decode) y límite de concurrencia para no bloquear otras tareas
-- **7 Temas** — dark, light, blue, teal, green, amber, red (Catppuccin-inspired)
+## Comandos
 
-## Notas técnicas
+| Comando | Uso |
+| --- | --- |
+| `bun test` | Pruebas DOM y unitarias con Bun + Happy DOM |
+| `bun run check` | Typecheck y lint sin modificar archivos |
+| `bun run build` | Build frontend de producción |
+| `bun run tauri dev` | App nativa en desarrollo |
+| `bun run tauri build` | Binario e instaladores Tauri |
 
-### BPM
+Gates Rust desde `src-tauri` y con MSVC inicializado:
 
-VirtualDJ almacena el BPM como período (`1/bpm`) en `Scan/@Bpm`. La conversión es:
+```powershell
+cargo test
+cargo check
+```
+
+## Arquitectura
 
 ```text
-BPM_real = 60 / Scan_Bpm_value
+src/
+├── App.tsx                    # estado raíz, navegación, scope de errores y caches
+├── components/
+│   ├── Dialog.tsx             # Dialog/ConfirmDialog accesible
+│   ├── Layout.tsx             # rail de 72 px, header y feedback contextual
+│   ├── IntegrityWorkspace.tsx # shell de diagnóstico
+│   ├── ResourceStudio.tsx     # shell del estudio de recursos
+│   └── SongTable.tsx          # tabla virtualizada y edición inline
+├── pages/                     # superficies por tarea
+├── lib/
+│   ├── navigation.ts          # NavigationState y aliases demo
+│   ├── runtimeServices.ts     # adaptadores Tauri/demo
+│   ├── paneLayout.ts          # vdj-layout-v2, clamping y breakpoint
+│   └── uiError.ts             # UiError contextual
+└── types/database.ts          # contratos TypeScript compartidos
+
+src-tauri/src/
+├── commands/                  # handlers IPC existentes
+├── database/                  # parser/modelo XML
+└── mutation/                  # backup, journal, lease y recovery
 ```
 
-### Backups
+La explicación completa está en [docs/architecture.md](docs/architecture.md), los contratos de producto en [docs/ui/view-contracts.md](docs/ui/view-contracts.md) y el estado verificado en [docs/implementation-status.md](docs/implementation-status.md).
 
-Las escrituras sobre `database.xml` crean un backup timestamped, validan el XML candidato, comprueban que la fuente no cambió y hacen un commit atómico.
+## Seguridad de escritura
 
-Las mutaciones de archivos mantienen un journal por biblioteca en app-data. Si una operación queda interrumpida, el shell abre un centro de recuperación: la biblioteca sigue disponible para lectura, pero nuevas escrituras quedan pausadas hasta que el usuario confirme `resume`, `rollback` o revisión manual. Recovery valida tamaño + SHA-256 antes de mover un archivo.
+- `database.xml` nunca se serializa completo desde el frontend.
+- Tags, relink, rename, move y remoción identifican entradas por `originalFilePath`.
+- Los writers crean backup, validan el XML, comprueban cambios concurrentes y hacen commit atómico.
+- Rename/move usan journal por biblioteca, no reemplazan destinos y bloquean nuevas mutaciones durante recovery.
+- Cross-drive usa copy/delete journalizado; una ambigüedad queda en revisión manual.
+- Recursos VirtualDJ editables también crean backup antes de escribir.
+- Las pruebas de mutación usan fixtures y carpetas temporales.
 
-Los recursos editables de VirtualDJ (por ejemplo `settings.xml`, `.vdjmap`, `.vdjpad`) también generan backup antes de sobreescribirse.
+## Documentación útil
 
-### CSP (Content Security Policy)
-
-El WebView está protegido con una política restrictiva que solo permite recursos propios y `data:`/`asset:`/`tauri:` para imágenes.
-
-### Error Boundaries
-
-Un `<ErrorBoundary>` envuelve la app a nivel global y por página, previniendo que un error de render tumbe toda la aplicación.
-
-### Movimiento cross-drive
-
-Los movimientos entre unidades usan `copy` + `delete` journalizado por ítem. Nunca sobreescriben el destino; un rollback incierto queda visible como revisión manual.
-
-## Tareas VS Code
-
-El workspace incluye tareas predefinidas (`.vscode/tasks.json`):
-
-- `🚀 dev (Tauri)` — Desarrollo completo
-- `🔨 build (Tauri)` — Build binario
-- `🌐 dev (Vite only)` — Solo frontend
-- `🧹 lint` — Linting OXC
-- `🔍 typecheck` — Verificación de tipos
-- `✅ check` — Typecheck + lint (CI-friendly)
-- `🦀 cargo check` — Check Rust
-
-## Licencia
+- [Arquitectura](docs/architecture.md)
+- [Contratos de vistas](docs/ui/view-contracts.md)
+- [Estado de implementación](docs/implementation-status.md)
+- [Deuda técnica](docs/tech-debt.md)
 
 Proyecto privado.

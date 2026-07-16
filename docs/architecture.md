@@ -1,190 +1,148 @@
 # Arquitectura — VDJ Database Manager
 
+Actualizado: 2026-07-15.
+
 ## Visión general
 
-La aplicación sigue un modelo **Tauri 2**: un backend Rust que expone comandos IPC
-y un frontend React que los invoca via `@tauri-apps/api/core`.
-
-## Estado actual y dirección acordada
-
-Este documento ahora registra dos cosas distintas y complementarias:
-
-- el **estado actual** del código que existe hoy en el repo;
-- la **dirección acordada** en la sesión de arquitectura del `2026-05-15`.
-
-Los documentos maestros de esa dirección son:
-
-- `CONTEXT.md`
-- `docs/adr/0001-browser-de-biblioteca-como-seam-principal.md`
-- `docs/adr/0002-patch-in-place-para-mutaciones-criticas-de-database.md`
-- `docs/superpowers/plans/2026-05-15-vdj-manager-slices-criticos.md`
-
-### Dirección acordada del producto
-
-#### Núcleo de biblioteca
-
-- El seam principal del núcleo deja de ser una suma de páginas soberanas y pasa a ser un **Browser de biblioteca**.
-- La navegación objetivo del shell debe reflejar una sola entrada principal de **Biblioteca**, con vistas/fuentes internas para:
-  - colección general;
-  - `Playlists`;
-  - `History`.
-- `MissingFiles` deja de ser dueño de la corrección: la **Verificación de integridad** diagnostica y la **Reconciliación de rutas** vive en `RelinkTracks`.
-- Las **Entradas descubiertas** siguen siendo first-class dentro del browser, pero con tipo propio y **Catalogación explícita** para entrar en `database.xml`.
-
-#### Estudio de recursos
-
-- `Configs`, `Pads` y `Mappers` siguen siendo páginas separadas a nivel de producto.
-- Debajo de esa separación comparten invariantes de guardado, backup, validación y contratos backend.
-- La API pública debe ser explícita por recurso; los helpers genéricos quedan como implementación interna.
-- La política general del estudio es: **editor especializado por defecto + modo raw avanzado como fallback**.
-
-#### Motor de mutaciones críticas
-
-- Las mutaciones críticas sobre `database.xml` deben usar **patch-in-place** sobre el XML original.
-- La identidad canónica de escritura es `originalFilePath`, no el índice posicional.
-- El matching de rutas debe ser Windows-friendly (normalizado y case-insensitive) sin depender de `canonicalize()` como identidad principal.
-- El contrato IPC deja de basarse en `String` humanas y pasa a un **reporte tipado** por operación/ítem.
-- La atomicidad acordada para operaciones batch es **por ítem**, no all-or-nothing del lote.
-- Si el writer no puede garantizar fidelidad estructural, debe **abortar sin escribir**; no hay fallback automático al serializer legacy.
-- El journal persistido vive en app data y queda ligado a una **Biblioteca VirtualDJ** concreta.
-- Si existe una **Recuperación de mutación** pendiente, la app permite lectura/diagnóstico, pero bloquea nuevas mutaciones críticas hasta resolverla.
-
-### Qué sigue siendo “estado actual”
-
-- El routing real todavía es state-based por `page: Page`.
-- La sidebar todavía expone varias páginas top-level (`Songs`, `Playlists`, `Duplicates`, etc.).
-- `MissingFiles` y `RelinkTracks` todavía comparten parte del territorio funcional.
-- La edición inline y batch, reconciliación, rename, move y remoción ya usan identidad estable y contratos tipados; playlists y recursos auxiliares conservan motores separados.
-- Rename/move y recovery comparten un lease OS-backed por biblioteca durante toda la coreografía. El journal registra tamaño + SHA-256 para rechazar sustituciones físicas.
+VDJ Manager es una aplicación de escritorio **Tauri 2**. El backend Rust conserva la autoridad sobre lectura, validación y mutaciones de Recursos VirtualDJ; el frontend React organiza esas capacidades en workspaces operativos.
 
 ```text
-┌──────────────────────────────────────────┐
-│              Frontend (WebView)          │
-│  React 19 + Vite 8 + Tailwind CSS 4     │
-│  ┌──────────┬──────────┬──────────┐     │
-│  │ Pages    │Components│ Lib      │     │
-│  │ (views)  │(reusable)│(api,anim)│     │
-│  └──────────┴──────────┴──────────┘     │
-│              invoke("cmd", args)         │
-├──────────────────────────────────────────┤
-│              Backend (Rust / Tauri)       │
-│  ┌──────────┬──────────┬──────────┐     │
-│  │ commands/│ database/│ models   │     │
-│  │ handlers │ parser   │ (serde)  │     │
-│  └──────────┴──────────┴──────────┘     │
-│              quick-xml + walkdir         │
-└──────────────────────────────────────────┘
+React 19 / Vite 8 / Tailwind 4
+  NavigationState + AppContext
+  workspaces + feedback accesible
+              │
+              │ RuntimeServices
+              ▼
+  Tauri adapter                 Demo adapter
+  IPC/dialog/asset URLs         fixtures deterministas in-memory
+              │
+              ▼
+Rust / Tauri commands
+  parser patch-in-place + journal + recovery + recursos
 ```
 
-## Flujo de datos
+El rediseño de workspaces cambió sólo la organización frontend. No modificó comandos Rust, formatos XML ni contratos de mutación.
 
-1. El usuario selecciona una carpeta de VirtualDJ.
-2. El frontend llama `invoke("load_database", { vdjFolder })`.
-3. Rust parsea `database.xml` con `quick-xml` y devuelve `Vec<SongSummary>`.
-4. En paralelo, `get_database_stats` calcula estadísticas agregadas.
-5. `get_mutation_recovery_state` consulta el journal de esa biblioteca.
-6. El estado global (`AppContext`) se actualiza y la UI se renderiza; un journal pendiente bloquea sólo mutaciones, no lectura ni navegación.
+## Navegación y shell
 
-El mismo contexto también conserva:
+`App.tsx` mantiene un `NavigationState` con `workspace` y `section`:
 
-- la página actual para recargas coherentes (`reload()` preserva vista)
-- carpetas externas de música persistidas en `localStorage`
-- parches locales de canciones para evitar recargas globales en ediciones inline
+- `dashboard`
+- `library`: Canciones, Playlists e History dentro del Browser
+- `integrity`: Faltantes, Tracks movidos, Duplicados y Huérfanos
+- `operations`: Batch
+- `resources`: Configuración, Pads y Mappers
+- `home`: entrada sin shell cuando aún no corresponde operar una biblioteca
 
-## Backend (Rust)
+Los valores legacy de `Page` existen sólo como adaptadores para aliases visuales `?demo&page=`. Las vistas trabajan con `NavigationState`; no existe `page/setPage` como contrato UI.
+
+El shell usa un rail de 72 px. La expansión es overlay y no cambia la geometría del workspace. El header muestra biblioteca, tracks, recarga y seguridad de escritura. Integridad de archivos y seguridad de mutaciones son estados separados.
+
+## Borde de runtime
+
+`RuntimeServices` es la única interfaz consumida por las vistas para operaciones Tauri:
+
+- el adaptador real delega en `lib/api.ts`, diálogos y URLs de assets;
+- el adaptador demo no invoca Tauri ni toca archivos;
+- el demo conserva escrituras de settings, mapper, pad y raw dentro de su instancia para que save/reload sea verificable sin I/O real;
+- los fixtures `healthy`, `problem`, `unverified`, `loading`, `error`, `empty`, `dense` y `first-run`, más `recovery`, `recovery=manual` y `recovery=error`, producen estados reproducibles;
+- recovery demo vive dentro de la instancia del adaptador, por lo que resume/rollback puede terminar en `clean` sin reaparecer al recargar.
+
+Los imports `@tauri-apps/*` quedan restringidos a `lib/api.ts` y `lib/runtimeServices.ts`.
+
+## Estado frontend
+
+`AppContext` conserva:
+
+- biblioteca activa, canciones, stats y loading;
+- `NavigationState` y scope de error actual;
+- `RuntimeServices`;
+- `UiError` contextual con resumen, detalle opt-in y una recuperación separada ligada al mismo scope;
+- tema `dark | light`;
+- carpetas externas de música;
+- recovery, bloqueo de mutaciones y resultados;
+- snapshot de integridad (`null | 0 | >0`) y resultados compartidos por biblioteca activa, para no convertir “sin verificar” en cero ni perder scans al cambiar de tab;
+- handoff de ruta entre Faltantes y Reconciliación.
+
+Un blocker temporal protege drafts del Estudio de recursos antes de navegar, recargar o cambiar biblioteca. Los editores también protegen el cambio de archivo o modo cuando corresponde.
+
+## Workspaces frontend
+
+### Dashboard
+
+La cola de atención deriva de `IntegritySnapshot`. Recovery y referencias rotas tienen prioridad; scans no ejecutados muestran `Sin verificar`. Las métricas son secundarias y no disparan I/O al renderizar.
+
+### Browser de Biblioteca
+
+`Songs.tsx` es el owner del Browser unificado. Presenta árbol, `SongTable` virtualizada y detalle contextual:
+
+- `@tanstack/react-virtual` mantiene el DOM acotado;
+- `PaneLayout` persiste en `vdj-layout-v2`, valida payload y aplica clamping;
+- los splitters soportan pointer, flechas, Home/End y reset con Enter; sus límites ARIA son los límites efectivos disponibles;
+- desde 1200 px se muestran tres paneles; bajo 1200 el detalle pasa a drawer;
+- inline edit, rating, color, waveform y backend tipado se preservan.
+
+### Resolver problemas
+
+`IntegrityWorkspace` agrupa diagnóstico sin cambiar ownership:
+
+- `MissingFiles` verifica y transfiere una ruta exacta;
+- `RelinkTracks` busca candidatos y confirma reconciliación;
+- `Duplicates` conserva remoción `db_only` / `trash_then_unindex` y movimiento seguro;
+- `OrphanFiles` compara disco y catálogo.
+
+### Operaciones
+
+`BatchOperations` mantiene selección, preview y reporte por ítem. Cada preview queda ligado a una firma de acción, selección y parámetros, y las respuestas asíncronas obsoletas se descartan. Ejecutar permanece deshabilitado sin una firma vigente. El árbol de destino es colapsable y toda ejecución pasa por `ConfirmDialog` y respeta recovery.
+
+### Estudio de recursos
+
+`ResourceStudio` agrupa `Configs`, `Pads` y `Mappers` con tabs, feedback local y action bar dirty/save/revert. Cada editor conserva su API pública especializada; raw queda como fallback avanzado.
+
+## Feedback y accesibilidad
+
+- `Dialog`/`ConfirmDialog`: Cancelar recibe foco, Tab/Shift+Tab quedan contenidos, Escape cierra cuando no está busy, el fondo queda inert y el foco vuelve al origen.
+- `UiError`: scope por sección, resumen accionable, detalle desplegable y retry que repite la operación fallida; respuestas tardías de otro scope se descartan.
+- Tipografía base 14 px; 13 px para tablas y 12 px para metadata.
+- Targets densos interactivos miden al menos 24×24 px y tienen nombre accesible.
+- Contenido esencial no parte invisible. `prefers-reduced-motion` reduce animación a 1 ms/una iteración.
+- Los únicos temas son oscuro y claro; valores heredados distintos de `light` migran a `dark`.
+
+La ventana Tauri tiene mínimo 1180×720. El documento no hace scroll horizontal; tablas/workbenches son dueños de su scroll interno.
+
+## Backend Rust
 
 ### Módulos
 
-- **`database/models.rs`** — Structs serde que mapean el XML schema de VDJ.
-- **`database/parser.rs`** — Parseo y writers patch-in-place/atómicos que preservan XML desconocido.
-- **`commands/database.rs`** — Load/stats, tags por path y remoción explícita (`db_only` / `trash_then_unindex`).
-- **`commands/files.rs`** — Verify, scan, relink, rename y move journalizados, find orphans y planners.
-- **`commands/recovery.rs`** — Detección y acciones confirmadas de recuperación por journal.
-- **`mutation_journal.rs`** — Generaciones append-only, leases cross-process y state machine de mutación.
-- **`commands/duplicates.rs`** — Detección de duplicados por nombre/tamaño/hash (MD5 64 KB).
-- **`commands/playlists.rs`** — Parsing de playlists M3U/M3U8/VDJ (`.vdjplaylist`, `.vdjlist`).
-- **`commands/configs.rs`** — Lectura/escritura curada de `settings.xml`, mappers `.vdjmap` y pads `.vdjpad`.
-- **`commands/waveforms.rs`** — Extracción de peaks + FFT (symphonia + realfft), cache de 3 niveles (memoria → disco → decode).
+- `database/models.rs`: structs serde del schema VirtualDJ.
+- `database/parser.rs`: parser y writers patch-in-place/atómicos.
+- `commands/database.rs`: load/stats, tags y remoción explícita.
+- `commands/files.rs`: verify, scan, relink, rename, move, orphans y planners.
+- `commands/recovery.rs`: estado y acciones de recovery.
+- `mutation_journal.rs`: generaciones append-only, leases y state machine.
+- `commands/duplicates.rs`: detección por nombre/tamaño/hash.
+- `commands/playlists.rs`: M3U/M3U8/formatos VirtualDJ.
+- `commands/configs.rs`: settings, mappers y pads.
+- `commands/waveforms.rs`: peaks + FFT y cache.
 
-### Seguridad
+### Invariantes de seguridad
 
-- Toda escritura de `database.xml` usa patch-in-place con backup, commit atómico, relectura optimista y validación; no existe un comando IPC de serializer global.
-- CSP habilitado en el WebView: solo recursos propios + `data:`/`asset:`/`tauri:` para imágenes.
-- El movimiento cross-drive usa copy + delete sin reemplazo, con journal y rollback por ítem.
-- Las identidades de escritura usan paths estables, no índices del array renderizado.
-- La extracción de waveforms limita la concurrencia en backend para no saturar CPU y dejar libres otros procesos de metadata/tagging.
+- `database.xml` se modifica patch-in-place con backup, validación, relectura optimista y commit atómico.
+- La identidad de escritura es `originalFilePath`, no el índice renderizado.
+- Rename/move no reemplazan destinos y usan journal/lease por biblioteca.
+- Cross-drive es copy + delete por ítem y deja revisión manual ante incertidumbre.
+- Recovery pendiente permite lectura/diagnóstico y pausa nuevas mutaciones críticas.
+- CSP limita recursos del WebView a orígenes propios y esquemas autorizados.
 
-## Frontend (React)
+## Persistencia local
 
-### Estado global
+- `vdj-theme`: `dark | light` con migración.
+- `vdj-layout-v2`: anchos versionados del Browser.
+- preferencias de columnas versionadas por tabla.
+- última biblioteca y carpetas de música.
 
-`App.tsx` mantiene un `AppContext` con:
+El journal de mutaciones vive en app-data; nunca se escribe dentro de música ni de la carpeta VirtualDJ como parte de la UI.
 
-- `vdjFolder`, `songs`, `stats`, `loading`, `error`, `page`
-- Métodos: `setPage`, `selectFolder`, `loadFromFolder`, `reload`, `patchSong`, `setError`
+## Verificación
 
-### Error Boundaries
-
-`<ErrorBoundary>` (class component) envuelve:
-
-- La app completa en `main.tsx` (crash global)
-- Cada página en `App.tsx` (degradación parcial con botón "Reintentar")
-
-### Routing
-
-Routing local por estado (`page: Page`), sin react-router.
-En la página `home`, se renderiza sin `Layout`; el resto usa `Layout` (sidebar + main).
-
-La dirección acordada no elimina esta técnica de routing inmediatamente, pero sí cambia su semántica: el shell debe converger hacia una entrada principal de **Biblioteca** que hospede al **Browser de biblioteca**, dejando `Songs` y `Playlists` como vistas transitorias o adaptadores mientras dure la migración.
-
-Páginas principales activas:
-
-- `Dashboard`
-- `Songs`
-- `Playlists`
-- `Duplicates`
-- `MissingFiles`
-- `OrphanFiles`
-- `BatchOperations`
-- `Configs`
-- `Pads`
-- `Mappers`
-
-Dirección acordada:
-
-- `Dashboard` permanece como superficie de resumen/observabilidad.
-- `Songs` + `Playlists` deben converger hacia el **Browser de biblioteca**.
-- `MissingFiles` permanece como diagnóstico; `RelinkTracks` absorbe el ownership de la **Reconciliación de rutas**.
-- `Duplicates` y `BatchOperations` siguen como herramientas del núcleo mientras el Browser madura.
-- `Configs`, `Pads` y `Mappers` siguen agrupadas bajo el **Estudio de recursos**.
-
-### Tabla virtualizada
-
-`SongTable` usa `@tanstack/react-virtual` para renderizar eficientemente 30+ columnas con scroll virtualizado.
-
-Las ediciones inline de texto, rating y color escriben en backend y luego parchean la canción en memoria para evitar un `reload()` global.
-
-### Editores estructurados de recursos VirtualDJ
-
-- `Configs.tsx` trabaja sobre un subconjunto curado de `settings.xml`.
-- `Mappers.tsx` interpreta `.vdjmap` como documento estructurado (`<mapper>` + bindings `<map ... />`).
-- `Pads.tsx` usa un árbol XML genérico para editar `.vdjpad` sin degradarlo a editor de texto plano.
-
-### Playlists y biblioteca extendida
-
-- `Songs.tsx` combina la base de datos con carpetas externas configuradas por el usuario.
-- `Playlists.tsx` presenta playlists e historial como árbol de carpetas y resuelve entradas contra la librería o como canciones externas sintéticas.
-
-### Animaciones
-
-GSAP 3 con `gsap.context()` y cleanup automático en `useEffect`.
-Presets compartidos en `lib/animations.ts`.
-
-### Temas
-
-7 temas definidos en `index.css` via CSS custom properties con selector `data-theme`:
-dark, light, blue, teal, green, amber, red (paleta Catppuccin-inspired).
-
-### Design tokens
-
-Definidos en `index.css` via `@theme` de Tailwind CSS 4.
+El harness DOM usa Bun + Happy DOM + Testing Library. El browser demo cubre los viewports 1180×720, 1280×800 y 1440×900. Las suites Rust usan fixtures y directorios temporales. Ver `docs/ui/view-contracts.md` y `docs/implementation-status.md` para aceptación y evidencia.

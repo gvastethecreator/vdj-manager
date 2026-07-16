@@ -1,7 +1,7 @@
 # Rediseño radical de workspaces — plan de implementación
 
 Fecha: 2026-07-15  
-Estado: en ejecución  
+Estado: cerrado y verificado
 Dirección: **Centro operativo**
 
 ## Resultado buscado
@@ -80,20 +80,20 @@ El adaptador real encapsula IPC/dialog/asset URLs de Tauri. El adaptador demo de
 
 ## Gate manifest
 
-| Gate | Aplicación | Evidencia requerida | Estado inicial |
+| Gate | Aplicación | Evidencia requerida | Estado final |
 | --- | --- | --- | --- |
-| Scope | requerida | diff contra interfaces y backend fuera de alcance | pendiente |
+| Scope | requerida | diff contra interfaces y backend fuera de alcance | passed; comandos Rust/XML sin cambios |
 | Baseline | requerida | capturas comparables | passed |
-| Regresión | requerida | tests DOM/helpers + suites existentes | pendiente |
-| Runtime | requerida | navegador real sobre demo determinista | pendiente |
-| Estados | requerida | healthy/problem/recovery/error/dirty/empty/dense/long | pendiente |
-| Viewport | requerida | 1180×720, 1280×800, 1440×900 | pendiente |
-| Teclado/foco | requerida | diálogo, rail, tabs, splitters, drawer | pendiente |
-| Tema | requerida | dark/light + migración | pendiente |
-| Seguridad | requerida | fixtures/temp; sin rutas reales | pendiente |
+| Regresión | requerida | tests DOM/helpers + suites existentes | passed; 49 frontend + gates Rust finales |
+| Runtime | requerida | navegador real sobre demo determinista | passed; Chromium sin errores de página/consola en matriz final |
+| Estados | requerida | healthy/problem/recovery/error/dirty/empty/dense/long | passed; evidencia en `.scratch/evidence/radical-ui/phase6-final/` |
+| Viewport | requerida | 1180×720, 1280×800, 1440×900 | passed; se añadió límite exacto 1200×800 |
+| Teclado/foco | requerida | diálogo, rail, tabs, splitters, drawer | passed; DOM + browser |
+| Tema | requerida | dark/light + migración | passed; contraste normal mínimo >4.5:1 |
+| Seguridad | requerida | fixtures/temp; sin rutas reales | passed; sólo demo/fixtures/temporales |
 | Dirección | requerida | tres tesis + elección + firma/substracción | passed; lectura ciega eligió A y se corrigió la ambigüedad entre seguridad de mutación e integridad sin verificar |
-| Revisión independiente | requerida | reviewer fresco sobre evidencia final | pendiente |
-| Autopsia adversarial | requerida | objeción fuerte reparada o severidad explícita | pendiente |
+| Revisión independiente | requerida | reviewer fresco sobre evidencia final | passed; veredicto 0 blocker / 0 P1 |
+| Autopsia adversarial | requerida | objeción fuerte reparada o severidad explícita | passed; carreras, retry, teclado, clamping y estados reparados |
 
 ## Verificación
 
