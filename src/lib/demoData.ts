@@ -326,8 +326,16 @@ export function getDemoInitialPage(): Page {
   return page && demoPages.has(page) ? page : "dashboard";
 }
 
-export function getDemoAppState() {
-  const scenario = new URLSearchParams(window.location.search).get("state") ?? "healthy";
+export function getDemoAppState(search = window.location.search) {
+  const scenario = new URLSearchParams(search).get("state") ?? "healthy";
+  if (scenario === "first-run") {
+    return {
+      vdjFolder: null,
+      songs: [],
+      stats: null,
+      musicFolders: [],
+    };
+  }
   const songs = demoSongsForScenario(scenario);
   return {
     vdjFolder: DEMO_FOLDER,

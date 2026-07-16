@@ -2,7 +2,6 @@ import { useMemo, useState } from "react";
 import { FileWarning, Link2, RefreshCw } from "lucide-react";
 import { useApp } from "../App";
 import { formatSize } from "../lib/api";
-import type { FileVerification } from "../types/database";
 
 type Filter = "all" | "missing" | "mismatch" | "ok";
 
@@ -11,8 +10,8 @@ type Filter = "all" | "missing" | "mismatch" | "ok";
  * diagnostic surface never writes database.xml or ranks candidates.
  */
 export function MissingFiles() {
-  const { vdjFolder, clearUiError, reportUiError, services, setNavigation, updateIntegrity, openRelinkTarget } = useApp();
-  const [results, setResults] = useState<FileVerification[] | null>(null);
+  const { vdjFolder, clearUiError, reportUiError, services, setNavigation, updateIntegrity, openRelinkTarget, integrityResults, updateIntegrityResults } = useApp();
+  const results = integrityResults.verification;
   const [loading, setLoading] = useState(false);
   const [filter, setFilter] = useState<Filter>("missing");
 
@@ -22,13 +21,13 @@ export function MissingFiles() {
     clearUiError();
     try {
       const verification = await services.verifyFiles(vdjFolder);
-      setResults(verification);
+      updateIntegrityResults({ verification });
       updateIntegrity({
         missing: verification.filter((entry) => !entry.exists).length,
         mismatched: verification.filter((entry) => entry.exists && !entry.size_match).length,
       });
     } catch (error) {
-      reportUiError("No se pudo verificar la integridad de la biblioteca.", error);
+      reportUiError("No se pudo verificar la integridad de la biblioteca.", error, { retry: runVerify });
     } finally {
       setLoading(false);
     }

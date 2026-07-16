@@ -276,9 +276,15 @@ export function createDemoRuntimeServices(): RuntimeServices {
     },
     async selectFile() { return `${DEMO_FOLDER}\\Playlists\\Warm up.m3u8`; },
     convertFileSrc: () => SILENT_WAV,
-    async loadDatabase() { return clone(scenarioSongs); },
+    async loadDatabase() {
+      await demoScenarioGate("abrir la biblioteca");
+      return clone(scenarioSongs);
+    },
     async getWaveformPreview(filePath, bucketCount = 64) { return buildSyntheticWaveformPreview(filePath, bucketCount); },
-    async getDatabaseStats() { return clone(demoStats); },
+    async getDatabaseStats() {
+      await demoScenarioGate("leer las métricas de la biblioteca");
+      return clone(demoStats);
+    },
     async updateSongTags(_folder, originalFilePath, update): Promise<UpdateSongTagsResult> {
       return { status: "completed", originalFilePath, currentFilePath: originalFilePath, updatedFields: Object.keys(update) };
     },

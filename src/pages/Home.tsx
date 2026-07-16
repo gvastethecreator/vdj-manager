@@ -10,6 +10,8 @@ export function Home() {
     loadFromFolder,
     loading,
     uiError,
+    uiErrorRecovery,
+    currentScope,
     clearUiError,
     musicFolders,
     removeMusicFolder,
@@ -46,7 +48,20 @@ export function Home() {
           </div>
 
           {loading ? <div className="mt-4 flex items-center gap-2 text-sm text-text-muted"><div className="spinner" /> Cargando biblioteca…</div> : null}
-          {uiError ? <div className="mt-4"><UiErrorNotice error={uiError} onDismiss={clearUiError} /></div> : null}
+          {uiError?.scope === currentScope ? (
+            <div className="mt-4">
+              <UiErrorNotice
+                error={uiError}
+                onDismiss={clearUiError}
+                onRetry={uiErrorRecovery?.scope === currentScope ? () => {
+                  const retry = uiErrorRecovery.run;
+                  clearUiError();
+                  void retry();
+                } : undefined}
+                retryLabel={uiErrorRecovery?.scope === currentScope ? uiErrorRecovery.label : undefined}
+              />
+            </div>
+          ) : null}
 
           <div className="mt-8 flex items-start gap-3 border-t border-border pt-5">
             <ShieldCheck className="mt-0.5 h-5 w-5 shrink-0 text-success" />

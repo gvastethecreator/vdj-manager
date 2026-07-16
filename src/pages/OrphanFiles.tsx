@@ -5,17 +5,27 @@ import { mergeFolderLists } from "../lib/api";
 
 /** Scans a folder for audio files not registered in the VDJ database. */
 export function OrphanFiles() {
-    const { songs, musicFolders, removeMusicFolder, selectMusicFolder, reportUiError, services, updateIntegrity } = useApp();
-    const [orphans, setOrphans] = useState<string[] | null>(null);
-    const [allFiles, setAllFiles] = useState<string[] | null>(null);
+    const { songs, musicFolders, removeMusicFolder, selectMusicFolder, reportUiError, services, updateIntegrity, integrityResults, updateIntegrityResults } = useApp();
+    const orphans = integrityResults.orphanFiles?.orphans ?? null;
+    const allFiles = integrityResults.orphanFiles?.allFiles ?? null;
     const [loading, setLoading] = useState(false);
 
     const scanFolders = useMemo(() => mergeFolderLists(musicFolders), [musicFolders]);
 
+    function invalidateScan() {
+        updateIntegrityResults({ orphanFiles: null });
+        updateIntegrity({ orphans: null });
+    }
+
+    async function addScanFolder() {
+        const selected = await selectMusicFolder();
+        if (selected) invalidateScan();
+    }
+
     async function runScan() {
         if (scanFolders.length === 0) return;
         setLoading(true);
-        setOrphans(null);
+        invalidateScan();
         try {
             const fileGroups = await Promise.all(scanFolders.map((folder) => services.scanMusicFolder(folder)));
             const uniqueFiles = Array.from(
@@ -29,11 +39,10 @@ export function OrphanFiles() {
             const databasePaths = new Set(songs.map((song) => song.file_path.toLowerCase()));
             const orphanPaths = uniqueFiles.filter((filePath) => !databasePaths.has(filePath.toLowerCase()));
 
-            setOrphans(orphanPaths);
-            setAllFiles(uniqueFiles);
+            updateIntegrityResults({ orphanFiles: { orphans: orphanPaths, allFiles: uniqueFiles } });
             updateIntegrity({ orphans: orphanPaths.length });
         } catch (err) {
-            reportUiError("No se pudo completar el escaneo de huérfanos.", err);
+            reportUiError("No se pudo completar el escaneo de huérfanos.", err, { retry: runScan });
         } finally {
             setLoading(false);
         }
@@ -54,7 +63,7 @@ export function OrphanFiles() {
                             Se usan las carpetas musicales persistentes configuradas desde el inicio de la app.
                         </p>
                     </div>
-                    <button onClick={selectMusicFolder} className="btn btn-ghost btn-sm">
+                    <button onClick={() => void addScanFolder()} className="btn btn-ghost btn-sm">
                         <Music className="h-4 w-4" />
                         Agregar carpeta
                     </button>
@@ -74,7 +83,7 @@ export function OrphanFiles() {
                                 </span>
                                 <button
                                     type="button"
-                                    onClick={() => removeMusicFolder(folder)}
+                                    onClick={() => { removeMusicFolder(folder); invalidateScan(); }}
                                     className="btn btn-ghost btn-sm shrink-0"
                                     title="Quitar carpeta"
                                 >
@@ -121,13 +130,13 @@ export function OrphanFiles() {
                     </div>
 
                     <div className="max-h-[calc(100vh-360px)] overflow-auto rounded-[5px] border-2 border-border">
-                        <table className="w-full text-[12px]">
+                        <table className="w-full text-[13px]">
                             <thead className="sticky top-0 bg-surface-hover">
                                 <tr>
-                                    <th className="px-2.5 py-1.5 text-left text-xs font-medium text-text-muted">#</th>
-                                    <th className="px-2.5 py-1.5 text-left text-xs font-medium text-text-muted">Archivo</th>
-                                    <th className="px-2.5 py-1.5 text-left text-xs font-medium text-text-muted">Formato</th>
-                                    <th className="px-2.5 py-1.5 text-left text-xs font-medium text-text-muted">Carpeta</th>
+                                    <th className="px-2.5 py-1.5 text-left text-[13px] font-medium text-text-muted">#</th>
+                                    <th className="px-2.5 py-1.5 text-left text-[13px] font-medium text-text-muted">Archivo</th>
+                                    <th className="px-2.5 py-1.5 text-left text-[13px] font-medium text-text-muted">Formato</th>
+                                    <th className="px-2.5 py-1.5 text-left text-[13px] font-medium text-text-muted">Carpeta</th>
                                 </tr>
                             </thead>
                             <tbody>

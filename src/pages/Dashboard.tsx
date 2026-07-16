@@ -116,7 +116,7 @@ export function Dashboard() {
           <div className="m-4 rounded-md border border-border bg-background p-3">
             <div className="flex items-center gap-2 text-sm font-semibold text-text"><Music2 className="h-4 w-4 text-primary-light" /> Metadata habitual</div>
             <p className="mt-1 text-xs leading-relaxed text-text-muted">{missingMetadata} pista{missingMetadata === 1 ? "" : "s"} sin título, artista o BPM.</p>
-            <button type="button" className="mt-3 inline-flex min-h-8 items-center rounded px-2 text-xs font-semibold text-primary-light hover:bg-primary/10" onClick={() => setNavigation({ workspace: "library", section: "songs" })}>Abrir Browser</button>
+            <button type="button" className="mt-3 inline-flex min-h-8 items-center rounded px-2 text-sm font-semibold text-primary-light hover:bg-primary/10" onClick={() => setNavigation({ workspace: "library", section: "songs" })}>Abrir Browser</button>
           </div>
         </aside>
       </div>

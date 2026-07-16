@@ -1,6 +1,8 @@
 import { Component } from "react";
 import type { ErrorInfo, ReactNode } from "react";
 import { log } from "../lib/logger";
+import { createUiError } from "../lib/uiError";
+import { UiErrorNotice } from "./UiErrorNotice";
 
 interface Props {
     children: ReactNode;
@@ -31,21 +33,20 @@ export class ErrorBoundary extends Component<Props, State> {
         if (this.state.hasError) {
             if (this.props.fallback) return this.props.fallback;
 
+            const error = createUiError(
+                "application",
+                "No se pudo mostrar esta vista.",
+                this.state.error ?? undefined,
+            );
+
             return (
                 <div className="flex h-full items-center justify-center p-8">
-                    <div className="w-full max-w-md space-y-4 text-center">
-                        <div className="text-4xl">⚠️</div>
-                        <h2 className="text-lg font-bold text-text">Algo salió mal</h2>
-                        <p className="text-sm text-text-muted">
-                            {this.state.error?.message ?? "Error inesperado en la aplicación."}
-                        </p>
-                        <button
-                            type="button"
-                            className="btn btn-primary"
-                            onClick={() => this.setState({ hasError: false, error: null })}
-                        >
-                            Reintentar
-                        </button>
+                    <div className="w-full max-w-xl">
+                        <UiErrorNotice
+                            error={error}
+                            onRetry={() => window.location.reload()}
+                            retryLabel="Recargar la aplicación"
+                        />
                     </div>
                 </div>
             );

@@ -44,6 +44,7 @@ export function ResourceStudio({ children }: { children: ReactNode }) {
     setNavigation,
     registerNavigationBlocker,
     uiError,
+    currentScope,
     clearUiError,
   } = useApp();
   const [editor, setEditor] = useState<ResourceEditorState | null>(null);
@@ -129,7 +130,7 @@ export function ResourceStudio({ children }: { children: ReactNode }) {
           </nav>
         </header>
 
-        {uiError ? (
+        {uiError?.scope === currentScope ? (
           <div className="shrink-0 px-4 pt-3">
             <UiErrorNotice
               error={uiError}

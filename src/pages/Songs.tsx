@@ -10,9 +10,12 @@ import { getConfiguredMusicRoots } from "../lib/api";
 import {
   clampPaneLayout,
   DEFAULT_PANE_LAYOUT,
+  getPaneLimits,
   loadPaneLayout,
   resizePane,
   savePaneLayout,
+  setPaneSize,
+  shouldUseDetailDrawer,
   type PaneLayout,
 } from "../lib/paneLayout";
 import { compareDriveAwarePaths, compareSongsByDrivePath, getPathLeafName, isPathInsideFolder } from "../lib/pathUtils";
@@ -81,13 +84,17 @@ export function Songs() {
   const [playlistLoading, setPlaylistLoading] = useState(false);
   const [selectedPlaylist, setSelectedPlaylist] = useState<PlaylistInfo | null>(null);
   const [playlistEntries, setPlaylistEntries] = useState<PlaylistEntry[]>([]);
+  const [playlistEntriesLoading, setPlaylistEntriesLoading] = useState(false);
   const [externalSongs, setExternalSongs] = useState<SongSummary[]>([]);
   const [externalLoading, setExternalLoading] = useState(false);
   const [selectedSongIndex, setSelectedSongIndex] = useState<number | null>(null);
   const [detailDrawerOpen, setDetailDrawerOpen] = useState(false);
+  const playlistListRequest = useRef(0);
+  const playlistReadRequest = useRef(0);
 
   const mode: SourceMode = navigation.section === "playlists" ? "playlists" : "folders";
-  const compactDetail = workspaceWidth < 1200;
+  const compactDetail = shouldUseDetailDrawer(workspaceWidth);
+  const paneLimits = getPaneLimits(paneLayout, workspaceWidth);
 
   useEffect(() => {
     const element = workspaceRef.current;
@@ -116,6 +123,14 @@ export function Songs() {
     savePaneLayout(next);
   }, [workspaceWidth]);
 
+  const setLayoutPane = useCallback((pane: "tree" | "detail", value: number) => {
+    setPaneLayout((current) => {
+      const next = setPaneSize(current, pane, value, workspaceWidth);
+      savePaneLayout(next);
+      return next;
+    });
+  }, [workspaceWidth]);
+
   const beginResize = useCallback((pane: "tree" | "detail", event: ReactPointerEvent<HTMLDivElement>) => {
     event.preventDefault();
     let lastX = event.clientX;
@@ -139,26 +154,53 @@ export function Songs() {
 
   useEffect(() => {
     if (!vdjFolder) return;
+    const request = playlistListRequest.current + 1;
+    playlistListRequest.current = request;
     setPlaylistLoading(true);
     services.listPlaylists(vdjFolder)
-      .then(setPlaylists)
+      .then((nextPlaylists) => {
+        if (playlistListRequest.current === request) setPlaylists(nextPlaylists);
+      })
       .catch((error) => {
+        if (playlistListRequest.current !== request) return;
         setPlaylists([]);
         reportUiError("No se pudieron cargar las playlists.", error);
       })
-      .finally(() => setPlaylistLoading(false));
+      .finally(() => {
+        if (playlistListRequest.current === request) setPlaylistLoading(false);
+      });
+    return () => {
+      if (playlistListRequest.current === request) playlistListRequest.current += 1;
+    };
   }, [reportUiError, services, vdjFolder]);
 
   const selectPlaylist = useCallback(async (playlist: PlaylistInfo) => {
+    const request = playlistReadRequest.current + 1;
+    playlistReadRequest.current = request;
     setSelectedPlaylist(playlist);
     setSelectedFolder("");
+    setPlaylistEntries([]);
+    setPlaylistEntriesLoading(true);
     try {
-      setPlaylistEntries(await services.readPlaylist(playlist.path));
+      const entries = await services.readPlaylist(playlist.path);
+      if (playlistReadRequest.current === request) setPlaylistEntries(entries);
     } catch (error) {
+      if (playlistReadRequest.current !== request) return;
       setPlaylistEntries([]);
-      reportUiError("No se pudo abrir la playlist seleccionada.", error);
+      reportUiError("No se pudo abrir la playlist seleccionada.", error, {
+        retry: () => selectPlaylist(playlist),
+      });
+    } finally {
+      if (playlistReadRequest.current === request) setPlaylistEntriesLoading(false);
     }
   }, [reportUiError, services]);
+
+  const clearPlaylistSelection = useCallback(() => {
+    playlistReadRequest.current += 1;
+    setSelectedPlaylist(null);
+    setPlaylistEntries([]);
+    setPlaylistEntriesLoading(false);
+  }, []);
 
   const importPlaylist = useCallback(async () => {
     const selected = await services.selectFile({
@@ -275,7 +317,7 @@ export function Songs() {
             <p className="text-xs text-text-muted">{sourceLabel} · {filteredSongs.length.toLocaleString()} pistas</p>
           </div>
           <div className="tab-group min-w-64" aria-label="Fuente de biblioteca">
-            <button type="button" className={`tab-item flex items-center justify-center gap-2 ${mode === "folders" ? "tab-active" : ""}`} onClick={() => { setNavigation({ workspace: "library", section: "songs" }); setSelectedPlaylist(null); }}>
+            <button type="button" className={`tab-item flex items-center justify-center gap-2 ${mode === "folders" ? "tab-active" : ""}`} onClick={() => { setNavigation({ workspace: "library", section: "songs" }); clearPlaylistSelection(); }}>
               <Folders className="h-4 w-4" /> Canciones
             </button>
             <button type="button" className={`tab-item flex items-center justify-center gap-2 ${mode === "playlists" ? "tab-active" : ""}`} onClick={() => { setNavigation({ workspace: "library", section: "playlists" }); setSelectedFolder(""); }}>
@@ -283,7 +325,7 @@ export function Songs() {
             </button>
           </div>
         </div>
-        <button type="button" className="btn btn-ghost btn-sm" onClick={resetLayout} title="También disponible con Home sobre un separador">
+        <button type="button" className="btn btn-ghost btn-sm" onClick={resetLayout} title="También disponible con Enter sobre un separador">
           <RotateCcw className="h-4 w-4" /> Restablecer paneles
         </button>
       </header>
@@ -307,7 +349,7 @@ export function Songs() {
             <div className="min-h-0 flex-1 overflow-auto py-2">
               {playlistLoading ? <div className="p-3 text-sm text-text-muted">Cargando playlists…</div> : null}
               {!playlistLoading && playlists.length === 0 ? <div className="m-2 rounded-md border border-dashed border-border p-4 text-center text-sm text-text-muted">No hay playlists en esta biblioteca.</div> : null}
-              <button type="button" className={`flex w-full items-center justify-between px-3 py-2 text-left text-sm ${!selectedPlaylist ? "bg-primary/14 text-primary-light" : "text-text-secondary hover:bg-surface-hover"}`} onClick={() => setSelectedPlaylist(null)}>
+              <button type="button" className={`flex w-full items-center justify-between px-3 py-2 text-left text-sm ${!selectedPlaylist ? "bg-primary/14 text-primary-light" : "text-text-secondary hover:bg-surface-hover"}`} onClick={clearPlaylistSelection}>
                 Todas las canciones <span className="text-xs tabular-nums text-text-muted">{songs.length}</span>
               </button>
               {playlistFolders.map(([folder, entries]) => (
@@ -325,16 +367,17 @@ export function Songs() {
           )}
         </aside>
 
-        <PaneSeparator label="Ajustar ancho del árbol" value={paneLayout.treeWidth} min={208} max={360} onMove={(delta) => updateLayout("tree", delta)} onReset={resetLayout} onPointerDown={(event) => beginResize("tree", event)} />
+        <PaneSeparator label="Ajustar ancho del árbol" value={paneLayout.treeWidth} min={paneLimits.tree.min} max={paneLimits.tree.max} onMove={(delta) => updateLayout("tree", delta)} onSet={(value) => setLayoutPane("tree", value)} onReset={resetLayout} onPointerDown={(event) => beginResize("tree", event)} />
 
         <section className="min-h-0 min-w-0 flex-1 overflow-auto p-3" aria-label="Tabla de canciones">
           {externalLoading ? <div className="mb-2 text-xs text-text-muted">Escaneando archivos externos…</div> : null}
+          {playlistEntriesLoading ? <div className="mb-2 text-[13px] text-text-muted">Cargando contenido de la playlist…</div> : null}
           <SongTable songs={filteredSongs} storageKey="library" activeSongIndex={selectedSongIndex} onRowSelect={selectSong} />
         </section>
 
         {!compactDetail ? (
           <>
-            <PaneSeparator label="Ajustar ancho del detalle" value={paneLayout.detailWidth} min={304} max={480} onMove={(delta) => updateLayout("detail", delta)} onReset={resetLayout} onPointerDown={(event) => beginResize("detail", event)} />
+            <PaneSeparator label="Ajustar ancho del detalle" value={paneLayout.detailWidth} min={paneLimits.detail.min} max={paneLimits.detail.max} onMove={(delta) => updateLayout("detail", delta)} onSet={(value) => setLayoutPane("detail", value)} onReset={resetLayout} onPointerDown={(event) => beginResize("detail", event)} />
             <aside className="min-h-0 shrink-0 overflow-auto bg-surface p-3" style={{ width: paneLayout.detailWidth }} aria-label="Detalle de pista">
               {selectedSong ? <SongDetailsCard song={selectedSong} /> : <div className="rounded-md border border-dashed border-border p-5 text-center text-sm text-text-muted">Selecciona una pista para ver sus detalles.</div>}
             </aside>

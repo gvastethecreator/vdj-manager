@@ -30,7 +30,7 @@ export interface ColumnDef {
     editableTag?: string;
 }
 
-interface RenderHelpers {
+export interface RenderHelpers {
     rowColor: string | null;
     onStartEdit?: (songIndex: number, columnKey: ColumnKey) => void;
     editState?: { songIndex: number; columnKey: ColumnKey; value: string } | null;
@@ -113,7 +113,7 @@ const COLUMN_PREFS_VERSION = 2;
 // ── Column configuration end ──
 
 // ── Inline editing cell ──
-function EditableCell({ song, columnKey, value, helpers }: {
+export function EditableCell({ song, columnKey, value, helpers }: {
     song: SongSummary;
     columnKey: ColumnKey;
     value: string | null | undefined;
@@ -130,7 +130,7 @@ function EditableCell({ song, columnKey, value, helpers }: {
             <input
                 type="text"
                 aria-label={`Editar ${columnKey} de ${song.file_name}`}
-                className="w-full rounded border border-primary/50 bg-surface px-1 py-0 text-xs text-text outline-none focus:border-primary"
+                className="w-full rounded border border-primary/50 bg-surface px-1 py-0 text-[13px] text-text outline-none focus:border-primary"
                 value={helpers.editState?.value ?? ""}
                 onChange={(e) => helpers.onEditChange?.(e.target.value)}
                 onKeyDown={(e) => {
@@ -145,12 +145,60 @@ function EditableCell({ song, columnKey, value, helpers }: {
 
     return (
         <span
-            className="cursor-text"
+            role="button"
+            tabIndex={0}
+            aria-label={`Editar ${columnKey} de ${song.file_name}`}
+            className="cursor-text rounded-sm"
             onDoubleClick={() => helpers.onStartEdit?.(song.index, columnKey)}
-            title="Doble click para editar"
+            onKeyDown={(event) => {
+                if (event.key === "Enter" || event.key === " " || event.key === "F2") {
+                    event.preventDefault();
+                    helpers.onStartEdit?.(song.index, columnKey);
+                }
+            }}
+            title="Doble click, Enter o F2 para editar"
         >
             {value ?? "—"}
         </span>
+    );
+}
+
+export function SongTableRow({
+    song,
+    rowColor,
+    active,
+    selected,
+    onSelect,
+    children,
+}: {
+    song: SongSummary;
+    rowColor: string | null;
+    active: boolean;
+    selected: boolean;
+    onSelect?: (song: SongSummary) => void;
+    children: ReactNode;
+}) {
+    return (
+        <tr
+            style={{
+                height: ROW_HEIGHT,
+                ...(rowColor && { borderLeft: `3px solid ${rowColor}` }),
+            }}
+            className={`border-b border-border/30 ${active ? "bg-primary/12 ring-1 ring-inset ring-primary/35" : selected ? "bg-primary/8" : ""} ${onSelect ? "cursor-pointer" : ""}`}
+            onClick={() => onSelect?.(song)}
+            onKeyDown={(event) => {
+                if (!onSelect || event.target !== event.currentTarget) return;
+                if (event.key === "Enter" || event.key === " ") {
+                    event.preventDefault();
+                    onSelect(song);
+                }
+            }}
+            tabIndex={onSelect ? 0 : undefined}
+            aria-label={onSelect ? `Seleccionar ${song.file_name}` : undefined}
+            aria-selected={onSelect ? active : undefined}
+        >
+            {children}
+        </tr>
     );
 }
 
@@ -233,10 +281,10 @@ function ColorPickerPopup({ position, currentColor, onSelect, onClose }: {
                     onChange={(e) => setCustom(e.target.value)}
                     className="h-[24px] w-[24px] cursor-pointer rounded border border-border/60 bg-transparent p-0"
                 />
-                <button type="button" className="btn btn-ghost btn-sm flex-1 text-xs" onClick={() => onSelect(custom)}>
+                <button type="button" className="btn btn-ghost btn-sm flex-1" onClick={() => onSelect(custom)}>
                     Aplicar
                 </button>
-                <button type="button" className="btn btn-ghost btn-sm text-xs text-error" onClick={() => onSelect(null)}>
+                <button type="button" className="btn btn-ghost btn-sm text-error" onClick={() => onSelect(null)}>
                     Quitar
                 </button>
             </div>
@@ -369,13 +417,22 @@ export function SongTable({
             return;
         }
         if (globalAudio) { globalAudio.pause(); globalAudio = null; }
-        const audio = new Audio(services.convertFileSrc(filePath));
-        audio.volume = 0.5;
-        audio.play().catch(console.error);
-        audio.onended = () => { setPlayingPath(null); globalAudio = null; };
-        globalAudio = audio;
-        setPlayingPath(filePath);
-    }, [playingPath, services]);
+        try {
+            const audio = new Audio(services.convertFileSrc(filePath));
+            audio.volume = 0.5;
+            audio.onended = () => { setPlayingPath(null); globalAudio = null; };
+            globalAudio = audio;
+            setPlayingPath(filePath);
+            void audio.play().catch((error) => {
+                if (globalAudio === audio) globalAudio = null;
+                setPlayingPath(null);
+                reportUiError("No se pudo reproducir la vista previa de audio.", error);
+            });
+        } catch (error) {
+            setPlayingPath(null);
+            reportUiError("No se pudo preparar la vista previa de audio.", error);
+        }
+    }, [playingPath, reportUiError, services]);
 
     // ── Color picker ──
     const [colorPicker, setColorPicker] = useState<{ songIndex: number; position: { x: number; y: number } } | null>(null);
@@ -586,7 +643,7 @@ export function SongTable({
                 ref={parentRef}
                 className="data-table-shell max-h-[calc(100vh-220px)] overflow-auto"
             >
-                <table className="w-full text-xs" style={{ tableLayout: "fixed", minWidth }}>
+                <table className="w-full text-[13px]" style={{ tableLayout: "fixed", minWidth }}>
                     <colgroup>
                         {selectable && <col style={{ width: 32 }} />}
                         {columns.map((c) => <col key={c.key} style={{ width: c.width }} />)}
@@ -599,8 +656,16 @@ export function SongTable({
                                 return (
                                     <th
                                         key={c.key}
-                                        className={`select-none whitespace-nowrap ${c.key === "play" || c.key === "stars" ? "px-1" : "px-2.5"} py-1.5 text-left text-xs font-semibold ${columnSortKey ? "cursor-pointer text-text-muted hover:text-text" : "text-text-muted/80"}`}
+                                        className={`select-none whitespace-nowrap ${c.key === "play" || c.key === "stars" ? "px-1" : "px-2.5"} py-1.5 text-left text-[13px] font-semibold ${columnSortKey ? "cursor-pointer text-text-muted hover:text-text" : "text-text-muted/80"}`}
                                         onClick={columnSortKey ? () => toggleSort(columnSortKey) : undefined}
+                                        onKeyDown={columnSortKey ? (event) => {
+                                            if (event.key === "Enter" || event.key === " ") {
+                                                event.preventDefault();
+                                                toggleSort(columnSortKey);
+                                            }
+                                        } : undefined}
+                                        tabIndex={columnSortKey ? 0 : undefined}
+                                        aria-sort={columnSortKey && sortKey === columnSortKey ? (sortAsc ? "ascending" : "descending") : undefined}
                                         onContextMenu={handleHeaderContext}
                                     >
                                         {c.label}
@@ -631,14 +696,13 @@ export function SongTable({
                                 vdjFolder,
                             };
                             return (
-                                <tr
+                                <SongTableRow
                                     key={song.index}
-                                    style={{
-                                        height: ROW_HEIGHT,
-                                        ...(rowColor && { borderLeft: `3px solid ${rowColor}` }),
-                                    }}
-                                    className={`border-b border-border/30 ${activeSongIndex === song.index ? "bg-primary/12 ring-1 ring-inset ring-primary/35" : selected?.has(song.index) ? "bg-primary/8" : ""} ${onRowSelect ? "cursor-pointer" : ""}`}
-                                    onClick={() => onRowSelect?.(song)}
+                                    song={song}
+                                    rowColor={rowColor}
+                                    active={activeSongIndex === song.index}
+                                    selected={selected?.has(song.index) ?? false}
+                                    onSelect={onRowSelect}
                                 >
                                     {selectable && (
                                         <td className="px-1.5">
@@ -655,7 +719,7 @@ export function SongTable({
                                             {c.render(song, helpers)}
                                         </td>
                                     ))}
-                                </tr>
+                                </SongTableRow>
                             );
                         })}
                         {paddingBottom > 0 && (
@@ -697,7 +761,7 @@ export function SongTable({
                     <div className="mt-1 flex gap-1 border-t border-border pt-1">
                         <button
                             type="button"
-                            className="btn btn-ghost btn-sm flex-1 text-xs"
+                            className="btn btn-ghost btn-sm flex-1"
                             onClick={() => {
                                 const all = new Set<ColumnKey>(ALL_COLUMNS.map((c) => c.key));
                                 setVisibleCols(all);
@@ -708,7 +772,7 @@ export function SongTable({
                         </button>
                         <button
                             type="button"
-                            className="btn btn-ghost btn-sm flex-1 text-xs"
+                            className="btn btn-ghost btn-sm flex-1"
                             onClick={() => {
                                 const defaults = new Set<ColumnKey>(DEFAULT_VISIBLE);
                                 setVisibleCols(defaults);
@@ -865,7 +929,7 @@ export function SongMiniTable({
     }, [visibleKeys]);
 
     return (
-        <table className="w-full table-fixed text-xs">
+        <table className="w-full table-fixed text-[13px]">
             <colgroup>
                 {selectable && <col className="w-8" />}
                 {cols.map((c) => <col key={c.key} style={{ width: c.width }} />)}
@@ -898,6 +962,7 @@ export function SongMiniTable({
                                 <td className="px-2 py-0.5">
                                     <input
                                         type="checkbox"
+                                        aria-label={`Seleccionar ${s.file_name}`}
                                         checked={selected?.has(s.index) ?? false}
                                         onChange={() => onToggle?.(s.index)}
                                     />

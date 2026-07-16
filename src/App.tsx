@@ -5,6 +5,8 @@ import { log } from "./lib/logger";
 import type {
   ApplyRecoveryResult,
   DatabaseStats,
+  DuplicateResult,
+  FileVerification,
   MutationRecoveryAction,
   MutationRecoveryState,
   SongSummary,
@@ -55,6 +57,30 @@ interface AppState {
   navigation: NavigationState;
 }
 
+interface UiErrorRecovery {
+  scope: string;
+  label: string;
+  run: () => void | Promise<void>;
+}
+
+interface ReportUiErrorOptions {
+  scope?: string;
+  retry?: () => void | Promise<void>;
+  retryLabel?: string;
+}
+
+interface IntegrityWorkspaceResults {
+  verification: FileVerification[] | null;
+  duplicates: DuplicateResult | null;
+  orphanFiles: { orphans: string[]; allFiles: string[] } | null;
+}
+
+const EMPTY_INTEGRITY_RESULTS: IntegrityWorkspaceResults = {
+  verification: null,
+  duplicates: null,
+  orphanFiles: null,
+};
+
 interface AppContextType extends AppState {
   setNavigation: (navigation: NavigationState) => void;
   registerNavigationBlocker: (blocker: (navigation: NavigationState | null, proceed: () => void) => boolean) => () => void;
@@ -65,8 +91,9 @@ interface AppContextType extends AppState {
   reload: () => Promise<void>;
   patchSong: (songIndex: number, patch: Partial<SongSummary>) => void;
   uiError: UiError | null;
+  uiErrorRecovery: UiErrorRecovery | null;
   setUiError: (error: UiError | null) => void;
-  reportUiError: (summary: string, error?: unknown, scope?: string) => void;
+  reportUiError: (summary: string, error?: unknown, options?: ReportUiErrorOptions) => void;
   clearUiError: () => void;
   musicFolders: string[];
   addMusicFolder: (folder: string) => void;
@@ -85,6 +112,8 @@ interface AppContextType extends AppState {
   resolveRecovery: (action: MutationRecoveryAction, journalId: string) => Promise<void>;
   integrity: IntegritySnapshot;
   updateIntegrity: (patch: Partial<IntegritySnapshot>) => void;
+  integrityResults: IntegrityWorkspaceResults;
+  updateIntegrityResults: (patch: Partial<IntegrityWorkspaceResults>) => void;
   relinkTargetPath: string | null;
   openRelinkTarget: (filePath: string) => void;
   clearRelinkTarget: () => void;
@@ -111,6 +140,7 @@ export default function App() {
     navigation: initialNavigation(window.location.search, demoMode),
   });
   const [uiError, setUiError] = useState<UiError | null>(null);
+  const [uiErrorRecovery, setUiErrorRecovery] = useState<UiErrorRecovery | null>(null);
   const [musicFolders, setMusicFolders] = useState<string[]>(() => {
     if (demoState) return demoState.musicFolders;
     try {
@@ -142,10 +172,15 @@ export default function App() {
       ? demoIntegritySnapshot(new URLSearchParams(window.location.search).get("state") ?? "healthy")
       : { ...EMPTY_INTEGRITY_SNAPSHOT }
   ));
+  const [integrityResults, setIntegrityResults] = useState<IntegrityWorkspaceResults>(EMPTY_INTEGRITY_RESULTS);
   const [relinkTargetPath, setRelinkTargetPath] = useState<string | null>(null);
   const navigationBlockerRef = useRef<((navigation: NavigationState | null, proceed: () => void) => boolean) | null>(null);
+  const loadRequestVersion = useRef(0);
+  const loadFromFolderRef = useRef<(folder: string, options?: { targetNavigation?: NavigationState }) => Promise<void>>(async () => {});
 
   const currentScope = navigationScope(state.navigation);
+  const currentScopeRef = useRef(currentScope);
+  currentScopeRef.current = currentScope;
 
   useEffect(() => {
     document.documentElement.setAttribute("data-theme", theme);
@@ -162,6 +197,7 @@ export default function App() {
 
   useEffect(() => {
     setUiError((error) => errorForScope(error, currentScope));
+    setUiErrorRecovery((recovery) => recovery?.scope === currentScope ? recovery : null);
   }, [currentScope]);
 
   const toggleTheme = useCallback(() => {
@@ -191,10 +227,20 @@ export default function App() {
     };
   }, []);
 
-  const clearUiError = useCallback(() => setUiError(null), []);
+  const clearUiError = useCallback(() => {
+    setUiError(null);
+    setUiErrorRecovery(null);
+  }, []);
 
-  const reportUiError = useCallback((summary: string, error?: unknown, scope = currentScope) => {
+  const reportUiError = useCallback((summary: string, error?: unknown, options?: ReportUiErrorOptions) => {
+    const scope = options?.scope ?? currentScope;
+    if (scope !== currentScopeRef.current) return;
     setUiError(createUiError(scope, summary, error));
+    setUiErrorRecovery(options?.retry ? {
+      scope,
+      label: options.retryLabel ?? "Reintentar",
+      run: options.retry,
+    } : null);
   }, [currentScope]);
 
   const addMusicFolder = useCallback((folder: string) => {
@@ -219,9 +265,13 @@ export default function App() {
     folder: string,
     options?: { targetNavigation?: NavigationState },
   ) => {
+    const requestVersion = loadRequestVersion.current + 1;
+    loadRequestVersion.current = requestVersion;
+    const requestScope = currentScopeRef.current;
     log.info(`Loading database from ${folder}`);
     setState((previous) => ({ ...previous, loading: true }));
     setUiError(null);
+    setUiErrorRecovery(null);
     try {
       const recoveryRequest = services.getMutationRecoveryState(folder)
         .then((next) => ({ state: next, error: null as UiError | null }))
@@ -234,10 +284,12 @@ export default function App() {
         services.getDatabaseStats(folder),
         recoveryRequest,
       ]);
+      if (loadRequestVersion.current !== requestVersion) return;
       setRecoveryState(recovery.state);
       setRecoveryError(recovery.error);
       setRecoveryOutcomes([]);
       if (!demoMode) setIntegrity({ ...EMPTY_INTEGRITY_SNAPSHOT });
+      setIntegrityResults(EMPTY_INTEGRITY_RESULTS);
       log.info(`Loaded ${songs.length} songs`);
       setState((previous) => ({
         ...previous,
@@ -245,7 +297,9 @@ export default function App() {
         songs,
         stats,
         loading: false,
-        navigation: options?.targetNavigation ?? { workspace: "dashboard" },
+        navigation: currentScopeRef.current === requestScope
+          ? options?.targetNavigation ?? { workspace: "dashboard" }
+          : previous.navigation,
       }));
       setLastVdjFolder(folder);
       try {
@@ -254,11 +308,22 @@ export default function App() {
         // The loaded session remains valid without persistence.
       }
     } catch (error) {
+      if (loadRequestVersion.current !== requestVersion) return;
       log.error("Failed to load database", error);
       setState((previous) => ({ ...previous, loading: false }));
-      setUiError(createUiError(currentScope, "No se pudo abrir esta Biblioteca VirtualDJ.", error));
+      if (currentScopeRef.current === requestScope) {
+        setUiError(createUiError(requestScope, "No se pudo abrir esta Biblioteca VirtualDJ.", error));
+        setUiErrorRecovery({
+          scope: requestScope,
+          label: "Reintentar apertura",
+          run: () => loadFromFolderRef.current(folder, options),
+        });
+      } else {
+        setUiErrorRecovery(null);
+      }
     }
   }, [currentScope, demoMode, services]);
+  loadFromFolderRef.current = loadFromFolder;
 
   const refreshRecovery = useCallback(async () => {
     if (!state.vdjFolder) return;
@@ -329,6 +394,10 @@ export default function App() {
     }));
   }, []);
 
+  const updateIntegrityResults = useCallback((patch: Partial<IntegrityWorkspaceResults>) => {
+    setIntegrityResults((previous) => ({ ...previous, ...patch }));
+  }, []);
+
   const openRelinkTarget = useCallback((filePath: string) => {
     setRelinkTargetPath(filePath);
     setNavigation({ workspace: "integrity", section: "relink" });
@@ -347,6 +416,7 @@ export default function App() {
     reload,
     patchSong,
     uiError,
+    uiErrorRecovery,
     setUiError,
     reportUiError,
     clearUiError,
@@ -367,6 +437,8 @@ export default function App() {
     resolveRecovery,
     integrity,
     updateIntegrity,
+    integrityResults,
+    updateIntegrityResults,
     relinkTargetPath,
     openRelinkTarget,
     clearRelinkTarget,

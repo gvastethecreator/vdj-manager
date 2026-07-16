@@ -6,7 +6,7 @@ import { moveStatusLabel, transferMethodLabel } from "../lib/moveReport";
 import { SongMiniTable } from "../components/SongTable";
 import { MutationBlockedNotice } from "../components/MutationBlockedNotice";
 import { ConfirmDialog } from "../components/Dialog";
-import type { DuplicateResult, DuplicateGroup, LibraryRemovalResult, MoveBatchReport } from "../types/database";
+import type { DuplicateGroup, LibraryRemovalResult, MoveBatchReport } from "../types/database";
 
 type DupTab = "by_name" | "by_size" | "by_hash";
 
@@ -14,8 +14,8 @@ type DeleteModal = { open: false } | { open: true; dbOnly: boolean };
 
 /** Three-tab duplicate finder with selection, filters and bulk actions. */
 export function Duplicates() {
-    const { vdjFolder, reportUiError, reload, refreshRecovery, mutationsBlocked, services, updateIntegrity } = useApp();
-    const [result, setResult] = useState<DuplicateResult | null>(null);
+    const { vdjFolder, reportUiError, reload, refreshRecovery, mutationsBlocked, services, updateIntegrity, integrityResults, updateIntegrityResults } = useApp();
+    const result = integrityResults.duplicates;
     const [loading, setLoading] = useState(false);
     const [tab, setTab] = useState<DupTab>("by_name");
     const [selected, setSelected] = useState<Set<number>>(new Set());
@@ -44,7 +44,7 @@ export function Duplicates() {
             if (report.summary.completed > 0) await reload();
             setLoading(true);
             const nextResult = await services.findDuplicates(vdjFolder);
-            setResult(nextResult);
+            updateIntegrityResults({ duplicates: nextResult });
             updateIntegrity({ duplicateGroups: nextResult.by_name.length + nextResult.by_size.length + nextResult.by_hash.length });
         } catch (err) {
             reportUiError("No se pudieron mover los duplicados seleccionados.", err);
@@ -57,16 +57,16 @@ export function Duplicates() {
     async function runScan() {
         if (!vdjFolder) return;
         setLoading(true);
-        setResult(null);
+        updateIntegrityResults({ duplicates: null });
         setSelected(new Set());
         setRemovalResults([]);
         setMoveReport(null);
         try {
             const r = await services.findDuplicates(vdjFolder);
-            setResult(r);
+            updateIntegrityResults({ duplicates: r });
             updateIntegrity({ duplicateGroups: r.by_name.length + r.by_size.length + r.by_hash.length });
         } catch (err) {
-            reportUiError("No se pudo completar el análisis de duplicados.", err);
+            reportUiError("No se pudo completar el análisis de duplicados.", err, { retry: runScan });
         } finally {
             setLoading(false);
         }
@@ -175,7 +175,7 @@ export function Duplicates() {
             // Refresh duplicate groups without erasing the operation report.
             setLoading(true);
             const nextResult = await services.findDuplicates(vdjFolder);
-            setResult(nextResult);
+            updateIntegrityResults({ duplicates: nextResult });
             updateIntegrity({ duplicateGroups: nextResult.by_name.length + nextResult.by_size.length + nextResult.by_hash.length });
         } catch (err) {
             reportUiError("No se pudieron eliminar las referencias seleccionadas.", err);

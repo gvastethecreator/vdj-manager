@@ -24,6 +24,7 @@ function libraryName(folder: string | null): string {
 export function Layout({ children }: { children: ReactNode }) {
   const {
     uiError,
+    uiErrorRecovery,
     clearUiError,
     vdjFolder,
     stats,
@@ -32,6 +33,7 @@ export function Layout({ children }: { children: ReactNode }) {
     mutationsBlocked,
     recoveryError,
     navigation,
+    currentScope,
   } = useApp();
   const fullBleed = navigation.workspace !== "dashboard";
   const errorOwnedByWorkspace = navigation.workspace === "resources";
@@ -84,7 +86,20 @@ export function Layout({ children }: { children: ReactNode }) {
 
         <RecoveryCenter />
         <main className={`min-h-0 min-w-0 flex-1 overflow-auto ${fullBleed ? "p-0" : "p-5"}`}>
-          {uiError && !errorOwnedByWorkspace ? <div className={fullBleed ? "px-4 pt-4" : ""}><UiErrorNotice error={uiError} onDismiss={clearUiError} onRetry={() => void reload()} /></div> : null}
+          {uiError?.scope === currentScope && !errorOwnedByWorkspace ? (
+            <div className={fullBleed ? "px-4 pt-4" : ""}>
+              <UiErrorNotice
+                error={uiError}
+                onDismiss={clearUiError}
+                onRetry={uiErrorRecovery?.scope === currentScope ? () => {
+                  const retry = uiErrorRecovery.run;
+                  clearUiError();
+                  void retry();
+                } : undefined}
+                retryLabel={uiErrorRecovery?.scope === currentScope ? uiErrorRecovery.label : undefined}
+              />
+            </div>
+          ) : null}
           {children}
         </main>
       </div>

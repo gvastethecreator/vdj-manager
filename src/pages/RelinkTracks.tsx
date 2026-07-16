@@ -59,8 +59,10 @@ export function RelinkTracks() {
     updateIntegrity,
     relinkTargetPath,
     clearRelinkTarget,
+    integrityResults,
+    updateIntegrityResults,
   } = useApp();
-  const [results, setResults] = useState<FileVerification[] | null>(null);
+  const results = integrityResults.verification;
   const [loading, setLoading] = useState(false);
   const [searching, setSearching] = useState(false);
   const [relocating, setRelocating] = useState(false);
@@ -110,7 +112,7 @@ export function RelinkTracks() {
     clearUiError();
     try {
       const verification = await services.verifyFiles(vdjFolder);
-      setResults(verification);
+      updateIntegrityResults({ verification });
       updateIntegrity({
         missing: verification.filter((entry) => !entry.exists).length,
         mismatched: verification.filter((entry) => entry.exists && !entry.size_match).length,
@@ -128,7 +130,7 @@ export function RelinkTracks() {
       selectedPathRef.current = nextSelected;
       setCandidateMatch(null);
     } catch (error) {
-      reportUiError("No se pudo verificar la biblioteca antes de reconciliar.", error);
+      reportUiError("No se pudo verificar la biblioteca antes de reconciliar.", error, { retry: runVerify });
     } finally {
       setLoading(false);
     }
@@ -154,7 +156,9 @@ export function RelinkTracks() {
         reportUiError("No se encontraron candidatos seguros.", match.message ?? "La referencia requiere revisión manual.");
       }
     } catch (error) {
-      reportUiError("No se pudieron buscar candidatos de reconciliación.", error);
+      reportUiError("No se pudieron buscar candidatos de reconciliación.", error, {
+        retry: () => searchCandidates(roots),
+      });
     } finally {
       setSearching(false);
     }
@@ -188,8 +192,8 @@ export function RelinkTracks() {
         return;
       }
       setPending(null);
-      await runVerify();
       await reload();
+      await runVerify();
     } catch (error) {
       reportUiError("No se pudo guardar la ruta reconciliada.", error);
       setPending(null);
@@ -210,11 +214,11 @@ export function RelinkTracks() {
 
   useEffect(() => {
     if (!vdjFolder) {
-      setResults(null);
+      updateIntegrityResults({ verification: null });
       selectPath(null);
       return;
     }
-    void runVerify();
+    if (!results) void runVerify();
   }, [vdjFolder]);
 
   const counts = {

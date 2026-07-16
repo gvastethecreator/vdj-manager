@@ -119,7 +119,7 @@ export function FolderTree({
             <div key={node.path}>
                 <button
                     type="button"
-                    className={`flex w-full items-center gap-1 rounded px-2 py-1 text-xs transition-colors ${selectedPath === node.path
+                    className={`flex w-full items-center gap-1 rounded px-2 py-1 text-[13px] transition-colors ${selectedPath === node.path
                         ? "bg-primary/15 text-primary-light"
                         : "text-text-secondary hover:bg-surface-hover"
                         }`}

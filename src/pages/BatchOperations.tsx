@@ -1,4 +1,4 @@
-import { useState, useCallback, useMemo } from "react";
+import { useState, useCallback, useMemo, useRef } from "react";
 import { Eye, PanelLeftClose, PanelLeftOpen, Play } from "lucide-react";
 import { useApp } from "../App";
 import { SongTable } from "../components/SongTable";
@@ -24,18 +24,26 @@ export function BatchOperations() {
         grouping: "", bpm: "", key: "", stars: "", color: "",
         gain: "", user1: "", user2: "", commentText: "",
     });
-    const setTag = (field: keyof typeof tagForm, value: string) => {
-        setTagForm((prev) => ({ ...prev, [field]: value }));
-        setDryResult(null);
-        setMoveReport(null);
-    };
-    const running_tag_fields = Object.entries(tagForm).filter(([, v]) => v !== "");
     const [running, setRunning] = useState(false);
     const [log, setLog] = useState<string[]>([]);
     const [dryResult, setDryResult] = useState<DryRunResult | null>(null);
     const [moveReport, setMoveReport] = useState<MoveBatchReport | null>(null);
+    const [validatedPreviewKey, setValidatedPreviewKey] = useState<string | null>(null);
     const [confirmOpen, setConfirmOpen] = useState(false);
     const [treeOpen, setTreeOpen] = useState(true);
+    const previewRequestVersion = useRef(0);
+
+    const invalidatePreview = useCallback(() => {
+        previewRequestVersion.current += 1;
+        setValidatedPreviewKey(null);
+        setDryResult(null);
+        setMoveReport(null);
+    }, []);
+    const setTag = (field: keyof typeof tagForm, value: string) => {
+        setTagForm((prev) => ({ ...prev, [field]: value }));
+        invalidatePreview();
+    };
+    const running_tag_fields = Object.entries(tagForm).filter(([, v]) => v !== "");
 
     // Derive tree roots from actual music paths; fall back to VDJ folder
     const treeRoots = useMemo(
@@ -44,26 +52,43 @@ export function BatchOperations() {
     );
 
     const toggleSelect = useCallback((index: number) => {
+        invalidatePreview();
         setSelected((prev) => {
             const next = new Set(prev);
             if (next.has(index)) next.delete(index);
             else next.add(index);
             return next;
         });
-    }, []);
-    const selectAll = useCallback(() => setSelected(new Set(songs.map((s) => s.index))), [songs]);
-    const deselectAll = useCallback(() => setSelected(new Set()), []);
+    }, [invalidatePreview]);
+    const selectAll = useCallback(() => {
+        invalidatePreview();
+        setSelected(new Set(songs.map((s) => s.index)));
+    }, [invalidatePreview, songs]);
+    const deselectAll = useCallback(() => {
+        invalidatePreview();
+        setSelected(new Set());
+    }, [invalidatePreview]);
     const selectedPaths = useMemo(
         () => songs.filter((song) => selected.has(song.index)).map((song) => song.file_path),
         [selected, songs],
     );
+    const previewKey = useMemo(() => JSON.stringify({
+        action,
+        selectedPaths,
+        targetFolder: action === "move" ? targetFolder : "",
+        renameFileName: action === "rename" ? renameFileName : "",
+        tagForm: action === "tag" ? tagForm : {},
+    }), [action, renameFileName, selectedPaths, tagForm, targetFolder]);
+    const currentPreviewKey = useRef(previewKey);
+    currentPreviewKey.current = previewKey;
+    const hasFreshPreview = validatedPreviewKey === previewKey
+        && (action === "move" ? moveReport !== null : dryResult !== null);
 
     async function pickTarget() {
         const folder = await services.selectDirectory({ purpose: "destination", title: "Seleccionar carpeta destino" });
         if (folder) {
             setTargetFolder(folder);
-            setDryResult(null);
-            setMoveReport(null);
+            invalidatePreview();
             addMusicFolder(folder);
         }
     }
@@ -75,10 +100,18 @@ export function BatchOperations() {
     async function runDryRun() {
         if (!vdjFolder || selected.size === 0) return;
         const indices = Array.from(selected);
+        const requestVersion = previewRequestVersion.current + 1;
+        previewRequestVersion.current = requestVersion;
+        const requestKey = previewKey;
+        setValidatedPreviewKey(null);
+        setDryResult(null);
+        setMoveReport(null);
         try {
             if (action === "move" && targetFolder) {
-                setMoveReport(await services.planMoveFiles(vdjFolder, selectedPaths, targetFolder));
-                setDryResult(null);
+                const report = await services.planMoveFiles(vdjFolder, selectedPaths, targetFolder);
+                if (previewRequestVersion.current !== requestVersion || currentPreviewKey.current !== requestKey) return;
+                setMoveReport(report);
+                setValidatedPreviewKey(requestKey);
                 return;
             }
             let result: DryRunResult;
@@ -104,9 +137,12 @@ export function BatchOperations() {
                     }),
                 };
             }
+            if (previewRequestVersion.current !== requestVersion || currentPreviewKey.current !== requestKey) return;
             setDryResult(result);
+            setValidatedPreviewKey(requestKey);
         } catch (err) {
-            reportUiError("No se pudo preparar la vista previa de la operación.", err);
+            if (previewRequestVersion.current !== requestVersion) return;
+            reportUiError("No se pudo preparar la vista previa de la operación.", err, { retry: runDryRun });
         }
     }
 
@@ -115,11 +151,14 @@ export function BatchOperations() {
             reportUiError("Operación pausada por una recuperación pendiente.");
             return;
         }
+        if (!hasFreshPreview) {
+            reportUiError("Prepara una vista previa actualizada antes de ejecutar la operación.");
+            return;
+        }
         if (!vdjFolder || selected.size === 0) return;
         setRunning(true);
         setLog([]);
-        setDryResult(null);
-        setMoveReport(null);
+        invalidatePreview();
         try {
             const indices = Array.from(selected);
             if (action === "move" && targetFolder) {
@@ -198,7 +237,7 @@ export function BatchOperations() {
                 <div className="flex-1 overflow-auto p-1">
                     <FolderTree
                         roots={treeRoots}
-                        onSelect={(folder) => { setTargetFolder(folder); setDryResult(null); setMoveReport(null); }}
+                        onSelect={(folder) => { setTargetFolder(folder); invalidatePreview(); }}
                         selectedPath={targetFolder}
                         maxHeightClass="max-h-full"
                     />
@@ -228,7 +267,7 @@ export function BatchOperations() {
                         { key: "tag", label: "Editar Tag" },
                     ] as const).map(({ key, label }) => (
                         <button key={key} type="button"
-                            onClick={() => { setAction(key); setDryResult(null); setMoveReport(null); }}
+                            onClick={() => { setAction(key); invalidatePreview(); }}
                             className={`tab-item flex-1 ${action === key ? "tab-active" : ""}`}>
                             {label}
                         </button>
@@ -242,7 +281,8 @@ export function BatchOperations() {
                             <label className="mb-1 block text-xs text-text-muted">Carpeta destino</label>
                             <div className="flex gap-2">
                                 <input type="text" value={targetFolder}
-                                    onChange={(e) => { setTargetFolder(e.target.value); setDryResult(null); setMoveReport(null); }}
+                                    onChange={(e) => { setTargetFolder(e.target.value); invalidatePreview(); }}
+                                    aria-label="Carpeta destino"
                                     placeholder="Selecciona en el árbol o escribe una ruta"
                                     className="input flex-1" />
                                 <button type="button" onClick={pickTarget} className="btn btn-ghost">
@@ -258,7 +298,8 @@ export function BatchOperations() {
                                 Nombre de archivo destino (literal, con extensión)
                             </label>
                             <input type="text" value={renameFileName}
-                                onChange={(e) => { setRenameFileName(e.target.value); setDryResult(null); }}
+                                onChange={(e) => { setRenameFileName(e.target.value); invalidatePreview(); }}
+                                aria-label="Nombre de archivo destino"
                                 placeholder="ejemplo.mp3"
                                 className="input w-full" />
                             <p className="mt-1 text-xs text-text-muted">
@@ -285,6 +326,7 @@ export function BatchOperations() {
                                         <label className="mb-0.5 block text-xs text-text-muted">{label}</label>
                                         <input type="text" value={tagForm[field]}
                                             onChange={(e) => setTag(field, e.target.value)}
+                                            aria-label={label}
                                             placeholder="—" className="input w-full text-xs" />
                                     </div>
                                 ))}
@@ -297,6 +339,7 @@ export function BatchOperations() {
                                             value={tagForm.color || "#ffffff"}
                                             onChange={(e) => setTag("color", e.target.value)}
                                             className="color-picker-input"
+                                            aria-label="Selector de color"
                                             title="Elegir color"
                                         />
                                         <input
@@ -304,6 +347,7 @@ export function BatchOperations() {
                                             value={tagForm.color}
                                             onChange={(e) => setTag("color", e.target.value)}
                                             placeholder="—"
+                                            aria-label="Color en formato hexadecimal"
                                             className="input flex-1 font-mono text-xs"
                                             maxLength={9}
                                         />
@@ -326,7 +370,7 @@ export function BatchOperations() {
                                 disabled={running || selected.size === 0 || (action === "move" && targetFolder.length === 0) || (action === "rename" && (selected.size !== 1 || renameFileName.length === 0)) || (action === "tag" && running_tag_fields.length === 0)}
                                 className="btn btn-ghost"><Eye className="h-4 w-4" /> Preparar vista previa</button>
                             <button type="button" onClick={() => setConfirmOpen(true)}
-                                disabled={mutationsBlocked || running || selected.size === 0 || (action === "move" && targetFolder.length === 0) || (action === "rename" && (selected.size !== 1 || renameFileName.length === 0)) || (action === "tag" && running_tag_fields.length === 0)}
+                                disabled={mutationsBlocked || running || !hasFreshPreview || selected.size === 0 || (action === "move" && targetFolder.length === 0) || (action === "rename" && (selected.size !== 1 || renameFileName.length === 0)) || (action === "tag" && running_tag_fields.length === 0)}
                                 className="btn btn-primary">
                                 <Play className="h-4 w-4" /> {running ? "Ejecutando..." : "Ejecutar"}
                             </button>
