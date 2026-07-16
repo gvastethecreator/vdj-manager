@@ -1,0 +1,46 @@
+{
+  "workUnitId": "vdj-manager-operational-shell",
+  "archetype": "command-center",
+  "secondaryRegions": {
+    "library": "decision-list-plus-evidence-pane",
+    "resources": "inspector-workbench",
+    "operations": "workflow"
+  },
+  "userMode": ["monitor", "decide", "act"],
+  "primaryArtifact": "attention queue with evidence and next safe action",
+  "frequency": "repeated",
+  "pressure": "data-safety-sensitive desktop maintenance with long paths and dense collections",
+  "input": ["keyboard", "pointer"],
+  "spatialModel": "multi-panel desktop shell",
+  "costlyStates": [
+    "mutation recovery pending",
+    "integrity scan not run versus verified zero",
+    "destructive duplicate removal",
+    "partial batch mutation result",
+    "unsaved resource edit",
+    "invalid persisted pane widths"
+  ],
+  "constraints": [
+    "React 19, Vite 8, Tailwind CSS 4, Tauri 2",
+    "minimum viewport 1180x720",
+    "dark and light violet themes only",
+    "demo must never invoke Tauri or touch files",
+    "no changes to Rust commands, XML formats, or mutation contracts"
+  ],
+  "preservedContracts": [
+    "originalFilePath identity",
+    "patch-in-place XML writes",
+    "journal and mutation gate",
+    "table virtualization and inline edit",
+    "waveform preview",
+    "legacy demo page aliases"
+  ],
+  "proofMatrix": {
+    "viewports": ["1180x720", "1280x800", "1440x900"],
+    "themes": ["dark", "light"],
+    "states": ["healthy", "problem", "recovery", "empty", "dense", "long-path", "loading", "error", "disabled", "dirty"],
+    "interactions": ["keyboard navigation", "dialog focus loop", "pane resize and reset", "drawer", "save and revert"]
+  },
+  "designRead": "command center + monitor/decide/act + attention queue + safety-sensitive repeated use + multi-panel desktop shell + recovery/dense/keyboard proof"
+}
+

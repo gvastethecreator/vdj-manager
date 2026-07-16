@@ -1,0 +1,64 @@
+{
+  "calibration": {
+    "expression": "quiet instrument with one violet selection signal",
+    "density": "scan-heavy field in tables, focused sequence for destructive choices",
+    "motion": "instant and functional",
+    "familiarity": "established desktop navigation and table grammar",
+    "confidence": "evidentiary; status is qualified by freshness and verification",
+    "emotionalTone": ["calm", "exact", "protective"]
+  },
+  "directions": [
+    {
+      "id": "A",
+      "name": "Centro operativo",
+      "argument": "Organize the product around what needs attention, the evidence behind it, and the next safe action.",
+      "coreTask": "triage and act without losing safety context",
+      "composition": "72px rail + minimal header + attention queue; workspaces recompose inside the shell",
+      "interaction": "stable queue rows open the exact workspace and section",
+      "visualLanguage": "flat layered canvases, hard alignment, restrained violet, semantic state labels",
+      "signature": "attention queue with state, evidence, freshness, and next action",
+      "responsiveScrollModel": "one shell; workspace-owned scroll; library detail becomes drawer below 1200px",
+      "assetPlan": "real deterministic product fixtures and waveform output; no decorative imagery",
+      "representativeArtifact": "direction-sketches.md#direction-a--centro-operativo",
+      "primaryRisk": "the queue can become another card list unless rows share a strict operational grammar",
+      "proofTarget": "first viewport exposes current safety state and next action at 1180x720",
+      "status": "selected",
+      "selectionReason": "It matches the approved product thesis, keeps recovery visible, and gives every secondary workspace a stable destination without subordinating its primary artifact."
+    },
+    {
+      "id": "B",
+      "name": "Browser soberano",
+      "argument": "Make the library browser the permanent center and embed all repair tools around the selected track.",
+      "coreTask": "browse first, repair contextually",
+      "composition": "persistent tree/table/evidence frame with tools in contextual drawers",
+      "interaction": "selection is the universal route into every operation",
+      "visualLanguage": "dense workbench, pinned columns, subdued chrome",
+      "signature": "selected track anchors every diagnostic and mutation",
+      "responsiveScrollModel": "table owns space; side panels collapse progressively",
+      "assetPlan": "real song rows, paths, waveforms and candidate lists",
+      "representativeArtifact": "direction-sketches.md#direction-b--browser-soberano",
+      "primaryRisk": "global library health and resource editing become awkward passengers of a track-centric model",
+      "proofTarget": "track-to-repair path without route changes",
+      "status": "rejected",
+      "selectionReason": "Strong for Biblioteca but incompatible with Dashboard attention and non-track resources."
+    },
+    {
+      "id": "C",
+      "name": "Cadena de integridad",
+      "argument": "Present the app as a staged verify-review-repair-report pipeline.",
+      "coreTask": "move a library from unknown to verified",
+      "composition": "workflow strip above a stage-specific evidence canvas",
+      "interaction": "each stage exposes blockers, count, recovery and handoff",
+      "visualLanguage": "status ledger, checkpoints, compact reports",
+      "signature": "verification state advances only with evidence",
+      "responsiveScrollModel": "horizontal stage strip remains fixed; current stage owns vertical scroll",
+      "assetPlan": "real scan and mutation report fixtures",
+      "representativeArtifact": "direction-sketches.md#direction-c--cadena-de-integridad",
+      "primaryRisk": "library exploration and resource editing are nonlinear and do not belong inside a mandatory pipeline",
+      "proofTarget": "unknown-to-verified integrity flow with partial failure",
+      "status": "rejected",
+      "selectionReason": "Excellent for Resolver problemas, too linear as the product shell."
+    }
+  ]
+}
+
