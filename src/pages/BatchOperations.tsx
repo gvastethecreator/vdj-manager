@@ -1,4 +1,5 @@
 import { useState, useCallback, useMemo } from "react";
+import { Eye, PanelLeftClose, PanelLeftOpen, Play } from "lucide-react";
 import { useApp } from "../App";
 import { SongTable } from "../components/SongTable";
 import { FolderTree } from "../components/FolderTree";
@@ -23,14 +24,18 @@ export function BatchOperations() {
         grouping: "", bpm: "", key: "", stars: "", color: "",
         gain: "", user1: "", user2: "", commentText: "",
     });
-    const setTag = (field: keyof typeof tagForm, value: string) =>
+    const setTag = (field: keyof typeof tagForm, value: string) => {
         setTagForm((prev) => ({ ...prev, [field]: value }));
+        setDryResult(null);
+        setMoveReport(null);
+    };
     const running_tag_fields = Object.entries(tagForm).filter(([, v]) => v !== "");
     const [running, setRunning] = useState(false);
     const [log, setLog] = useState<string[]>([]);
     const [dryResult, setDryResult] = useState<DryRunResult | null>(null);
     const [moveReport, setMoveReport] = useState<MoveBatchReport | null>(null);
     const [confirmOpen, setConfirmOpen] = useState(false);
+    const [treeOpen, setTreeOpen] = useState(true);
 
     // Derive tree roots from actual music paths; fall back to VDJ folder
     const treeRoots = useMemo(
@@ -57,6 +62,8 @@ export function BatchOperations() {
         const folder = await services.selectDirectory({ purpose: "destination", title: "Seleccionar carpeta destino" });
         if (folder) {
             setTargetFolder(folder);
+            setDryResult(null);
+            setMoveReport(null);
             addMusicFolder(folder);
         }
     }
@@ -170,9 +177,9 @@ export function BatchOperations() {
     }
 
     return (
-        <div className="flex h-full gap-0">
+        <div className="flex h-full min-h-0 gap-0 bg-background">
             {/* ── Left side panel: folder tree ── */}
-            <div className="flex w-56 shrink-0 flex-col border-r-2 border-border bg-surface">
+            {treeOpen && <aside id="batch-destination-tree" className="flex w-64 shrink-0 flex-col overflow-hidden border-r border-border bg-surface" aria-label="Árbol de destinos">
                 <div className="flex items-center justify-between border-b-2 border-border px-3 py-2">
                     <span className="text-xs font-semibold text-text-muted">Carpetas</span>
                     <button type="button" onClick={pickTreeRoot}
@@ -191,16 +198,26 @@ export function BatchOperations() {
                 <div className="flex-1 overflow-auto p-1">
                     <FolderTree
                         roots={treeRoots}
-                        onSelect={setTargetFolder}
+                        onSelect={(folder) => { setTargetFolder(folder); setDryResult(null); setMoveReport(null); }}
                         selectedPath={targetFolder}
                         maxHeightClass="max-h-full"
                     />
                 </div>
-            </div>
+            </aside>}
 
             {/* ── Right: main content ── */}
-            <div className="min-w-0 flex-1 space-y-3 overflow-auto p-3">
-                <h2 className="text-lg font-bold text-text">Operaciones en Lote</h2>
+            <div className="min-w-0 flex-1 space-y-4 overflow-auto p-4">
+                <header className="flex items-start justify-between gap-4">
+                    <div>
+                        <p className="text-xs font-semibold uppercase tracking-wide text-primary-light">Workspace de ejecución</p>
+                        <h1 className="mt-1 text-xl font-bold text-text">Operaciones en lote</h1>
+                        <p className="mt-1 text-sm text-text-muted">Selecciona pistas, prepara una vista previa y confirma una única operación protegida.</p>
+                    </div>
+                    <button type="button" className="btn btn-ghost btn-sm" onClick={() => setTreeOpen((value) => !value)} aria-expanded={treeOpen} aria-controls="batch-destination-tree">
+                        {treeOpen ? <PanelLeftClose className="h-4 w-4" /> : <PanelLeftOpen className="h-4 w-4" />}
+                        {treeOpen ? "Ocultar destinos" : "Mostrar destinos"}
+                    </button>
+                </header>
                 <MutationBlockedNotice />
 
                 {/* Action tabs */}
@@ -225,7 +242,7 @@ export function BatchOperations() {
                             <label className="mb-1 block text-xs text-text-muted">Carpeta destino</label>
                             <div className="flex gap-2">
                                 <input type="text" value={targetFolder}
-                                    onChange={(e) => setTargetFolder(e.target.value)}
+                                    onChange={(e) => { setTargetFolder(e.target.value); setDryResult(null); setMoveReport(null); }}
                                     placeholder="Selecciona en el árbol o escribe una ruta"
                                     className="input flex-1" />
                                 <button type="button" onClick={pickTarget} className="btn btn-ghost">
@@ -241,7 +258,7 @@ export function BatchOperations() {
                                 Nombre de archivo destino (literal, con extensión)
                             </label>
                             <input type="text" value={renameFileName}
-                                onChange={(e) => setRenameFileName(e.target.value)}
+                                onChange={(e) => { setRenameFileName(e.target.value); setDryResult(null); }}
                                 placeholder="ejemplo.mp3"
                                 className="input w-full" />
                             <p className="mt-1 text-xs text-text-muted">
@@ -307,11 +324,11 @@ export function BatchOperations() {
                         <div className="flex gap-2">
                             <button type="button" onClick={runDryRun}
                                 disabled={running || selected.size === 0 || (action === "move" && targetFolder.length === 0) || (action === "rename" && (selected.size !== 1 || renameFileName.length === 0)) || (action === "tag" && running_tag_fields.length === 0)}
-                                className="btn btn-warning">Vista Previa</button>
+                                className="btn btn-ghost"><Eye className="h-4 w-4" /> Preparar vista previa</button>
                             <button type="button" onClick={() => setConfirmOpen(true)}
                                 disabled={mutationsBlocked || running || selected.size === 0 || (action === "move" && targetFolder.length === 0) || (action === "rename" && (selected.size !== 1 || renameFileName.length === 0)) || (action === "tag" && running_tag_fields.length === 0)}
                                 className="btn btn-primary">
-                                {running ? "Ejecutando..." : "Ejecutar"}
+                                <Play className="h-4 w-4" /> {running ? "Ejecutando..." : "Ejecutar"}
                             </button>
                         </div>
                     </div>

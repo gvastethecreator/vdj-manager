@@ -11,6 +11,7 @@ import type {
 } from "./types/database";
 import { ErrorBoundary } from "./components/ErrorBoundary";
 import { Layout } from "./components/Layout";
+import { IntegrityWorkspace } from "./components/IntegrityWorkspace";
 import { getDemoAppState, isDemoMode } from "./lib/demoData";
 import {
   initialNavigation,
@@ -82,6 +83,9 @@ interface AppContextType extends AppState {
   resolveRecovery: (action: MutationRecoveryAction, journalId: string) => Promise<void>;
   integrity: IntegritySnapshot;
   updateIntegrity: (patch: Partial<IntegritySnapshot>) => void;
+  relinkTargetPath: string | null;
+  openRelinkTarget: (filePath: string) => void;
+  clearRelinkTarget: () => void;
 }
 
 const AppContext = createContext<AppContextType | null>(null);
@@ -136,6 +140,7 @@ export default function App() {
       ? demoIntegritySnapshot(new URLSearchParams(window.location.search).get("state") ?? "healthy")
       : { ...EMPTY_INTEGRITY_SNAPSHOT }
   ));
+  const [relinkTargetPath, setRelinkTargetPath] = useState<string | null>(null);
 
   const currentScope = navigationScope(state.navigation);
 
@@ -301,6 +306,13 @@ export default function App() {
     }));
   }, []);
 
+  const openRelinkTarget = useCallback((filePath: string) => {
+    setRelinkTargetPath(filePath);
+    setNavigation({ workspace: "integrity", section: "relink" });
+  }, [setNavigation]);
+
+  const clearRelinkTarget = useCallback(() => setRelinkTargetPath(null), []);
+
   const context: AppContextType = {
     ...state,
     setNavigation,
@@ -331,6 +343,9 @@ export default function App() {
     resolveRecovery,
     integrity,
     updateIntegrity,
+    relinkTargetPath,
+    openRelinkTarget,
+    clearRelinkTarget,
   };
 
   function renderPage(): ReactNode {
@@ -339,10 +354,10 @@ export default function App() {
       case "dashboard": return <Dashboard />;
       case "songs": return <Songs />;
       case "playlists": return <Songs />;
-      case "duplicates": return <Duplicates />;
-      case "missing": return <MissingFiles />;
-      case "relink": return <RelinkTracks />;
-      case "orphans": return <OrphanFiles />;
+      case "duplicates": return <IntegrityWorkspace><Duplicates /></IntegrityWorkspace>;
+      case "missing": return <IntegrityWorkspace><MissingFiles /></IntegrityWorkspace>;
+      case "relink": return <IntegrityWorkspace><RelinkTracks /></IntegrityWorkspace>;
+      case "orphans": return <IntegrityWorkspace><OrphanFiles /></IntegrityWorkspace>;
       case "batch": return <BatchOperations />;
       case "configs": return <Configs />;
       case "pads": return <Pads />;

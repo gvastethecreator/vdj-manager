@@ -12,6 +12,16 @@ describe("operational attention queue", () => {
     ]);
   });
 
+  test.each(["loading", "error", "empty", "dense"])(
+    "keeps integrity metrics unverified for the %s visual fixture",
+    (scenario) => {
+      const snapshot = demoIntegritySnapshot(scenario);
+      expect(displayScanCount(snapshot.missing)).toBe("Sin verificar");
+      expect(displayScanCount(snapshot.duplicateGroups)).toBe("Sin verificar");
+      expect(displayScanCount(snapshot.orphans)).toBe("Sin verificar");
+    },
+  );
+
   test("prioritizes recovery and broken paths before duplicate cleanup", () => {
     const queue = buildAttentionQueue(demoIntegritySnapshot("problem"), true);
     expect(queue.map((item) => item.id)).toEqual(["recovery", "missing", "duplicates", "orphans"]);

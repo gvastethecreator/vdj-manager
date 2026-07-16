@@ -204,6 +204,14 @@ export function Duplicates() {
                 </div>
             )}
 
+            {!loading && result === null ? (
+                <div className="rounded-lg border border-dashed border-border bg-surface px-6 py-10 text-center">
+                    <h3 className="text-base font-semibold text-text">Todavía no se analizaron duplicados</h3>
+                    <p className="mx-auto mt-2 max-w-xl text-sm leading-relaxed text-text-muted">El análisis compara nombre, tamaño y hash. Ningún resultado se interpreta como cero hasta ejecutar la búsqueda.</p>
+                    <button type="button" onClick={() => void runScan()} disabled={!vdjFolder} className="btn btn-primary mt-4">Ejecutar análisis</button>
+                </div>
+            ) : null}
+
             {result && (
                 <>
                     {/* Tabs */}

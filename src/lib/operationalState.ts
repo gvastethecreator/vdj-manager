@@ -28,7 +28,7 @@ export const EMPTY_INTEGRITY_SNAPSHOT: IntegritySnapshot = {
 };
 
 export function demoIntegritySnapshot(scenario: string): IntegritySnapshot {
-  if (scenario === "unverified") return { ...EMPTY_INTEGRITY_SNAPSHOT };
+  if (["unverified", "loading", "error", "empty", "dense"].includes(scenario)) return { ...EMPTY_INTEGRITY_SNAPSHOT };
   const problem = scenario === "problem";
   return {
     missing: problem ? 1 : 0,

@@ -57,13 +57,16 @@ export function RelinkTracks() {
     refreshRecovery,
     services,
     updateIntegrity,
+    relinkTargetPath,
+    clearRelinkTarget,
   } = useApp();
   const [results, setResults] = useState<FileVerification[] | null>(null);
   const [loading, setLoading] = useState(false);
   const [searching, setSearching] = useState(false);
   const [relocating, setRelocating] = useState(false);
-  const [selectedPath, setSelectedPath] = useState<string | null>(null);
-  const selectedPathRef = useRef<string | null>(null);
+  const [selectedPath, setSelectedPath] = useState<string | null>(relinkTargetPath);
+  const selectedPathRef = useRef<string | null>(relinkTargetPath);
+  const autoSearchRef = useRef<string | null>(null);
   const [candidateMatch, setCandidateMatch] = useState<{
     originalFilePath: string;
     status: "completed" | "not_found" | "manual_review_required";
@@ -156,6 +159,14 @@ export function RelinkTracks() {
       setSearching(false);
     }
   }
+
+  useEffect(() => {
+    if (!relinkTargetPath || !selectedItem || searching) return;
+    if (pathKey(selectedItem.verification.file_path) !== pathKey(relinkTargetPath)) return;
+    if (autoSearchRef.current === pathKey(relinkTargetPath)) return;
+    autoSearchRef.current = pathKey(relinkTargetPath);
+    void searchCandidates().finally(clearRelinkTarget);
+  }, [clearRelinkTarget, relinkTargetPath, searching, selectedItem]);
 
   function requestRelink(newFilePath: string, candidate: SimilarFileCandidate | null = null) {
     if (!selectedItem || mutationsBlocked) return;

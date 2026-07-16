@@ -11,7 +11,7 @@ type Filter = "all" | "missing" | "mismatch" | "ok";
  * diagnostic surface never writes database.xml or ranks candidates.
  */
 export function MissingFiles() {
-  const { vdjFolder, clearUiError, reportUiError, services, setNavigation, updateIntegrity } = useApp();
+  const { vdjFolder, clearUiError, reportUiError, services, setNavigation, updateIntegrity, openRelinkTarget } = useApp();
   const [results, setResults] = useState<FileVerification[] | null>(null);
   const [loading, setLoading] = useState(false);
   const [filter, setFilter] = useState<Filter>("missing");
@@ -126,6 +126,7 @@ export function MissingFiles() {
                   <th className="px-3 py-2 text-left text-xs font-medium text-text-muted">Artista</th>
                   <th className="px-3 py-2 text-right text-xs font-medium text-text-muted">Esperado</th>
                   <th className="px-3 py-2 text-right text-xs font-medium text-text-muted">Real</th>
+                  <th className="px-3 py-2 text-right text-xs font-medium text-text-muted">Próxima acción</th>
                 </tr>
               </thead>
               <tbody>
@@ -145,6 +146,13 @@ export function MissingFiles() {
                     <td className="max-w-40 truncate px-3 py-2">{entry.author ?? "—"}</td>
                     <td className="px-3 py-2 text-right tabular-nums">{formatSize(entry.expected_size)}</td>
                     <td className="px-3 py-2 text-right tabular-nums">{formatSize(entry.actual_size)}</td>
+                    <td className="px-3 py-2 text-right">
+                      {!entry.exists ? (
+                        <button type="button" className="btn btn-ghost btn-sm" onClick={() => openRelinkTarget(entry.file_path)}>
+                          <Link2 className="h-3.5 w-3.5" /> Ver candidatos
+                        </button>
+                      ) : <span className="text-xs text-text-muted">Sin acción</span>}
+                    </td>
                   </tr>
                 ))}
               </tbody>

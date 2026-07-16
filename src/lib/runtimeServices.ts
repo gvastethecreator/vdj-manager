@@ -135,6 +135,16 @@ function clone<T>(value: T): T {
   return JSON.parse(JSON.stringify(value)) as T;
 }
 
+async function demoIntegrityGate(operation: string): Promise<void> {
+  const scenario = demoScenario();
+  if (scenario === "loading") {
+    await new Promise((resolve) => setTimeout(resolve, 900));
+  }
+  if (scenario === "error") {
+    throw new Error(`Fixture demo: ${operation} no está disponible.`);
+  }
+}
+
 function demoVerification(): FileVerification[] {
   const problem = demoScenario() === "problem";
   return demoSongs.filter((song) => song.in_database).map((song, index) => ({
@@ -250,8 +260,12 @@ export function createDemoRuntimeServices(): RuntimeServices {
         }],
       };
     },
-    async verifyFiles() { return clone(demoVerification()); },
+    async verifyFiles() {
+      await demoIntegrityGate("verificación de archivos");
+      return clone(demoVerification());
+    },
     async scanMusicFolder(folderPath) {
+      await demoIntegrityGate("escaneo de carpeta");
       return scenarioSongs.filter((song) => song.file_path.toLowerCase().startsWith(folderPath.toLowerCase())).map((song) => song.file_path);
     },
     async renameFileOp(_folder, originalFilePath, newFileName): Promise<RenameFileResult> {
@@ -261,6 +275,7 @@ export function createDemoRuntimeServices(): RuntimeServices {
     async moveFilesOp(_folder, paths, targetFolder) { return demoMoveReport(paths, targetFolder, true); },
     async findOrphanFiles() { return demoScenario() === "problem" ? [`${DEMO_MUSIC_ROOTS[2]}\\Uncatalogued Edit.wav`] : []; },
     async findDuplicates(): Promise<DuplicateResult> {
+      await demoIntegrityGate("análisis de duplicados");
       if (demoScenario() !== "problem") return { by_name: [], by_size: [], by_hash: [] };
       const pair = [clone(demoSongs[0]), { ...clone(demoSongs[0]), index: 90, file_path: `${DEMO_MUSIC_ROOTS[2]}\\Disclosure - You & Me copy.flac`, file_name: "Disclosure - You & Me copy.flac" }];
       return { by_name: [{ key: "disclosure - you & me", songs: pair }], by_size: [], by_hash: [] };
@@ -269,6 +284,7 @@ export function createDemoRuntimeServices(): RuntimeServices {
       return Promise.all(missingPaths.map((path) => createDemoRuntimeServices().findRelinkCandidates(_folder, path, [scanFolder])));
     },
     async findRelinkCandidates(_folder, originalFilePath, scanFolders): Promise<SimilarFileMatch> {
+      await demoIntegrityGate("búsqueda de candidatos");
       const target = `${scanFolders[0] ?? DEMO_MUSIC_ROOTS[0]}\\Recovered\\${originalFilePath.split(/[\\/]/).pop() ?? "track.mp3"}`;
       return {
         status: "completed",
