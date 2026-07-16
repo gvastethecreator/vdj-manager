@@ -258,6 +258,50 @@ export const demoStats: DatabaseStats = {
   songs_with_tags: 5,
 };
 
+function statsForSongs(songs: SongSummary[]): DatabaseStats {
+  const catalogued = songs.filter((song) => song.in_database);
+  const countBy = (selector: (song: SongSummary) => string | null | undefined) => {
+    const counts = new Map<string, number>();
+    for (const song of catalogued) {
+      const value = selector(song);
+      if (value) counts.set(value, (counts.get(value) ?? 0) + 1);
+    }
+    return [...counts.entries()].sort((a, b) => b[1] - a[1] || a[0].localeCompare(b[0]));
+  };
+  const bpms = catalogued.flatMap((song) => song.bpm == null ? [] : [song.bpm]);
+  return {
+    total_songs: catalogued.length,
+    total_size_bytes: catalogued.reduce((total, song) => total + (song.file_size ?? 0), 0),
+    genres: countBy((song) => song.genre),
+    artists: countBy((song) => song.author),
+    years: countBy((song) => song.year),
+    avg_bpm: bpms.length ? bpms.reduce((total, bpm) => total + bpm, 0) / bpms.length : null,
+    songs_with_cues: catalogued.filter((song) => song.cue_count > 0).length,
+    songs_with_tags: catalogued.filter((song) => song.title || song.author || song.genre).length,
+  };
+}
+
+export function demoSongsForScenario(scenario: string): SongSummary[] {
+  if (scenario === "empty") return [];
+  if (scenario !== "dense") return demoSongs;
+  const bases = demoSongs.filter((song) => song.in_database);
+  return Array.from({ length: 160 }, (_, index) => {
+    const base = bases[index % bases.length];
+    const number = String(index + 1).padStart(3, "0");
+    const artist = base.author ?? "Demo Artist";
+    const title = `${base.title ?? "Untitled"} · Library Cut ${number}`;
+    const fileName = `${artist} - ${title}.mp3`;
+    return {
+      ...base,
+      index,
+      file_name: fileName,
+      file_path: `D:\\Music\\Archive\\2020s\\Curated Sets and Extended Versions\\${artist}\\Season ${Math.floor(index / 20) + 1}\\${fileName}`,
+      title,
+      play_count: (base.play_count ?? 0) + index,
+    };
+  });
+}
+
 const demoPages = new Set<Page>([
   "home",
   "dashboard",
@@ -283,10 +327,12 @@ export function getDemoInitialPage(): Page {
 }
 
 export function getDemoAppState() {
+  const scenario = new URLSearchParams(window.location.search).get("state") ?? "healthy";
+  const songs = demoSongsForScenario(scenario);
   return {
     vdjFolder: DEMO_FOLDER,
-    songs: demoSongs,
-    stats: demoStats,
+    songs,
+    stats: scenario === "healthy" || scenario === "problem" || scenario === "unverified" ? demoStats : statsForSongs(songs),
     musicFolders: DEMO_MUSIC_ROOTS,
   };
 }

@@ -36,7 +36,6 @@ import { RelinkTracks } from "./pages/RelinkTracks";
 import { OrphanFiles } from "./pages/OrphanFiles";
 import { BatchOperations } from "./pages/BatchOperations";
 import { Configs } from "./pages/Configs";
-import { Playlists } from "./pages/Playlists";
 import { Pads } from "./pages/Pads";
 import { Mappers } from "./pages/Mappers";
 import { getDemoRecoveryState, isMutationBlocked } from "./lib/recovery";
@@ -339,7 +338,7 @@ export default function App() {
       case "home": return <Home />;
       case "dashboard": return <Dashboard />;
       case "songs": return <Songs />;
-      case "playlists": return <Playlists />;
+      case "playlists": return <Songs />;
       case "duplicates": return <Duplicates />;
       case "missing": return <MissingFiles />;
       case "relink": return <RelinkTracks />;

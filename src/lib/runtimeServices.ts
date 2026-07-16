@@ -2,7 +2,7 @@ import { convertFileSrc } from "@tauri-apps/api/core";
 import { open } from "@tauri-apps/plugin-dialog";
 import * as api from "./api";
 import { buildSyntheticWaveformPreview } from "./waveformFallback";
-import { DEMO_FOLDER, DEMO_MUSIC_ROOTS, demoSongs, demoStats } from "./demoData";
+import { DEMO_FOLDER, DEMO_MUSIC_ROOTS, demoSongs, demoSongsForScenario, demoStats } from "./demoData";
 import { getDemoRecoveryState } from "./recovery";
 import type {
   ApplyRecoveryResult,
@@ -219,6 +219,7 @@ export function createTauriRuntimeServices(): RuntimeServices {
 }
 
 export function createDemoRuntimeServices(): RuntimeServices {
+  const scenarioSongs = demoSongsForScenario(demoScenario());
   return {
     mode: "demo",
     async selectDirectory({ purpose }) {
@@ -226,7 +227,7 @@ export function createDemoRuntimeServices(): RuntimeServices {
     },
     async selectFile() { return `${DEMO_FOLDER}\\Playlists\\Warm up.m3u8`; },
     convertFileSrc: () => SILENT_WAV,
-    async loadDatabase() { return clone(demoSongs); },
+    async loadDatabase() { return clone(scenarioSongs); },
     async getWaveformPreview(filePath, bucketCount = 64) { return buildSyntheticWaveformPreview(filePath, bucketCount); },
     async getDatabaseStats() { return clone(demoStats); },
     async updateSongTags(_folder, originalFilePath, update): Promise<UpdateSongTagsResult> {
@@ -251,7 +252,7 @@ export function createDemoRuntimeServices(): RuntimeServices {
     },
     async verifyFiles() { return clone(demoVerification()); },
     async scanMusicFolder(folderPath) {
-      return demoSongs.filter((song) => song.file_path.toLowerCase().startsWith(folderPath.toLowerCase())).map((song) => song.file_path);
+      return scenarioSongs.filter((song) => song.file_path.toLowerCase().startsWith(folderPath.toLowerCase())).map((song) => song.file_path);
     },
     async renameFileOp(_folder, originalFilePath, newFileName): Promise<RenameFileResult> {
       const parent = originalFilePath.replace(/[\\/][^\\/]+$/, "");
