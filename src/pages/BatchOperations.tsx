@@ -183,7 +183,7 @@ export function BatchOperations() {
                 <div className="flex items-center justify-between border-b-2 border-border px-3 py-2">
                     <span className="text-xs font-semibold text-text-muted">Carpetas</span>
                     <button type="button" onClick={pickTreeRoot}
-                        className="text-xs text-primary-light hover:underline">
+                        className="inline-flex min-h-8 items-center rounded px-2 text-xs text-primary-light hover:bg-primary/10">
                         + Agregar
                     </button>
                 </div>

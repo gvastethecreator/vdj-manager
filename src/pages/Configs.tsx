@@ -168,12 +168,13 @@ export function Configs() {
                                 const currentValue = draft[entry.key] ?? "";
                                 const isBoolean = looksBoolean(entry.value);
                                 const isAvailable = entry.value !== null;
+                                const labelId = `setting-${entry.key.replace(/[^a-zA-Z0-9_-]/g, "-")}-label`;
 
                                 return (
                                     <div key={entry.key} className="rounded border border-border/60 bg-surface-hover/20 p-3">
                                         <div className="flex flex-wrap items-start justify-between gap-2">
                                             <div>
-                                                <div className="text-sm font-medium text-text">{entry.label}</div>
+                                                <div id={labelId} className="text-sm font-medium text-text">{entry.label}</div>
                                                 <div className="mt-0.5 text-xs text-text-muted">{entry.description}</div>
                                             </div>
                                             <span className="rounded bg-background px-2 py-0.5 font-mono text-xs text-text-muted">
@@ -184,6 +185,7 @@ export function Configs() {
                                         <div className="mt-3">
                                             {isBoolean ? (
                                                 <select
+                                                    aria-labelledby={labelId}
                                                     className="input w-full"
                                                     value={normalizeBooleanInput(currentValue || entry.value || "no")}
                                                     onChange={(e) => onDraftChange(entry.key, e.target.value)}
@@ -195,6 +197,7 @@ export function Configs() {
                                             ) : (
                                                 <input
                                                     type="text"
+                                                    aria-labelledby={labelId}
                                                     className="input w-full"
                                                     value={currentValue}
                                                     onChange={(e) => onDraftChange(entry.key, e.target.value)}

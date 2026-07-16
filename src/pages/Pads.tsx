@@ -111,7 +111,7 @@ function XmlNodeEditor({
                         <Plus className="h-3.5 w-3.5" /> Hijo
                     </button>
                     {!isRoot && onRemove ? (
-                        <button type="button" onClick={() => onRemove(path)} className="btn btn-ghost btn-sm text-danger">
+                        <button type="button" onClick={() => onRemove(path)} className="btn btn-ghost btn-sm text-danger" aria-label={`Eliminar nodo ${node.name}`}>
                             <Trash2 className="h-3.5 w-3.5" />
                         </button>
                     ) : null}
@@ -151,7 +151,7 @@ function XmlNodeEditor({
                     <div key={`${path.join("-")}-${key}`} className="grid gap-2 md:grid-cols-[220px_1fr_auto] md:items-center">
                         <input className="input w-full font-mono" value={key} onChange={(e) => renameAttribute(key, e.target.value)} />
                         <input className="input w-full font-mono" value={value} onChange={(e) => setAttribute(key, e.target.value)} />
-                        <button type="button" onClick={() => removeAttribute(key)} className="btn btn-ghost btn-sm text-danger">
+                        <button type="button" onClick={() => removeAttribute(key)} className="btn btn-ghost btn-sm text-danger" aria-label={`Eliminar atributo ${key}`}>
                             <Trash2 className="h-3.5 w-3.5" />
                         </button>
                     </div>

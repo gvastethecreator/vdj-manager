@@ -51,8 +51,9 @@ export const ALL_COLUMNS: ColumnDef[] = [
         render: (s, { onPlayClick, playingPath }) => (
             <button
                 type="button"
-                className="flex h-5 w-5 items-center justify-center rounded-full text-text-muted hover:bg-primary/15 hover:text-primary-light"
+                className="flex h-[24px] w-[24px] items-center justify-center rounded-full text-text-muted hover:bg-primary/15 hover:text-primary-light"
                 onClick={() => onPlayClick?.(s.file_path)}
+                aria-label={playingPath === s.file_path ? `Pausar ${s.file_name}` : `Reproducir ${s.file_name}`}
                 title="Reproducir"
             >
                 {playingPath === s.file_path
@@ -75,7 +76,7 @@ export const ALL_COLUMNS: ColumnDef[] = [
     { key: "file_size", label: "Tamaño", width: 72, defaultVisible: false, cellClass: "tabular-nums", render: (s) => formatSize(s.file_size) },
     { key: "play_count", label: "Plays", width: 52, defaultVisible: true, cellClass: "tabular-nums", render: (s) => s.play_count ?? "—" },
     {
-        key: "stars", label: "★", width: 72, defaultVisible: true,
+        key: "stars", label: "★", width: 132, defaultVisible: true,
         render: (s, { onStarClick }) => <StarRating stars={s.stars} onRate={s.in_database && onStarClick ? (v) => onStarClick(s.index, v) : undefined} />,
     },
     { key: "cue_count", label: "Cues", width: 48, defaultVisible: true, cellClass: "tabular-nums", render: (s) => s.cue_count || "—" },
@@ -90,10 +91,10 @@ export const ALL_COLUMNS: ColumnDef[] = [
         key: "color", label: "Color", width: 46, defaultVisible: true,
         render: (_s, { rowColor, onColorClick }) => rowColor
             ? (_s.in_database
-                ? <button type="button" className="inline-block h-3.5 w-3.5 rounded-[3px] border border-border/60 cursor-pointer hover:ring-2 hover:ring-primary/40" style={{ backgroundColor: rowColor }} title={`Color: ${rowColor} — click para cambiar`} onClick={(e) => onColorClick?.(_s.index, e)} />
+                ? <button type="button" className="inline-block h-[24px] w-[24px] rounded-[3px] border border-border/60 cursor-pointer hover:ring-2 hover:ring-primary/40" style={{ backgroundColor: rowColor }} aria-label={`Cambiar color de ${_s.file_name}; actual ${rowColor}`} title={`Color: ${rowColor} — click para cambiar`} onClick={(e) => onColorClick?.(_s.index, e)} />
                 : <span className="inline-block h-3.5 w-3.5 rounded-[3px] border border-border/60" style={{ backgroundColor: rowColor }} title={`Color: ${rowColor}`} />)
             : (_s.in_database
-                ? <button type="button" className="text-text-muted hover:text-primary-light cursor-pointer" title="Asignar color" onClick={(e) => onColorClick?.(_s.index, e)}>+</button>
+                ? <button type="button" className="inline-flex h-[24px] w-[24px] items-center justify-center text-text-muted hover:text-primary-light cursor-pointer" aria-label={`Asignar color a ${_s.file_name}`} title="Asignar color" onClick={(e) => onColorClick?.(_s.index, e)}>+</button>
                 : <span className="text-text-muted">—</span>),
     },
     { key: "gain", label: "Gain", width: 52, defaultVisible: false, cellClass: "tabular-nums", render: (s) => s.gain ?? "—" },
@@ -128,6 +129,7 @@ function EditableCell({ song, columnKey, value, helpers }: {
         return (
             <input
                 type="text"
+                aria-label={`Editar ${columnKey} de ${song.file_name}`}
                 className="w-full rounded border border-primary/50 bg-surface px-1 py-0 text-xs text-text outline-none focus:border-primary"
                 value={helpers.editState?.value ?? ""}
                 onChange={(e) => helpers.onEditChange?.(e.target.value)}
@@ -165,9 +167,11 @@ function StarRating({ stars, onRate }: { stars: string | null | undefined; onRat
                 <button
                     key={n}
                     type="button"
-                    className="cursor-pointer p-0 leading-none"
-                    style={{ color: n <= filled ? STAR_COLORS[n - 1] : "var(--color-text-muted)", fontSize: "11px", background: "none", border: "none" }}
+                    className="flex h-[24px] w-[24px] items-center justify-center p-0 leading-none disabled:cursor-default"
+                    style={{ color: n <= filled ? STAR_COLORS[n - 1] : "var(--color-text-muted)", fontSize: "12px", background: "none", border: "none" }}
                     onClick={() => onRate?.(n === filled ? 0 : n)}
+                    disabled={!onRate}
+                    aria-label={`${n} estrella${n > 1 ? "s" : ""}`}
                     title={`${n} estrella${n > 1 ? "s" : ""}`}
                 >
                     ★
@@ -214,7 +218,7 @@ function ColorPickerPopup({ position, currentColor, onSelect, onClose }: {
                     <button
                         key={c}
                         type="button"
-                        className="h-5 w-5 rounded-[3px] border border-border/60 cursor-pointer hover:ring-2 hover:ring-primary/40"
+                        className="h-[24px] w-[24px] rounded-[3px] border border-border/60 cursor-pointer hover:ring-2 hover:ring-primary/40"
                         style={{ backgroundColor: c }}
                         onClick={() => onSelect(c)}
                         title={c}
@@ -224,9 +228,10 @@ function ColorPickerPopup({ position, currentColor, onSelect, onClose }: {
             <div className="mt-2 flex items-center gap-1.5">
                 <input
                     type="color"
+                    aria-label="Color personalizado"
                     value={custom}
                     onChange={(e) => setCustom(e.target.value)}
-                    className="h-6 w-6 cursor-pointer rounded border border-border/60 bg-transparent p-0"
+                    className="h-[24px] w-[24px] cursor-pointer rounded border border-border/60 bg-transparent p-0"
                 />
                 <button type="button" className="btn btn-ghost btn-sm flex-1 text-xs" onClick={() => onSelect(custom)}>
                     Aplicar
@@ -555,6 +560,7 @@ export function SongTable({
             <div className="mb-2.5 flex items-center gap-2.5">
                 <input
                     type="text"
+                    aria-label="Buscar canciones"
                     value={search}
                     onChange={(e) => setSearch(e.target.value)}
                     placeholder="Buscar por nombre, título, artista, álbum, género, sello, compositor..."
@@ -587,13 +593,13 @@ export function SongTable({
                     </colgroup>
                     <thead className="sticky top-0 z-10">
                         <tr onContextMenu={handleHeaderContext}>
-                            {selectable && <th className="w-8 px-2.5 py-1.5" />}
+                            {selectable && <th className="w-8 px-1.5 py-1.5" />}
                             {columns.map((c) => {
                                 const columnSortKey = getColumnSortKey(c);
                                 return (
                                     <th
                                         key={c.key}
-                                        className={`select-none whitespace-nowrap px-2.5 py-1.5 text-left text-xs font-semibold ${columnSortKey ? "cursor-pointer text-text-muted hover:text-text" : "text-text-muted/80"}`}
+                                        className={`select-none whitespace-nowrap ${c.key === "play" || c.key === "stars" ? "px-1" : "px-2.5"} py-1.5 text-left text-xs font-semibold ${columnSortKey ? "cursor-pointer text-text-muted hover:text-text" : "text-text-muted/80"}`}
                                         onClick={columnSortKey ? () => toggleSort(columnSortKey) : undefined}
                                         onContextMenu={handleHeaderContext}
                                     >
@@ -635,16 +641,17 @@ export function SongTable({
                                     onClick={() => onRowSelect?.(song)}
                                 >
                                     {selectable && (
-                                        <td className="px-2.5">
+                                        <td className="px-1.5">
                                             <input
                                                 type="checkbox"
+                                                aria-label={`Seleccionar ${song.file_name}`}
                                                 checked={selected?.has(song.index) ?? false}
                                                 onChange={() => onToggle?.(song.index)}
                                             />
                                         </td>
                                     )}
                                     {columns.map((c) => (
-                                        <td key={c.key} className={`px-2.5 ${c.cellClass ?? ""}`}>
+                                        <td key={c.key} className={`${c.key === "play" || c.key === "stars" ? "px-1" : "px-2.5"} ${c.cellClass ?? ""}`}>
                                             {c.render(song, helpers)}
                                         </td>
                                     ))}

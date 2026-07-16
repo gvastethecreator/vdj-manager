@@ -48,7 +48,6 @@ export function ResourceStudio({ children }: { children: ReactNode }) {
   } = useApp();
   const [editor, setEditor] = useState<ResourceEditorState | null>(null);
   const [pendingNavigation, setPendingNavigation] = useState<{
-    navigation: NavigationState;
     proceed: () => void;
   } | null>(null);
   const section = (navigation.section as ResourceSection | undefined) ?? "configs";
@@ -57,8 +56,8 @@ export function ResourceStudio({ children }: { children: ReactNode }) {
   useEffect(() => {
     if (!editor?.dirty) return;
     return registerNavigationBlocker((next, proceed) => {
-      if (sameNavigation(next, navigation)) return false;
-      setPendingNavigation({ navigation: next, proceed });
+      if (next && sameNavigation(next, navigation)) return false;
+      setPendingNavigation({ proceed });
       return true;
     });
   }, [editor?.dirty, navigation, registerNavigationBlocker]);
@@ -146,7 +145,7 @@ export function ResourceStudio({ children }: { children: ReactNode }) {
       <ConfirmDialog
         open={pendingNavigation !== null}
         title="Hay cambios sin guardar"
-        description="Si cambias de workspace, se restaurará la última versión cargada y se descartarán tus cambios pendientes."
+        description="Si continúas, se restaurará la última versión cargada y se descartarán tus cambios pendientes antes de navegar, recargar o cambiar de biblioteca."
         confirmLabel="Descartar y cambiar"
         destructive
         onCancel={() => setPendingNavigation(null)}

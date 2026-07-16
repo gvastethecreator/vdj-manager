@@ -429,7 +429,7 @@ export function Mappers() {
                                                             />
                                                         </label>
                                                         <div className="flex items-end xl:justify-end">
-                                                            <button type="button" onClick={() => removeBinding(index)} className="btn btn-ghost btn-sm text-danger">
+                                                            <button type="button" onClick={() => removeBinding(index)} className="btn btn-ghost btn-sm text-danger" aria-label={`Eliminar binding ${binding.value || index + 1}`}>
                                                                 <Trash2 className="h-3.5 w-3.5" />
                                                             </button>
                                                         </div>

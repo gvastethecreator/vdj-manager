@@ -57,7 +57,7 @@ interface AppState {
 
 interface AppContextType extends AppState {
   setNavigation: (navigation: NavigationState) => void;
-  registerNavigationBlocker: (blocker: (navigation: NavigationState, proceed: () => void) => boolean) => () => void;
+  registerNavigationBlocker: (blocker: (navigation: NavigationState | null, proceed: () => void) => boolean) => () => void;
   currentScope: string;
   services: RuntimeServices;
   selectFolder: () => Promise<void>;
@@ -143,7 +143,7 @@ export default function App() {
       : { ...EMPTY_INTEGRITY_SNAPSHOT }
   ));
   const [relinkTargetPath, setRelinkTargetPath] = useState<string | null>(null);
-  const navigationBlockerRef = useRef<((navigation: NavigationState, proceed: () => void) => boolean) | null>(null);
+  const navigationBlockerRef = useRef<((navigation: NavigationState | null, proceed: () => void) => boolean) | null>(null);
 
   const currentScope = navigationScope(state.navigation);
 
@@ -184,7 +184,7 @@ export default function App() {
     commitNavigation(normalized);
   }, [commitNavigation]);
 
-  const registerNavigationBlocker = useCallback((blocker: (navigation: NavigationState, proceed: () => void) => boolean) => {
+  const registerNavigationBlocker = useCallback((blocker: (navigation: NavigationState | null, proceed: () => void) => boolean) => {
     navigationBlockerRef.current = blocker;
     return () => {
       if (navigationBlockerRef.current === blocker) navigationBlockerRef.current = null;
@@ -293,18 +293,25 @@ export default function App() {
   }, [loadFromFolder, services, state.navigation, state.vdjFolder]);
 
   const selectFolder = useCallback(async () => {
-    const selected = await services.selectDirectory({
-      purpose: "virtualdj",
-      title: "Seleccionar carpeta de VirtualDJ",
-      defaultPath: "D:\\Documents\\VirtualDJ",
-    });
-    if (selected) await loadFromFolder(selected);
+    const performSelection = async () => {
+      const selected = await services.selectDirectory({
+        purpose: "virtualdj",
+        title: "Seleccionar carpeta de VirtualDJ",
+        defaultPath: "D:\\Documents\\VirtualDJ",
+      });
+      if (selected) await loadFromFolder(selected);
+    };
+    const blocker = navigationBlockerRef.current;
+    if (blocker?.(null, () => void performSelection())) return;
+    await performSelection();
   }, [loadFromFolder, services]);
 
   const reload = useCallback(async () => {
-    if (state.vdjFolder) {
-      await loadFromFolder(state.vdjFolder, { targetNavigation: state.navigation });
-    }
+    if (!state.vdjFolder) return;
+    const performReload = () => loadFromFolder(state.vdjFolder!, { targetNavigation: state.navigation });
+    const blocker = navigationBlockerRef.current;
+    if (blocker?.(null, () => void performReload())) return;
+    await performReload();
   }, [loadFromFolder, state.navigation, state.vdjFolder]);
 
   const patchSong = useCallback((songIndex: number, patch: Partial<SongSummary>) => {
