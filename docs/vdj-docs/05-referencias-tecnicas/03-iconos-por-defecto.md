@@ -15,7 +15,7 @@ tags:
 **Skin SDK: the Default Icons**
 
 ---
-![](VDJ%20Icons.png)
+![VirtualDJ default icons](https://www.virtualdj.com/files/icons.png)
 ---
 
   

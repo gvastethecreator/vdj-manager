@@ -1,0 +1,914 @@
+{
+  "generated_at": "2026-08-08T09:53:52Z",
+  "generated_from_commit": "eaa519c72d78bb7f50513bda7e4758e0513eb05a",
+  "scope": [
+    "."
+  ],
+  "nodes": [
+    {
+      "id": "external-dependencies",
+      "path": "src-tauri/src/commands/configs.rs",
+      "role": "Represents external packages referenced by tracked source files.",
+      "type": "external",
+      "boundary": "External",
+      "entrypoints": [
+        "src-tauri/src/commands/configs.rs:serde"
+      ],
+      "tests": [],
+      "constraints": [
+        "Only dependencies with literal tracked-source references appear here."
+      ],
+      "evidence": {
+        "status": "verified",
+        "locations": [
+          {
+            "path": "src-tauri/src/commands/configs.rs",
+            "symbol": "serde"
+          }
+        ]
+      }
+    },
+    {
+      "id": "repository",
+      "path": "index.html",
+      "role": "Owns the tracked files for the repository module.",
+      "type": "module",
+      "boundary": "Repository",
+      "entrypoints": [
+        "index.html:VDJ Database Manager"
+      ],
+      "tests": [],
+      "constraints": [
+        "This baseline uses tracked source and explicit dependency references only."
+      ],
+      "evidence": {
+        "status": "verified",
+        "locations": [
+          {
+            "path": "index.html",
+            "symbol": "VDJ Database Manager"
+          }
+        ]
+      }
+    },
+    {
+      "id": "src",
+      "path": "src",
+      "role": "Owns the tracked files for the src module.",
+      "type": "module",
+      "boundary": "Src",
+      "entrypoints": [
+        "src/App.tsx:useApp"
+      ],
+      "tests": [],
+      "constraints": [
+        "This baseline uses tracked source and explicit dependency references only."
+      ],
+      "evidence": {
+        "status": "verified",
+        "locations": [
+          {
+            "path": "src/App.tsx",
+            "symbol": "useApp"
+          }
+        ]
+      }
+    },
+    {
+      "id": "src-components",
+      "path": "src/components",
+      "role": "Owns the tracked files for the src / components module.",
+      "type": "interface",
+      "boundary": "Src",
+      "entrypoints": [
+        "src/components/CodeEditor.tsx:CodeEditor"
+      ],
+      "tests": [
+        "tests/Dialog.test.tsx",
+        "tests/PaneSeparator.test.tsx",
+        "tests/SongTableKeyboard.test.tsx",
+        "tests/UiErrorNotice.test.tsx"
+      ],
+      "constraints": [
+        "This baseline uses tracked source and explicit dependency references only."
+      ],
+      "evidence": {
+        "status": "verified",
+        "locations": [
+          {
+            "path": "src/components/CodeEditor.tsx",
+            "symbol": "CodeEditor"
+          }
+        ]
+      }
+    },
+    {
+      "id": "src-lib",
+      "path": "src/lib",
+      "role": "Owns the tracked files for the src / lib module.",
+      "type": "module",
+      "boundary": "Src",
+      "entrypoints": [
+        "src/lib/api.ts:loadDatabase"
+      ],
+      "tests": [
+        "src/lib/cueOverlay.test.ts",
+        "src/lib/libraryRemoval.test.ts",
+        "src/lib/moveReport.test.ts",
+        "src/lib/pathTree.test.ts",
+        "src/lib/pathUtils.test.ts"
+      ],
+      "constraints": [
+        "This baseline uses tracked source and explicit dependency references only."
+      ],
+      "evidence": {
+        "status": "verified",
+        "locations": [
+          {
+            "path": "src/lib/api.ts",
+            "symbol": "loadDatabase"
+          }
+        ]
+      }
+    },
+    {
+      "id": "src-pages",
+      "path": "src/pages",
+      "role": "Owns the tracked files for the src / pages module.",
+      "type": "interface",
+      "boundary": "Src",
+      "entrypoints": [
+        "src/pages/BatchOperations.tsx:BatchOperations"
+      ],
+      "tests": [],
+      "constraints": [
+        "This baseline uses tracked source and explicit dependency references only."
+      ],
+      "evidence": {
+        "status": "verified",
+        "locations": [
+          {
+            "path": "src/pages/BatchOperations.tsx",
+            "symbol": "BatchOperations"
+          }
+        ]
+      }
+    },
+    {
+      "id": "src-tauri",
+      "path": "src-tauri",
+      "role": "Owns the tracked files for the src-tauri module.",
+      "type": "module",
+      "boundary": "Src Tauri",
+      "entrypoints": [
+        "src-tauri/src/lib.rs:run"
+      ],
+      "tests": [
+        "src-tauri/tests/mutation_journal.rs"
+      ],
+      "constraints": [
+        "This baseline uses tracked source and explicit dependency references only."
+      ],
+      "evidence": {
+        "status": "verified",
+        "locations": [
+          {
+            "path": "src-tauri/src/lib.rs",
+            "symbol": "run"
+          }
+        ]
+      }
+    },
+    {
+      "id": "src-types",
+      "path": "src/types",
+      "role": "Owns the tracked files for the src / types module.",
+      "type": "module",
+      "boundary": "Src",
+      "entrypoints": [
+        "src/types/database.ts:CueMarker"
+      ],
+      "tests": [
+        "src/lib/cueOverlay.test.ts",
+        "src/lib/libraryRemoval.test.ts",
+        "src/lib/recovery.test.ts",
+        "src/lib/relink.test.ts"
+      ],
+      "constraints": [
+        "This baseline uses tracked source and explicit dependency references only."
+      ],
+      "evidence": {
+        "status": "verified",
+        "locations": [
+          {
+            "path": "src/types/database.ts",
+            "symbol": "CueMarker"
+          }
+        ]
+      }
+    }
+  ],
+  "edges": [
+    {
+      "from": "repository",
+      "to": "external-dependencies",
+      "type": "imports",
+      "evidence": {
+        "status": "verified",
+        "locations": [
+          {
+            "path": "vite.config.ts",
+            "symbol": "vite"
+          },
+          {
+            "path": "vite.config.ts",
+            "symbol": "@vitejs/plugin-react"
+          },
+          {
+            "path": "vite.config.ts",
+            "symbol": "@tailwindcss/vite"
+          }
+        ]
+      }
+    },
+    {
+      "from": "src",
+      "to": "external-dependencies",
+      "type": "imports",
+      "evidence": {
+        "status": "verified",
+        "locations": [
+          {
+            "path": "src/App.tsx",
+            "symbol": "react"
+          },
+          {
+            "path": "src/main.tsx",
+            "symbol": "react"
+          },
+          {
+            "path": "src/main.tsx",
+            "symbol": "react-dom/client"
+          }
+        ]
+      }
+    },
+    {
+      "from": "src",
+      "to": "src-components",
+      "type": "imports",
+      "evidence": {
+        "status": "verified",
+        "locations": [
+          {
+            "path": "src/App.tsx",
+            "symbol": "./components/ErrorBoundary"
+          },
+          {
+            "path": "src/App.tsx",
+            "symbol": "./components/Layout"
+          },
+          {
+            "path": "src/App.tsx",
+            "symbol": "./components/IntegrityWorkspace"
+          },
+          {
+            "path": "src/App.tsx",
+            "symbol": "./components/ResourceStudio"
+          },
+          {
+            "path": "src/main.tsx",
+            "symbol": "./components/ErrorBoundary"
+          }
+        ]
+      }
+    },
+    {
+      "from": "src",
+      "to": "src-lib",
+      "type": "imports",
+      "evidence": {
+        "status": "verified",
+        "locations": [
+          {
+            "path": "src/App.tsx",
+            "symbol": "./lib/api"
+          },
+          {
+            "path": "src/App.tsx",
+            "symbol": "./lib/logger"
+          },
+          {
+            "path": "src/App.tsx",
+            "symbol": "./lib/demoData"
+          },
+          {
+            "path": "src/App.tsx",
+            "symbol": "./lib/navigation"
+          },
+          {
+            "path": "src/App.tsx",
+            "symbol": "./lib/runtimeServices"
+          },
+          {
+            "path": "src/App.tsx",
+            "symbol": "./lib/uiError"
+          },
+          {
+            "path": "src/App.tsx",
+            "symbol": "./lib/theme"
+          },
+          {
+            "path": "src/App.tsx",
+            "symbol": "./lib/operationalState"
+          }
+        ]
+      }
+    },
+    {
+      "from": "src",
+      "to": "src-pages",
+      "type": "imports",
+      "evidence": {
+        "status": "verified",
+        "locations": [
+          {
+            "path": "src/App.tsx",
+            "symbol": "./pages/Home"
+          },
+          {
+            "path": "src/App.tsx",
+            "symbol": "./pages/Dashboard"
+          },
+          {
+            "path": "src/App.tsx",
+            "symbol": "./pages/Songs"
+          },
+          {
+            "path": "src/App.tsx",
+            "symbol": "./pages/Duplicates"
+          },
+          {
+            "path": "src/App.tsx",
+            "symbol": "./pages/MissingFiles"
+          },
+          {
+            "path": "src/App.tsx",
+            "symbol": "./pages/RelinkTracks"
+          },
+          {
+            "path": "src/App.tsx",
+            "symbol": "./pages/OrphanFiles"
+          },
+          {
+            "path": "src/App.tsx",
+            "symbol": "./pages/BatchOperations"
+          }
+        ]
+      }
+    },
+    {
+      "from": "src",
+      "to": "src-types",
+      "type": "imports",
+      "evidence": {
+        "status": "verified",
+        "locations": [
+          {
+            "path": "src/App.tsx",
+            "symbol": "./types/database"
+          }
+        ]
+      }
+    },
+    {
+      "from": "src-components",
+      "to": "external-dependencies",
+      "type": "imports",
+      "evidence": {
+        "status": "verified",
+        "locations": [
+          {
+            "path": "src/components/CodeEditor.tsx",
+            "symbol": "lucide-react"
+          },
+          {
+            "path": "src/components/Dialog.tsx",
+            "symbol": "react"
+          },
+          {
+            "path": "src/components/Dialog.tsx",
+            "symbol": "react-dom"
+          },
+          {
+            "path": "src/components/Dialog.tsx",
+            "symbol": "lucide-react"
+          },
+          {
+            "path": "src/components/ErrorBoundary.tsx",
+            "symbol": "react"
+          },
+          {
+            "path": "src/components/FolderTree.tsx",
+            "symbol": "react"
+          },
+          {
+            "path": "src/components/FolderTree.tsx",
+            "symbol": "lucide-react"
+          },
+          {
+            "path": "src/components/IntegrityWorkspace.tsx",
+            "symbol": "react"
+          }
+        ]
+      }
+    },
+    {
+      "from": "src-components",
+      "to": "src",
+      "type": "imports",
+      "evidence": {
+        "status": "verified",
+        "locations": [
+          {
+            "path": "src/components/FolderTree.tsx",
+            "symbol": "../App"
+          },
+          {
+            "path": "src/components/IntegrityWorkspace.tsx",
+            "symbol": "../App"
+          },
+          {
+            "path": "src/components/Layout.tsx",
+            "symbol": "../App"
+          },
+          {
+            "path": "src/components/MutationBlockedNotice.tsx",
+            "symbol": "../App"
+          },
+          {
+            "path": "src/components/RecoveryCenter.tsx",
+            "symbol": "../App"
+          },
+          {
+            "path": "src/components/ResourceStudio.tsx",
+            "symbol": "../App"
+          },
+          {
+            "path": "src/components/Sidebar.tsx",
+            "symbol": "../App"
+          },
+          {
+            "path": "src/components/SongDetailsCard.tsx",
+            "symbol": "../App"
+          }
+        ]
+      }
+    },
+    {
+      "from": "src-components",
+      "to": "src-lib",
+      "type": "imports",
+      "evidence": {
+        "status": "verified",
+        "locations": [
+          {
+            "path": "src/components/ErrorBoundary.tsx",
+            "symbol": "../lib/logger"
+          },
+          {
+            "path": "src/components/ErrorBoundary.tsx",
+            "symbol": "../lib/uiError"
+          },
+          {
+            "path": "src/components/FolderTree.tsx",
+            "symbol": "../lib/pathUtils"
+          },
+          {
+            "path": "src/components/FolderTree.tsx",
+            "symbol": "../lib/pathTree"
+          },
+          {
+            "path": "src/components/IntegrityWorkspace.tsx",
+            "symbol": "../lib/navigation"
+          },
+          {
+            "path": "src/components/IntegrityWorkspace.tsx",
+            "symbol": "../lib/operationalState"
+          },
+          {
+            "path": "src/components/RecoveryCenter.tsx",
+            "symbol": "../lib/recovery"
+          },
+          {
+            "path": "src/components/ResourceStudio.tsx",
+            "symbol": "../lib/navigation"
+          }
+        ]
+      }
+    },
+    {
+      "from": "src-components",
+      "to": "src-types",
+      "type": "imports",
+      "evidence": {
+        "status": "verified",
+        "locations": [
+          {
+            "path": "src/components/RecoveryCenter.tsx",
+            "symbol": "../types/database"
+          },
+          {
+            "path": "src/components/SongDetailsCard.tsx",
+            "symbol": "../types/database"
+          },
+          {
+            "path": "src/components/SongTable.tsx",
+            "symbol": "../types/database"
+          },
+          {
+            "path": "src/components/VdjResourceEditorPage.tsx",
+            "symbol": "../types/database"
+          },
+          {
+            "path": "src/components/WaveformPreview.tsx",
+            "symbol": "../types/database"
+          }
+        ]
+      }
+    },
+    {
+      "from": "src-lib",
+      "to": "external-dependencies",
+      "type": "imports",
+      "evidence": {
+        "status": "verified",
+        "locations": [
+          {
+            "path": "src/lib/api.ts",
+            "symbol": "@tauri-apps/api/core"
+          },
+          {
+            "path": "src/lib/runtimeServices.ts",
+            "symbol": "@tauri-apps/api/core"
+          },
+          {
+            "path": "src/lib/runtimeServices.ts",
+            "symbol": "@tauri-apps/plugin-dialog"
+          }
+        ]
+      }
+    },
+    {
+      "from": "src-lib",
+      "to": "src-types",
+      "type": "imports",
+      "evidence": {
+        "status": "verified",
+        "locations": [
+          {
+            "path": "src/lib/api.ts",
+            "symbol": "../types/database"
+          },
+          {
+            "path": "src/lib/cueOverlay.test.ts",
+            "symbol": "../types/database"
+          },
+          {
+            "path": "src/lib/cueOverlay.ts",
+            "symbol": "../types/database"
+          },
+          {
+            "path": "src/lib/demoData.ts",
+            "symbol": "../types/database"
+          },
+          {
+            "path": "src/lib/libraryRemoval.test.ts",
+            "symbol": "../types/database"
+          },
+          {
+            "path": "src/lib/libraryRemoval.ts",
+            "symbol": "../types/database"
+          },
+          {
+            "path": "src/lib/moveReport.ts",
+            "symbol": "../types/database"
+          },
+          {
+            "path": "src/lib/navigation.ts",
+            "symbol": "../types/database"
+          }
+        ]
+      }
+    },
+    {
+      "from": "src-pages",
+      "to": "external-dependencies",
+      "type": "imports",
+      "evidence": {
+        "status": "verified",
+        "locations": [
+          {
+            "path": "src/pages/BatchOperations.tsx",
+            "symbol": "react"
+          },
+          {
+            "path": "src/pages/BatchOperations.tsx",
+            "symbol": "lucide-react"
+          },
+          {
+            "path": "src/pages/Configs.tsx",
+            "symbol": "react"
+          },
+          {
+            "path": "src/pages/Dashboard.tsx",
+            "symbol": "lucide-react"
+          },
+          {
+            "path": "src/pages/Duplicates.tsx",
+            "symbol": "react"
+          },
+          {
+            "path": "src/pages/Home.tsx",
+            "symbol": "lucide-react"
+          },
+          {
+            "path": "src/pages/Mappers.tsx",
+            "symbol": "react"
+          },
+          {
+            "path": "src/pages/Mappers.tsx",
+            "symbol": "lucide-react"
+          }
+        ]
+      }
+    },
+    {
+      "from": "src-pages",
+      "to": "src",
+      "type": "imports",
+      "evidence": {
+        "status": "verified",
+        "locations": [
+          {
+            "path": "src/pages/BatchOperations.tsx",
+            "symbol": "../App"
+          },
+          {
+            "path": "src/pages/Configs.tsx",
+            "symbol": "../App"
+          },
+          {
+            "path": "src/pages/Dashboard.tsx",
+            "symbol": "../App"
+          },
+          {
+            "path": "src/pages/Duplicates.tsx",
+            "symbol": "../App"
+          },
+          {
+            "path": "src/pages/Home.tsx",
+            "symbol": "../App"
+          },
+          {
+            "path": "src/pages/Mappers.tsx",
+            "symbol": "../App"
+          },
+          {
+            "path": "src/pages/MissingFiles.tsx",
+            "symbol": "../App"
+          },
+          {
+            "path": "src/pages/OrphanFiles.tsx",
+            "symbol": "../App"
+          }
+        ]
+      }
+    },
+    {
+      "from": "src-pages",
+      "to": "src-components",
+      "type": "imports",
+      "evidence": {
+        "status": "verified",
+        "locations": [
+          {
+            "path": "src/pages/BatchOperations.tsx",
+            "symbol": "../components/SongTable"
+          },
+          {
+            "path": "src/pages/BatchOperations.tsx",
+            "symbol": "../components/FolderTree"
+          },
+          {
+            "path": "src/pages/BatchOperations.tsx",
+            "symbol": "../components/MutationBlockedNotice"
+          },
+          {
+            "path": "src/pages/BatchOperations.tsx",
+            "symbol": "../components/Dialog"
+          },
+          {
+            "path": "src/pages/Configs.tsx",
+            "symbol": "../components/ResourceStudio"
+          },
+          {
+            "path": "src/pages/Duplicates.tsx",
+            "symbol": "../components/SongTable"
+          },
+          {
+            "path": "src/pages/Duplicates.tsx",
+            "symbol": "../components/MutationBlockedNotice"
+          },
+          {
+            "path": "src/pages/Duplicates.tsx",
+            "symbol": "../components/Dialog"
+          }
+        ]
+      }
+    },
+    {
+      "from": "src-pages",
+      "to": "src-lib",
+      "type": "imports",
+      "evidence": {
+        "status": "verified",
+        "locations": [
+          {
+            "path": "src/pages/BatchOperations.tsx",
+            "symbol": "../lib/api"
+          },
+          {
+            "path": "src/pages/BatchOperations.tsx",
+            "symbol": "../lib/moveReport"
+          },
+          {
+            "path": "src/pages/Dashboard.tsx",
+            "symbol": "../lib/api"
+          },
+          {
+            "path": "src/pages/Dashboard.tsx",
+            "symbol": "../lib/operationalState"
+          },
+          {
+            "path": "src/pages/Duplicates.tsx",
+            "symbol": "../lib/api"
+          },
+          {
+            "path": "src/pages/Duplicates.tsx",
+            "symbol": "../lib/libraryRemoval"
+          },
+          {
+            "path": "src/pages/Duplicates.tsx",
+            "symbol": "../lib/moveReport"
+          },
+          {
+            "path": "src/pages/Mappers.tsx",
+            "symbol": "../lib/api"
+          }
+        ]
+      }
+    },
+    {
+      "from": "src-pages",
+      "to": "src-types",
+      "type": "imports",
+      "evidence": {
+        "status": "verified",
+        "locations": [
+          {
+            "path": "src/pages/BatchOperations.tsx",
+            "symbol": "../types/database"
+          },
+          {
+            "path": "src/pages/Configs.tsx",
+            "symbol": "../types/database"
+          },
+          {
+            "path": "src/pages/Duplicates.tsx",
+            "symbol": "../types/database"
+          },
+          {
+            "path": "src/pages/Mappers.tsx",
+            "symbol": "../types/database"
+          },
+          {
+            "path": "src/pages/Pads.tsx",
+            "symbol": "../types/database"
+          },
+          {
+            "path": "src/pages/Playlists.tsx",
+            "symbol": "../types/database"
+          },
+          {
+            "path": "src/pages/RelinkTracks.tsx",
+            "symbol": "../types/database"
+          },
+          {
+            "path": "src/pages/Songs.tsx",
+            "symbol": "../types/database"
+          }
+        ]
+      }
+    },
+    {
+      "from": "src-tauri",
+      "to": "external-dependencies",
+      "type": "imports",
+      "evidence": {
+        "status": "verified",
+        "locations": [
+          {
+            "path": "src-tauri/src/commands/configs.rs",
+            "symbol": "serde"
+          },
+          {
+            "path": "src-tauri/src/commands/configs.rs",
+            "symbol": "xmltree"
+          },
+          {
+            "path": "src-tauri/src/commands/database.rs",
+            "symbol": "windows_sys"
+          },
+          {
+            "path": "src-tauri/src/commands/duplicates.rs",
+            "symbol": "md5"
+          },
+          {
+            "path": "src-tauri/src/commands/files.rs",
+            "symbol": "serde"
+          },
+          {
+            "path": "src-tauri/src/commands/files.rs",
+            "symbol": "tauri"
+          },
+          {
+            "path": "src-tauri/src/commands/files.rs",
+            "symbol": "walkdir"
+          },
+          {
+            "path": "src-tauri/src/commands/files.rs",
+            "symbol": "windows_sys"
+          }
+        ]
+      }
+    }
+  ],
+  "flows": [
+    {
+      "trigger": "Tracked reference src/App.tsx:./pages/Home",
+      "steps": [
+        "src",
+        "src-pages",
+        "src-components",
+        "src-lib",
+        "external-dependencies"
+      ],
+      "outcome": "The verified dependency path reaches external-dependencies through 4 step(s)."
+    },
+    {
+      "trigger": "Tracked reference src/App.tsx:./pages/Home to src-types",
+      "steps": [
+        "src",
+        "src-pages",
+        "src-components",
+        "src-lib",
+        "src-types"
+      ],
+      "outcome": "The verified dependency path reaches src-types through 4 step(s)."
+    },
+    {
+      "trigger": "Tracked reference src/components/FolderTree.tsx:../App",
+      "steps": [
+        "src-components",
+        "src",
+        "src-pages",
+        "src-lib",
+        "external-dependencies"
+      ],
+      "outcome": "The verified dependency path reaches external-dependencies through 4 step(s)."
+    },
+    {
+      "trigger": "Tracked reference src/components/FolderTree.tsx:../App to src-types",
+      "steps": [
+        "src-components",
+        "src",
+        "src-pages",
+        "src-lib",
+        "src-types"
+      ],
+      "outcome": "The verified dependency path reaches src-types through 4 step(s)."
+    },
+    {
+      "trigger": "Tracked reference src/pages/BatchOperations.tsx:../App",
+      "steps": [
+        "src-pages",
+        "src",
+        "src-components",
+        "src-lib",
+        "external-dependencies"
+      ],
+      "outcome": "The verified dependency path reaches external-dependencies through 4 step(s)."
+    }
+  ]
+}
