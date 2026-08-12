@@ -2,7 +2,7 @@
 
 Centro operativo de escritorio para explorar, verificar y mantener una biblioteca de **VirtualDJ 8+** sin debilitar sus contratos de escritura.
 
-Construido con **Tauri 2 + Rust**, **React 19**, **TypeScript 5**, **Vite 8** y **Tailwind CSS 4**. La ventana mínima soportada es 1180×720; móvil queda fuera de alcance.
+Construido con **Tauri 2 + Rust**, **React 19**, **TypeScript 7**, **Vite 8** y **Tailwind CSS 4**. La ventana mínima soportada es 1180×720; móvil queda fuera de alcance.
 
 ## Workspaces
 
@@ -48,6 +48,13 @@ http://127.0.0.1:3000/?demo&page=dashboard&recovery=manual
 | `bun run build` | Build frontend de producción |
 | `bun run tauri dev` | App nativa en desarrollo |
 | `bun run tauri build` | Binario e instaladores Tauri |
+| `bun run deps:check` | Dependencias pendientes |
+| `bun run audit` | Auditoría de seguridad |
+| `bun run verify` | Check + tests + build frontend |
+
+El proyecto conserva Bun porque las pruebas importan `bun:test` y Tauri usa
+`bun run` en sus hooks `beforeDevCommand`/`beforeBuildCommand`; no se migra a
+pnpm sin cambiar ese contrato.
 
 Gates Rust desde `src-tauri` y con MSVC inicializado:
 

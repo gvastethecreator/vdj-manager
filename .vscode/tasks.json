@@ -133,6 +133,30 @@
                 "panel": "shared",
                 "clear": true
             }
+        },
+        {
+            "label": "📋 deps",
+            "type": "shell",
+            "command": "bun",
+            "args": ["run", "deps:check"],
+            "options": { "cwd": "${workspaceFolder}" },
+            "problemMatcher": []
+        },
+        {
+            "label": "🛡️ audit",
+            "type": "shell",
+            "command": "bun",
+            "args": ["run", "audit"],
+            "options": { "cwd": "${workspaceFolder}" },
+            "problemMatcher": []
+        },
+        {
+            "label": "✅ verify",
+            "type": "shell",
+            "command": "bun",
+            "args": ["run", "verify"],
+            "options": { "cwd": "${workspaceFolder}" },
+            "problemMatcher": []
         }
     ]
 }

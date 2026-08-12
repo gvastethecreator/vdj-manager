@@ -1,6 +1,6 @@
 {
-  "generated_at": "2026-08-08T09:53:52Z",
-  "generated_from_commit": "eaa519c72d78bb7f50513bda7e4758e0513eb05a",
+  "generated_at": "2026-08-12T09:10:31Z",
+  "generated_from_commit": "46fba711736324f0c19bbc335664ffbb6a8cea55",
   "scope": [
     "."
   ],
@@ -29,11 +29,11 @@
       }
     },
     {
-      "id": "repository",
+      "id": "index",
       "path": "index.html",
-      "role": "Owns the tracked files for the repository module.",
+      "role": "Owns the tracked files for the index module.",
       "type": "module",
-      "boundary": "Repository",
+      "boundary": "Index",
       "entrypoints": [
         "index.html:VDJ Database Manager"
       ],
@@ -47,6 +47,29 @@
           {
             "path": "index.html",
             "symbol": "VDJ Database Manager"
+          }
+        ]
+      }
+    },
+    {
+      "id": "repository",
+      "path": "README.md",
+      "role": "Owns the tracked files for the repository module.",
+      "type": "module",
+      "boundary": "Repository",
+      "entrypoints": [
+        "README.md:VDJ Manager"
+      ],
+      "tests": [],
+      "constraints": [
+        "This baseline uses tracked source and explicit dependency references only."
+      ],
+      "evidence": {
+        "status": "verified",
+        "locations": [
+          {
+            "path": "README.md",
+            "symbol": "VDJ Manager"
           }
         ]
       }
@@ -161,11 +184,34 @@
       "type": "module",
       "boundary": "Src Tauri",
       "entrypoints": [
-        "src-tauri/src/lib.rs:run"
+        "src-tauri/Cargo.toml:package"
       ],
       "tests": [
         "src-tauri/tests/mutation_journal.rs"
       ],
+      "constraints": [
+        "This baseline uses tracked source and explicit dependency references only."
+      ],
+      "evidence": {
+        "status": "verified",
+        "locations": [
+          {
+            "path": "src-tauri/Cargo.toml",
+            "symbol": "package"
+          }
+        ]
+      }
+    },
+    {
+      "id": "src-tauri-src",
+      "path": "src-tauri/src",
+      "role": "Owns the tracked files for the src-tauri / src module.",
+      "type": "module",
+      "boundary": "Src Tauri",
+      "entrypoints": [
+        "src-tauri/src/lib.rs:run"
+      ],
+      "tests": [],
       "constraints": [
         "This baseline uses tracked source and explicit dependency references only."
       ],
@@ -206,27 +252,42 @@
           }
         ]
       }
-    }
-  ],
-  "edges": [
+    },
     {
-      "from": "repository",
-      "to": "external-dependencies",
-      "type": "imports",
+      "id": "vite-config",
+      "path": "vite.config.ts",
+      "role": "Owns the tracked files for the vite.config module.",
+      "type": "module",
+      "boundary": "Vite.Config",
+      "entrypoints": [
+        "vite.config.ts:host"
+      ],
+      "tests": [],
+      "constraints": [
+        "This baseline uses tracked source and explicit dependency references only."
+      ],
       "evidence": {
         "status": "verified",
         "locations": [
           {
             "path": "vite.config.ts",
-            "symbol": "vite"
-          },
+            "symbol": "host"
+          }
+        ]
+      }
+    }
+  ],
+  "edges": [
+    {
+      "from": "index",
+      "to": "src",
+      "type": "imports",
+      "evidence": {
+        "status": "verified",
+        "locations": [
           {
-            "path": "vite.config.ts",
-            "symbol": "@vitejs/plugin-react"
-          },
-          {
-            "path": "vite.config.ts",
-            "symbol": "@tailwindcss/vite"
+            "path": "index.html",
+            "symbol": "/src/main.tsx"
           }
         ]
       }
@@ -819,6 +880,24 @@
         "status": "verified",
         "locations": [
           {
+            "path": "src-tauri/tests/database_write.rs",
+            "symbol": "vdj_manager_lib"
+          },
+          {
+            "path": "src-tauri/tests/resource_write.rs",
+            "symbol": "vdj_manager_lib"
+          }
+        ]
+      }
+    },
+    {
+      "from": "src-tauri-src",
+      "to": "external-dependencies",
+      "type": "imports",
+      "evidence": {
+        "status": "verified",
+        "locations": [
+          {
             "path": "src-tauri/src/commands/configs.rs",
             "symbol": "serde"
           },
@@ -852,9 +931,66 @@
           }
         ]
       }
+    },
+    {
+      "from": "vite-config",
+      "to": "external-dependencies",
+      "type": "imports",
+      "evidence": {
+        "status": "verified",
+        "locations": [
+          {
+            "path": "vite.config.ts",
+            "symbol": "vite"
+          },
+          {
+            "path": "vite.config.ts",
+            "symbol": "@vitejs/plugin-react"
+          },
+          {
+            "path": "vite.config.ts",
+            "symbol": "@tailwindcss/vite"
+          }
+        ]
+      }
     }
   ],
   "flows": [
+    {
+      "trigger": "Tracked reference index.html:/src/main.tsx",
+      "steps": [
+        "index",
+        "src",
+        "src-pages",
+        "src-components",
+        "src-lib",
+        "external-dependencies"
+      ],
+      "outcome": "The verified dependency path reaches external-dependencies through 5 step(s)."
+    },
+    {
+      "trigger": "Tracked reference index.html:/src/main.tsx to src-types",
+      "steps": [
+        "index",
+        "src",
+        "src-pages",
+        "src-components",
+        "src-lib",
+        "src-types"
+      ],
+      "outcome": "The verified dependency path reaches src-types through 5 step(s)."
+    },
+    {
+      "trigger": "Tracked reference index.html:/src/main.tsx to external-dependencies",
+      "steps": [
+        "index",
+        "src",
+        "src-components",
+        "src-lib",
+        "external-dependencies"
+      ],
+      "outcome": "The verified dependency path reaches external-dependencies through 4 step(s)."
+    },
     {
       "trigger": "Tracked reference src/App.tsx:./pages/Home",
       "steps": [
@@ -876,39 +1012,6 @@
         "src-types"
       ],
       "outcome": "The verified dependency path reaches src-types through 4 step(s)."
-    },
-    {
-      "trigger": "Tracked reference src/components/FolderTree.tsx:../App",
-      "steps": [
-        "src-components",
-        "src",
-        "src-pages",
-        "src-lib",
-        "external-dependencies"
-      ],
-      "outcome": "The verified dependency path reaches external-dependencies through 4 step(s)."
-    },
-    {
-      "trigger": "Tracked reference src/components/FolderTree.tsx:../App to src-types",
-      "steps": [
-        "src-components",
-        "src",
-        "src-pages",
-        "src-lib",
-        "src-types"
-      ],
-      "outcome": "The verified dependency path reaches src-types through 4 step(s)."
-    },
-    {
-      "trigger": "Tracked reference src/pages/BatchOperations.tsx:../App",
-      "steps": [
-        "src-pages",
-        "src",
-        "src-components",
-        "src-lib",
-        "external-dependencies"
-      ],
-      "outcome": "The verified dependency path reaches external-dependencies through 4 step(s)."
     }
   ]
 }

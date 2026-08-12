@@ -1,7 +1,7 @@
 {
-  "current_commit": "eaa519c72d78bb7f50513bda7e4758e0513eb05a",
+  "current_commit": "46fba711736324f0c19bbc335664ffbb6a8cea55",
   "working_tree_dirty": true,
-  "generated_at": "2026-08-08T09:53:52Z",
+  "generated_at": "2026-08-12T09:10:31Z",
   "scanned_scope": [
     "."
   ],
@@ -11,6 +11,7 @@
     ".hg",
     ".next",
     ".nuxt",
+    ".scratch",
     ".svn",
     ".turbo",
     ".venv",
@@ -20,8 +21,10 @@
     "dist",
     "docs/codemap",
     "generated",
+    "logs",
     "node_modules",
     "out",
+    "src-tauri/target",
     "target",
     "vendor",
     "venv"
@@ -32,7 +35,7 @@
       "id": ".",
       "path": ".",
       "file_count": 10,
-      "fingerprint": "dd3d087a28d12761fdf114c7e64949505e14304b85ea6cac51dff3d0109052dd"
+      "fingerprint": "070ef52a034c0e533924935cc45bab5d7b20a940cf0e46bc46211630cbb51bde"
     },
     {
       "id": ".github",
@@ -44,7 +47,7 @@
       "id": ".vscode",
       "path": ".vscode",
       "file_count": 2,
-      "fingerprint": "6b57552601096052f8f245eb5745b1b675a2de612a09ebbabd6a1a5cfa850cbf"
+      "fingerprint": "78393b17c0d78ef995e6cb4c610c9b936d81bfcc370c8067bbc6ce6a73614cd5"
     },
     {
       "id": "assets",
