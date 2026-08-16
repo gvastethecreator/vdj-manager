@@ -5,10 +5,10 @@ import type { IntegritySection } from "../lib/navigation";
 import { displayScanCount } from "../lib/operationalState";
 
 const TABS: Array<{ section: IntegritySection; label: string; icon: typeof FileSearch }> = [
-  { section: "missing", label: "Faltantes", icon: FileSearch },
-  { section: "relink", label: "Tracks movidos", icon: Link2 },
-  { section: "duplicates", label: "Duplicados", icon: Copy },
-  { section: "orphans", label: "Huérfanos", icon: FolderSearch },
+  { section: "missing", label: "Missing", icon: FileSearch },
+  { section: "relink", label: "Moved tracks", icon: Link2 },
+  { section: "duplicates", label: "Duplicates", icon: Copy },
+  { section: "orphans", label: "Orphans", icon: FolderSearch },
 ];
 
 export function IntegrityWorkspace({ children }: { children: ReactNode }) {
@@ -21,16 +21,16 @@ export function IntegrityWorkspace({ children }: { children: ReactNode }) {
       <header className="shrink-0 border-b border-border bg-surface px-4 pt-3">
         <div className="flex items-start justify-between gap-4">
           <div>
-            <h1 className="text-base font-semibold text-text">Resolver problemas</h1>
-            <p className="mt-0.5 text-xs text-text-muted">Diagnostica primero; cada mutación exige confirmación y deja evidencia.</p>
+            <h1 className="text-base font-semibold text-text">Resolve issues</h1>
+            <p className="mt-0.5 text-xs text-text-muted">Diagnose first; every mutation requires confirmation and leaves evidence.</p>
           </div>
           <div className="flex gap-4 text-xs text-text-muted">
-            <span>Faltantes <strong className="ml-1 text-text-secondary">{displayScanCount(integrity.missing)}</strong></span>
-            <span>Duplicados <strong className="ml-1 text-text-secondary">{displayScanCount(integrity.duplicateGroups)}</strong></span>
-            <span>Huérfanos <strong className="ml-1 text-text-secondary">{displayScanCount(integrity.orphans)}</strong></span>
+            <span>Missing <strong className="ml-1 text-text-secondary">{displayScanCount(integrity.missing)}</strong></span>
+            <span>Duplicates <strong className="ml-1 text-text-secondary">{displayScanCount(integrity.duplicateGroups)}</strong></span>
+            <span>Orphans <strong className="ml-1 text-text-secondary">{displayScanCount(integrity.orphans)}</strong></span>
           </div>
         </div>
-        <nav className="mt-3 flex gap-1" aria-label="Secciones de integridad">
+        <nav className="mt-3 flex gap-1" aria-label="Integrity sections">
           {TABS.map(({ section: nextSection, label, icon: Icon }) => (
             <button
               key={nextSection}

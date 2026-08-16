@@ -169,13 +169,13 @@ export function SongDetailsCard({ song }: { song: SongSummary }) {
     try {
       const includeColor = Boolean(rowColor) || form.color !== initial.color;
       const result = await services.updateSongTags(vdjFolder, song.file_path, tagUpdate(form, includeColor));
-      if (!shouldApplySongUpdate(result)) throw new Error(`Resultado de actualización: ${result.status}`);
+      if (!shouldApplySongUpdate(result)) throw new Error(`Update result: ${result.status}`);
       patchSong(song.index, songPatch(form, includeColor));
-      setStatus("Cambios guardados");
+      setStatus("Changes saved");
     } catch (error) {
       await refreshRecovery();
-      reportUiError("No se pudieron guardar las etiquetas.", error);
-      setStatus("No se guardaron los cambios");
+      reportUiError("Tags could not be saved.", error);
+      setStatus("Changes were not saved");
     } finally {
       setSaving(false);
     }
@@ -188,58 +188,58 @@ export function SongDetailsCard({ song }: { song: SongSummary }) {
           <span className="badge border border-border bg-surface text-text-secondary">
             {song.in_database ? <><Database className="mr-1 h-3.5 w-3.5" /> database.xml</> : <><FileAudio2 className="mr-1 h-3.5 w-3.5" /> externo</>}
           </span>
-          {dirty ? <span className="badge bg-warning/12 text-warning">Sin guardar</span> : null}
+          {dirty ? <span className="badge bg-warning/12 text-warning">Unsaved</span> : null}
         </div>
         <h2 className="mt-3 break-words text-base font-semibold text-text">{form.title || song.file_name}</h2>
-        <p className="mt-1 text-sm text-text-secondary">{form.author || "Artista desconocido"}</p>
+        <p className="mt-1 text-sm text-text-secondary">{form.author || "Unknown artist"}</p>
         <div className="mt-3 rounded-md border border-border bg-surface p-2">
           <WaveformPreview filePath={song.file_path} fileSize={song.file_size} bucketCount={64} cueMarkers={song.cue_markers} durationSecs={song.duration_secs} vdjFolder={vdjFolder} heightClass="h-14" svgClassName="h-14" />
         </div>
       </div>
 
-      {mutationsBlocked ? <div className="border-b border-warning/30 bg-warning/10 px-3 py-2 text-xs text-warning">Edición pausada por recuperación pendiente.</div> : null}
+      {mutationsBlocked ? <div className="border-b border-warning/30 bg-warning/10 px-3 py-2 text-xs text-warning">Editing is paused while recovery is pending.</div> : null}
 
       <div className="space-y-3 p-3">
         <div className="grid grid-cols-2 gap-3">
-          <div className="col-span-2"><Field label="Título" value={form.title} disabled={!editable} onChange={(value) => setField("title", value)} /></div>
-          <div className="col-span-2"><Field label="Artista" value={form.author} disabled={!editable} onChange={(value) => setField("author", value)} /></div>
+          <div className="col-span-2"><Field label="Title" value={form.title} disabled={!editable} onChange={(value) => setField("title", value)} /></div>
+          <div className="col-span-2"><Field label="Artist" value={form.author} disabled={!editable} onChange={(value) => setField("author", value)} /></div>
           <Field label="BPM" value={form.bpm} disabled={!editable} onChange={(value) => setField("bpm", value)} />
-          <Field label="Tono" value={form.key} disabled={!editable} onChange={(value) => setField("key", value)} />
-          <div className="col-span-2"><Field label="Género" value={form.genre} disabled={!editable} onChange={(value) => setField("genre", value)} /></div>
-          <div className="col-span-2"><Field label="Álbum" value={form.album} disabled={!editable} onChange={(value) => setField("album", value)} /></div>
+          <Field label="Key" value={form.key} disabled={!editable} onChange={(value) => setField("key", value)} />
+          <div className="col-span-2"><Field label="Genre" value={form.genre} disabled={!editable} onChange={(value) => setField("genre", value)} /></div>
+          <div className="col-span-2"><Field label="Album" value={form.album} disabled={!editable} onChange={(value) => setField("album", value)} /></div>
         </div>
 
         <details className="group rounded-md border border-border bg-surface">
           <summary className="flex cursor-pointer list-none items-center justify-between px-3 py-2.5 text-sm font-semibold text-text [&::-webkit-details-marker]:hidden">
-            Edición avanzada <ChevronDown className="h-4 w-4 text-text-muted group-open:rotate-180" />
+            Advanced editing <ChevronDown className="h-4 w-4 text-text-muted group-open:rotate-180" />
           </summary>
           <div className="grid grid-cols-2 gap-3 border-t border-border p-3">
             <Field label="Remix" value={form.remix} disabled={!editable} onChange={(value) => setField("remix", value)} />
             <Field label="Remixer" value={form.remixer} disabled={!editable} onChange={(value) => setField("remixer", value)} />
-            <Field label="Compositor" value={form.composer} disabled={!editable} onChange={(value) => setField("composer", value)} />
-            <Field label="Sello" value={form.label} disabled={!editable} onChange={(value) => setField("label", value)} />
-            <Field label="Año" value={form.year} disabled={!editable} onChange={(value) => setField("year", value)} />
+            <Field label="Composer" value={form.composer} disabled={!editable} onChange={(value) => setField("composer", value)} />
+            <Field label="Label" value={form.label} disabled={!editable} onChange={(value) => setField("label", value)} />
+            <Field label="Year" value={form.year} disabled={!editable} onChange={(value) => setField("year", value)} />
             <Field label="Track #" value={form.trackNumber} disabled={!editable} onChange={(value) => setField("trackNumber", value)} />
-            <Field label="Agrupación" value={form.grouping} disabled={!editable} onChange={(value) => setField("grouping", value)} />
+            <Field label="Grouping" value={form.grouping} disabled={!editable} onChange={(value) => setField("grouping", value)} />
             <Field label="Gain" value={form.gain} disabled={!editable} onChange={(value) => setField("gain", value)} />
             <Field label="Estrellas" value={form.stars} disabled={!editable} onChange={(value) => setField("stars", value)} />
             <label className="block"><span className="mb-1 block text-xs font-medium text-text-muted">Color</span><input type="color" className="h-[34px] w-full rounded-md border border-border bg-background p-1" value={form.color} disabled={!editable} onChange={(event) => setField("color", event.target.value)} /></label>
             <div className="col-span-2"><Field label="User 1" value={form.user1} disabled={!editable} onChange={(value) => setField("user1", value)} /></div>
             <div className="col-span-2"><Field label="User 2" value={form.user2} disabled={!editable} onChange={(value) => setField("user2", value)} /></div>
-            <label className="col-span-2 block"><span className="mb-1 block text-xs font-medium text-text-muted">Comentario</span><textarea className="input min-h-20 w-full resize-y" value={form.commentText} disabled={!editable} onChange={(event) => setField("commentText", event.target.value)} /></label>
+            <label className="col-span-2 block"><span className="mb-1 block text-xs font-medium text-text-muted">Comment</span><textarea className="input min-h-20 w-full resize-y" value={form.commentText} disabled={!editable} onChange={(event) => setField("commentText", event.target.value)} /></label>
           </div>
         </details>
 
         <details className="group rounded-md border border-border bg-surface">
           <summary className="flex cursor-pointer list-none items-center justify-between px-3 py-2.5 text-sm font-semibold text-text [&::-webkit-details-marker]:hidden">
-            Archivo y cues <ChevronDown className="h-4 w-4 text-text-muted group-open:rotate-180" />
+            File and cues <ChevronDown className="h-4 w-4 text-text-muted group-open:rotate-180" />
           </summary>
           <div className="border-t border-border px-3 py-1">
-            <ReadonlyRow label="Duración" value={formatDuration(song.duration_secs)} />
-            <ReadonlyRow label="Tamaño" value={formatSize(song.file_size)} />
+            <ReadonlyRow label="Duration" value={formatDuration(song.duration_secs)} />
+            <ReadonlyRow label="Size" value={formatSize(song.file_size)} />
             <ReadonlyRow label="Bitrate" value={song.bitrate ? `${song.bitrate} kbps` : "—"} />
             <ReadonlyRow label="Plays" value={valueOf(song.play_count) || "—"} />
-            <ReadonlyRow label="Ruta" value={song.file_path} title={song.file_path} />
+            <ReadonlyRow label="Path" value={song.file_path} title={song.file_path} />
             {song.cue_markers.length > 0 ? (
               <div className="py-2">
                 <div className="mb-2 flex items-center gap-2 text-xs font-medium text-text-muted"><Clock3 className="h-3.5 w-3.5" /> {song.cue_markers.length} cue markers</div>
@@ -253,10 +253,10 @@ export function SongDetailsCard({ song }: { song: SongSummary }) {
       </div>
 
       <footer className="sticky bottom-0 flex items-center justify-between gap-2 border-t border-border bg-surface p-3">
-        <span className="min-w-0 truncate text-xs text-text-muted">{status ?? (editable ? "Selecciona un campo para editar" : "Sólo lectura")}</span>
+        <span className="min-w-0 truncate text-xs text-text-muted">{status ?? (editable ? "Select a field to edit" : "Read only")}</span>
         <div className="flex shrink-0 gap-2">
-          <button type="button" className="icon-button" onClick={reset} disabled={!dirty || saving} aria-label="Revertir cambios"><RotateCcw className="h-4 w-4" /></button>
-          <button type="button" className="btn btn-primary btn-sm" onClick={() => void save()} disabled={!editable || !dirty || saving}><Save className="h-4 w-4" /> {saving ? "Guardando…" : "Guardar"}</button>
+          <button type="button" className="icon-button" onClick={reset} disabled={!dirty || saving} aria-label="Revert changes"><RotateCcw className="h-4 w-4" /></button>
+          <button type="button" className="btn btn-primary btn-sm" onClick={() => void save()} disabled={!editable || !dirty || saving}><Save className="h-4 w-4" /> {saving ? "Saving…" : "Save"}</button>
         </div>
       </footer>
     </section>

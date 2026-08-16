@@ -58,11 +58,11 @@ export function relinkReasonLabel(reason: string): string {
     case "same_name": return "mismo nombre";
     case "same_stem": return "mismo stem";
     case "similar_stem": return "stem parecido";
-    case "same_extension": return "misma extensión";
-    case "size_match": return "mismo tamaño";
-    case "size_close": return "tamaño cercano";
-    case "title_match": return "título coincide";
-    case "author_match": return "artista coincide";
+    case "same_extension": return "same extension";
+    case "size_match": return "same size";
+    case "size_close": return "similar size";
+    case "title_match": return "title match";
+    case "author_match": return "artist match";
     default: return reason;
   }
 }

@@ -1,7 +1,7 @@
 {
-  "current_commit": "46fba711736324f0c19bbc335664ffbb6a8cea55",
+  "source_commit": "f1b10cc587c5e850ad7a4966514b8b9d876454bb",
   "working_tree_dirty": true,
-  "generated_at": "2026-08-12T09:10:31Z",
+  "generated_at": "2026-08-15T09:32:04Z",
   "scanned_scope": [
     "."
   ],
@@ -35,13 +35,13 @@
       "id": ".",
       "path": ".",
       "file_count": 10,
-      "fingerprint": "070ef52a034c0e533924935cc45bab5d7b20a940cf0e46bc46211630cbb51bde"
+      "fingerprint": "9558f0a6f631903ba6ffc8fc243e20860ae5640db6ed1afbf170566a32b53314"
     },
     {
       "id": ".github",
       "path": ".github",
       "file_count": 1,
-      "fingerprint": "b5906aa9b084e5d760810c98d1175011c1b84b6feb63c7370c9f4b20ddb15278"
+      "fingerprint": "45f812949fa17c8cf4322bf3660d3727442df0a9a1e19e688cebc1a693d19820"
     },
     {
       "id": ".vscode",
@@ -58,26 +58,26 @@
     {
       "id": "docs",
       "path": "docs",
-      "file_count": 102,
-      "fingerprint": "68b5cbd23de50e8157e564c90b6cbe3219636bf490f37c570c1f70ce4da1812e"
+      "file_count": 105,
+      "fingerprint": "3c3f6217c51ed08a0d3ea8db111f9b0a7fd962f425727a4c6886f103610c0f9f"
     },
     {
       "id": "src",
       "path": "src",
       "file_count": 64,
-      "fingerprint": "62f59012273997c19c706305cd5445f64dfe590d23ae6291cff0ac6ad53f7ff8"
+      "fingerprint": "ba5b15c6091c221ac2fc3ebd690fca415f8c70b030e97a8a4aa44c546a72a3dd"
     },
     {
       "id": "src-tauri",
       "path": "src-tauri",
       "file_count": 29,
-      "fingerprint": "7aa17c0bd88f56657d194a6cf06eaccad655577cc3c0b5242c3ce81b07e83a90"
+      "fingerprint": "cf546be06e21d4a873c3babb42c52ef9467e4b456a46245a75b62828a93eac1c"
     },
     {
       "id": "tests",
       "path": "tests",
       "file_count": 13,
-      "fingerprint": "5e32e66a7a1a5caae2e69b55145aa33184647470d6f3ea22a1882c2c2cd47ce4"
+      "fingerprint": "f5cbb1de6ac55cc354315590c93f0314b4b93738de7ac830c8d340fcb27cf395"
     }
   ]
 }

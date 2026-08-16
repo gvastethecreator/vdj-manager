@@ -17,6 +17,6 @@ describe("library removal UI helpers", () => {
       { originalFilePath: "b", status: "trash_failed", mode: "trash_then_unindex", message: "denied" },
     ];
     expect(summarizeRemoval(results)).toEqual({ completed: 1, attention: 1 });
-    expect(removalStatusLabel("trash_failed")).toBe("No se envió a papelera");
+    expect(removalStatusLabel("trash_failed")).toBe("Not sent to Recycle Bin");
   });
 });

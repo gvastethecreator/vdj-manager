@@ -166,7 +166,7 @@ export default function App() {
   );
   const [recoveryError, setRecoveryError] = useState<UiError | null>(() => (
     demoMode && new URLSearchParams(window.location.search).get("recovery") === "error"
-      ? createUiError("recovery", "No se pudo comprobar el estado de recuperación.", new Error("Fixture demo de recovery no disponible."))
+      ? createUiError("recovery", "Recovery status could not be checked.", new Error("The recovery demo fixture is unavailable."))
       : null
   ));
   const [recoveryLoading, setRecoveryLoading] = useState(false);
@@ -242,7 +242,7 @@ export default function App() {
     setUiError(createUiError(scope, summary, error));
     setUiErrorRecovery(options?.retry ? {
       scope,
-      label: options.retryLabel ?? "Reintentar",
+      label: options.retryLabel ?? "Retry",
       run: options.retry,
     } : null);
   }, [currentScope]);
@@ -258,7 +258,7 @@ export default function App() {
   const selectMusicFolder = useCallback(async () => {
     const selected = await services.selectDirectory({
       purpose: "music",
-      title: "Seleccionar carpeta de música",
+      title: "Select a music folder",
     });
     if (!selected) return null;
     addMusicFolder(selected);
@@ -281,7 +281,7 @@ export default function App() {
         .then((next) => ({ state: next, error: null as UiError | null }))
         .catch((error: unknown) => ({
           state: null,
-          error: createUiError("recovery", "No se pudo comprobar el estado de recuperación.", error),
+          error: createUiError("recovery", "Recovery status could not be checked.", error),
         }));
       const [songs, stats, recovery] = await Promise.all([
         services.loadDatabase(folder),
@@ -316,10 +316,10 @@ export default function App() {
       log.error("Failed to load database", error);
       setState((previous) => ({ ...previous, loading: false }));
       if (currentScopeRef.current === requestScope) {
-        setUiError(createUiError(requestScope, "No se pudo abrir esta Biblioteca VirtualDJ.", error));
+        setUiError(createUiError(requestScope, "This VirtualDJ library could not be opened.", error));
         setUiErrorRecovery({
           scope: requestScope,
-          label: "Reintentar apertura",
+          label: "Retry opening",
           run: () => loadFromFolderRef.current(folder, options),
         });
       } else {
@@ -337,7 +337,7 @@ export default function App() {
       setRecoveryState(next);
       setRecoveryError(null);
     } catch (error) {
-      setRecoveryError(createUiError("recovery", "No se pudo actualizar el estado de recuperación.", error));
+      setRecoveryError(createUiError("recovery", "Recovery status could not be refreshed.", error));
     } finally {
       setRecoveryLoading(false);
     }
@@ -355,7 +355,7 @@ export default function App() {
         await loadFromFolder(state.vdjFolder, { targetNavigation: state.navigation });
       }
     } catch (error) {
-      setRecoveryError(createUiError("recovery", "No se pudo completar la recuperación.", error));
+      setRecoveryError(createUiError("recovery", "Recovery could not be completed.", error));
     } finally {
       setRecoveryLoading(false);
     }
@@ -365,7 +365,7 @@ export default function App() {
     const performSelection = async () => {
       const selected = await services.selectDirectory({
         purpose: "virtualdj",
-        title: "Seleccionar carpeta de VirtualDJ",
+        title: "Select a VirtualDJ folder",
         defaultPath: "D:\\Documents\\VirtualDJ",
       });
       if (selected) await loadFromFolder(selected);

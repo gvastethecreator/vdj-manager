@@ -1,35 +1,60 @@
-# VDJ Manager
+<p align="center">
+  <picture>
+    <source media="(prefers-color-scheme: dark)" srcset="https://shieldcn.dev/header/waveform.svg?title=VDJ+Manager&subtitle=Inspect%2C+repair%2C+and+maintain+VirtualDJ+libraries+with+safe+write+contracts&logo=tauri&theme=violet&align=center&mode=dark" />
+    <img alt="VDJ Manager" src="https://shieldcn.dev/header/waveform.svg?title=VDJ+Manager&subtitle=Inspect%2C+repair%2C+and+maintain+VirtualDJ+libraries+with+safe+write+contracts&logo=tauri&theme=violet&align=center&mode=light" />
+  </picture>
+</p>
 
-Centro operativo de escritorio para explorar, verificar y mantener una biblioteca de **VirtualDJ 8+** sin debilitar sus contratos de escritura.
+<p align="center">
+  <a href="https://github.com/gvastethecreator/vdj-manager/actions/workflows/ci.yml"><img alt="CI status" src="https://shieldcn.dev/github/ci/gvastethecreator/vdj-manager.svg?workflow=CI&branch=main&variant=secondary&size=xs" /></a>
+  <a href="https://github.com/gvastethecreator/vdj-manager/stargazers"><img alt="GitHub stars" src="https://shieldcn.dev/github/stars/gvastethecreator/vdj-manager.svg?variant=secondary&size=xs" /></a>
+  <a href="https://github.com/gvastethecreator/vdj-manager/commits/main"><img alt="Last commit" src="https://shieldcn.dev/github/last-commit/gvastethecreator/vdj-manager.svg?variant=secondary&size=xs" /></a>
+  <a href="https://gvastethecreator.github.io/vdj-manager/"><img alt="Open the web demo" src="https://shieldcn.dev/badge/demo-live-8b5cf6.svg?logo=githubpages&variant=branded&size=xs" /></a>
+  <img alt="Windows desktop app" src="https://shieldcn.dev/badge/platform-Windows-2563eb.svg?logo=windows&variant=secondary&size=xs" />
+</p>
 
-Construido con **Tauri 2 + Rust**, **React 19**, **TypeScript 7**, **Vite 8** y **Tailwind CSS 4**. La ventana mínima soportada es 1180×720; móvil queda fuera de alcance.
+<p align="center">
+  A safety-first desktop workspace for exploring, verifying, and maintaining VirtualDJ 8+ libraries.
+  <br />
+  <a href="https://gvastethecreator.github.io/vdj-manager/"><strong>Explore the in-memory web demo</strong></a>
+</p>
 
-## Workspaces
+## Product tour
 
-- **Dashboard**: cola de atención priorizada, próxima acción y métricas secundarias. Un análisis no ejecutado dice `Sin verificar`, nunca cero.
-- **Biblioteca**: Browser unificado de Canciones y Playlists con árbol, tabla virtualizada y detalle. Usa tres paneles desde 1200 px y drawer por debajo.
-- **Resolver problemas**: Faltantes, Tracks movidos, Duplicados y Huérfanos comparten resultados dentro de la biblioteca activa.
-- **Operaciones**: move, rename literal y edición de tags por lote. Ejecutar exige una vista previa vigente para la selección y parámetros actuales.
-- **Recursos**: Configuración, Pads y Mappers en un estudio común con dirty/save/revert y protección frente a pérdida de cambios.
+| Prioritized dashboard                                                                                                           | Dense library browser                                                                                                      |
+| ------------------------------------------------------------------------------------------------------------------------------- | -------------------------------------------------------------------------------------------------------------------------- |
+| <img src="docs/assets/screenshots/dashboard.png" alt="VDJ Manager dashboard showing a prioritized library attention queue" /> | <img src="docs/assets/screenshots/library.png" alt="VDJ Manager dense library browser with source tree and track table" /> |
+| **Path reconciliation**                                                                                                         | **Resource studio**                                                                                                        |
+| <img src="docs/assets/screenshots/reconciliation.png" alt="VDJ Manager path reconciliation workspace with ranked candidates" /> | <img src="docs/assets/screenshots/resources.png" alt="VDJ Manager resource studio for VirtualDJ settings, pads, and mappers" /> |
 
-La identidad visual conserva el violeta en dos temas: oscuro y claro.
+## What it does
 
-## Inicio rápido
+- Prioritizes broken references, pending recovery, and checks that have not run.
+- Browses songs, playlists, history, metadata, cues, and waveforms in a unified workspace.
+- Finds missing files, moved tracks, duplicates, and unindexed files.
+- Previews rename, move, and batch tag operations before execution.
+- Edits VirtualDJ settings, pads, and mappers with dirty/save/revert protection.
+- Protects mutations with backups, validation, optimistic concurrency, atomic commits, no-clobber operations, a per-library journal, and explicit recovery.
+- Provides a deterministic web demo that stays entirely in memory and never accesses local files.
 
-Requisitos: Bun 1.x, Rust con toolchain MSVC y Windows.
+The native application supports Windows at a minimum window size of 1180×720. The Pages demo is a safe product tour, not a replacement for native filesystem features.
+
+## Quick start
+
+Install Bun 1.x, Rust with the MSVC toolchain, and the [Tauri Windows prerequisites](https://v2.tauri.app/start/prerequisites/).
 
 ```powershell
 bun install
 bun run tauri dev
 ```
 
-Para trabajar sólo con el frontend:
+For frontend-only work:
 
 ```powershell
 bun run dev
 ```
 
-El modo visual determinista se abre con URLs como:
+Open a deterministic state with a URL such as:
 
 ```text
 http://127.0.0.1:3000/?demo&page=dashboard&state=problem
@@ -37,74 +62,73 @@ http://127.0.0.1:3000/?demo&page=songs&state=dense
 http://127.0.0.1:3000/?demo&page=dashboard&recovery=manual
 ```
 
-`?demo` usa un adaptador en memoria: no invoca Tauri ni consulta archivos reales.
+## Commands
 
-## Comandos
-
-| Comando | Uso |
+| Command | Purpose |
 | --- | --- |
-| `bun test` | Pruebas DOM y unitarias con Bun + Happy DOM |
-| `bun run check` | Typecheck y lint sin modificar archivos |
-| `bun run build` | Build frontend de producción |
-| `bun run tauri dev` | App nativa en desarrollo |
-| `bun run tauri build` | Binario e instaladores Tauri |
-| `bun run deps:check` | Dependencias pendientes |
-| `bun run audit` | Auditoría de seguridad |
-| `bun run verify` | Check + tests + build frontend |
+| `bun run dev` | Start the Vite development server. |
+| `bun run tauri dev` | Start the native desktop application. |
+| `bun run check` | Run TypeScript checks and non-mutating lint. |
+| `bun test` | Run DOM and unit tests with Bun and Happy DOM. |
+| `bun run build` | Build the production frontend. |
+| `bun run build:pages` | Build the in-memory demo for `/vdj-manager/`. |
+| `bun run verify` | Run frontend checks, tests, and build. |
+| `bun run deps:check` | Report outdated frontend dependencies. |
+| `bun run audit` | Audit frontend dependencies. |
+| `cargo test --manifest-path src-tauri/Cargo.toml` | Run the Rust test suite. |
+| `cargo clippy --manifest-path src-tauri/Cargo.toml --all-targets --all-features -- -D warnings` | Enforce the Rust lint gate. |
 
-El proyecto conserva Bun porque las pruebas importan `bun:test` y Tauri usa
-`bun run` en sus hooks `beforeDevCommand`/`beforeBuildCommand`; no se migra a
-pnpm sin cambiar ese contrato.
+Bun is part of the project contract: tests import `bun:test`, and Tauri invokes Bun from its development and build hooks.
 
-Gates Rust desde `src-tauri` y con MSVC inicializado:
-
-```powershell
-cargo test
-cargo check
-```
-
-## Arquitectura
+## Architecture
 
 ```text
 src/
-├── App.tsx                    # estado raíz, navegación, scope de errores y caches
+├── App.tsx                    root state, navigation, errors, and caches
 ├── components/
-│   ├── Dialog.tsx             # Dialog/ConfirmDialog accesible
-│   ├── Layout.tsx             # rail de 72 px, header y feedback contextual
-│   ├── IntegrityWorkspace.tsx # shell de diagnóstico
-│   ├── ResourceStudio.tsx     # shell del estudio de recursos
-│   └── SongTable.tsx          # tabla virtualizada y edición inline
-├── pages/                     # superficies por tarea
+│   ├── Dialog.tsx             accessible dialog and confirmation behavior
+│   ├── Layout.tsx             navigation rail, header, and scoped feedback
+│   ├── IntegrityWorkspace.tsx shared diagnosis shell
+│   ├── ResourceStudio.tsx     settings, pads, and mappers shell
+│   └── SongTable.tsx          virtualized table and inline editing
+├── pages/                     task-focused product surfaces
 ├── lib/
-│   ├── navigation.ts          # NavigationState y aliases demo
-│   ├── runtimeServices.ts     # adaptadores Tauri/demo
-│   ├── paneLayout.ts          # vdj-layout-v2, clamping y breakpoint
-│   └── uiError.ts             # UiError contextual
-└── types/database.ts          # contratos TypeScript compartidos
+│   ├── navigation.ts          navigation state and demo aliases
+│   ├── runtimeServices.ts     native and in-memory adapters
+│   ├── paneLayout.ts          persisted panel sizing and clamping
+│   └── uiError.ts             scoped user-facing errors
+└── types/database.ts          shared TypeScript contracts
 
 src-tauri/src/
-├── commands/                  # handlers IPC existentes
-├── database/                  # parser/modelo XML
-└── mutation/                  # backup, journal, lease y recovery
+├── commands/                  typed IPC handlers
+├── database/                  XML model, parser, and patch writers
+└── mutation_journal.rs        journal, lease, and recovery state machine
 ```
 
-La explicación completa está en [docs/architecture.md](docs/architecture.md), los contratos de producto en [docs/ui/view-contracts.md](docs/ui/view-contracts.md) y el estado verificado en [docs/implementation-status.md](docs/implementation-status.md).
+## Write safety
 
-## Seguridad de escritura
+- The frontend never serializes the complete `database.xml` document.
+- Tags, relink, rename, move, and removal identify entries by `originalFilePath`.
+- Writers create a backup, validate XML, detect concurrent changes, and commit atomically.
+- Rename and move never overwrite a destination and use a journal for recovery.
+- Cross-drive moves use journaled copy/delete steps and stop for manual review when uncertain.
+- Editable VirtualDJ resources are backed up before writing.
+- Mutation tests use fixtures and temporary directories, never a real music library.
 
-- `database.xml` nunca se serializa completo desde el frontend.
-- Tags, relink, rename, move y remoción identifican entradas por `originalFilePath`.
-- Los writers crean backup, validan el XML, comprueban cambios concurrentes y hacen commit atómico.
-- Rename/move usan journal por biblioteca, no reemplazan destinos y bloquean nuevas mutaciones durante recovery.
-- Cross-drive usa copy/delete journalizado; una ambigüedad queda en revisión manual.
-- Recursos VirtualDJ editables también crean backup antes de escribir.
-- Las pruebas de mutación usan fixtures y carpetas temporales.
+## Documentation
 
-## Documentación útil
+- [Architecture](docs/architecture.md)
+- [View contracts](docs/ui/view-contracts.md)
+- [Implementation status](docs/implementation-status.md)
+- [Technical debt](docs/tech-debt.md)
+- [GitHub Pages deployment](docs/deployment.md)
+- [Contributing](CONTRIBUTING.md)
+- [Security policy](SECURITY.md)
 
-- [Arquitectura](docs/architecture.md)
-- [Contratos de vistas](docs/ui/view-contracts.md)
-- [Estado de implementación](docs/implementation-status.md)
-- [Deuda técnica](docs/tech-debt.md)
+## Support
 
-Proyecto privado.
+Support continued development through [GitHub Sponsors](https://github.com/sponsors/gvastethecreator) or [Ko-fi](https://ko-fi.com/gvaste).
+
+## License
+
+No license has been published for this repository. All rights are reserved unless the repository owner states otherwise.

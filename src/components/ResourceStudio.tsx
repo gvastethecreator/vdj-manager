@@ -28,7 +28,7 @@ export function useResourceEditorState(state: ResourceEditorState) {
 }
 
 const TABS: Array<{ section: ResourceSection; label: string; icon: typeof Settings2 }> = [
-  { section: "configs", label: "Configuración", icon: Settings2 },
+  { section: "configs", label: "Settings", icon: Settings2 },
   { section: "pads", label: "Pads", icon: Gamepad2 },
   { section: "mappers", label: "Mappers", icon: SlidersHorizontal },
 ];
@@ -100,22 +100,22 @@ export function ResourceStudio({ children }: { children: ReactNode }) {
         <header className="shrink-0 border-b border-border bg-surface px-4 pt-3">
           <div className="flex items-start justify-between gap-4">
             <div>
-              <h1 className="text-base font-semibold text-text">Estudio de recursos</h1>
-              <p className="mt-0.5 text-xs text-text-muted">Edita settings, pads y controladores con estado explícito y backup al guardar.</p>
+              <h1 className="text-base font-semibold text-text">Resource studio</h1>
+              <p className="mt-0.5 text-xs text-text-muted">Edit settings, pads, and controllers with explicit state and a backup on save.</p>
             </div>
             <div className="flex items-center gap-2" aria-live="polite">
               <span className={`badge border ${editor?.dirty ? "border-warning/35 bg-warning/10 text-warning" : "border-success/30 bg-success/8 text-success"}`}>
-                {editor?.busy ? "Procesando…" : editor?.dirty ? "Cambios pendientes" : "Sin cambios"}
+                {editor?.busy ? "Processing…" : editor?.dirty ? "Pending changes" : "No changes"}
               </span>
               <button type="button" className="btn btn-ghost btn-sm" disabled={!editor?.dirty || editor.busy} onClick={() => void runEditorAction(editor?.revert)}>
-                <RotateCcw className="h-4 w-4" /> Revertir
+                <RotateCcw className="h-4 w-4" /> Revert
               </button>
               <button type="button" className="btn btn-primary btn-sm" disabled={!editor?.dirty || editor.busy} onClick={() => void runEditorAction(editor?.save)}>
-                <Save className="h-4 w-4" /> Guardar
+                <Save className="h-4 w-4" /> Save
               </button>
             </div>
           </div>
-          <nav className="mt-3 flex gap-1" aria-label="Secciones del estudio de recursos">
+          <nav className="mt-3 flex gap-1" aria-label="Resource studio sections">
             {TABS.map(({ section: nextSection, label, icon: Icon }) => (
               <button
                 key={nextSection}
@@ -145,9 +145,9 @@ export function ResourceStudio({ children }: { children: ReactNode }) {
 
       <ConfirmDialog
         open={pendingNavigation !== null}
-        title="Hay cambios sin guardar"
-        description="Si continúas, se restaurará la última versión cargada y se descartarán tus cambios pendientes antes de navegar, recargar o cambiar de biblioteca."
-        confirmLabel="Descartar y cambiar"
+        title="There are unsaved changes"
+        description="If you continue, the last loaded version will be restored and pending changes will be discarded before browsing, reloading, or switching libraries."
+        confirmLabel="Discard and switch"
         destructive
         onCancel={() => setPendingNavigation(null)}
         onConfirm={confirmNavigation}

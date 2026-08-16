@@ -148,7 +148,7 @@ pub async fn rename_file_op(
     let app_data_dir = app
         .path()
         .app_data_dir()
-        .map_err(|error| format!("No se pudo resolver app-data para el journal: {error}"))?;
+        .map_err(|error| format!("App data could not be resolved for the journal: {error}"))?;
     let store = MutationJournalStore::new(app_data_dir);
     Ok(rename_file_core(&store, request))
 }
@@ -171,10 +171,10 @@ pub fn rename_file_core(
             match patch.status {
                 RelinkFileStatus::Completed => Ok(()),
                 status => Err(format!(
-                    "patch_song_path_in_place no completó ({status:?}): {}",
+                    "patch_song_path_in_place did not complete ({status:?}): {}",
                     patch
                         .message
-                        .unwrap_or_else(|| "resultado no exitoso".to_string())
+                        .unwrap_or_else(|| "unsuccessful result".to_string())
                 )),
             }
         },
@@ -235,7 +235,7 @@ where
                 String::new(),
                 None,
                 None,
-                Some(format!("No se pudo adquirir el lease de mutación: {error}")),
+                Some(format!("The mutation lease could not be acquired: {error}")),
             );
         }
     };
@@ -277,7 +277,7 @@ where
                 new_path_string,
                 None,
                 None,
-                Some(format!("No se pudo persistir la fase planned: {error}")),
+                Some(format!("The planned phase could not be persisted: {error}")),
             );
         }
     };
@@ -288,14 +288,16 @@ where
     // must never be overwritten just because preflight was initially clean.
     if new_path.exists() {
         return close_planned_as_rollback(
-            store,
-            &request.vdj_folder,
-            &journal_id,
-            &item_id,
-            &original,
-            &new_path_string,
+            RenameJournalContext {
+                store,
+                library: &request.vdj_folder,
+                journal_id: &journal_id,
+                item_id: &item_id,
+                original: &original,
+                target: &new_path_string,
+            },
             RenameFileStatus::TargetConflict,
-            "El destino apareció mientras se preparaba el rename".to_string(),
+            "The target appeared while the rename was being prepared".to_string(),
         );
     }
 
@@ -320,7 +322,7 @@ where
                 new_path_string,
                 Some(journal_id),
                 Some(operation.phase),
-                Some(format!("No se pudo renombrar físicamente: {error}")),
+                Some(format!("The file could not be physically renamed: {error}")),
             ),
             Err(journal_error) => RenameFileResult::new(
                 RenameFileStatus::JournalFailure,
@@ -329,7 +331,7 @@ where
                 Some(journal_id),
                 Some(MutationJournalPhase::Planned),
                 Some(format!(
-                    "Falló el rename físico ({error}) y también el cierre del journal: {journal_error}"
+                    "The physical rename failed ({error}), and closing the journal also failed: {journal_error}"
                 )),
             ),
         };
@@ -346,10 +348,10 @@ where
     ) {
         let rollback_error = rename(&new_path, &old_path).err();
         let message = format!(
-            "No se pudo persistir FsApplied: {journal_error}; rollback: {}",
+            "FsApplied could not be persisted: {journal_error}; rollback: {}",
             rollback_error
                 .as_deref()
-                .unwrap_or("completado")
+                .unwrap_or("completed")
         );
         let (phase, message) = persist_manual_review_or_report_actual(
             store,
@@ -371,14 +373,16 @@ where
 
     if let Err(patch_error) = patch(&database_path, &old_path_string, &new_path_string) {
         return rollback_after_database_failure(
-            store,
-            &request.vdj_folder,
-            &journal_id,
-            &item_id,
+            RenameJournalContext {
+                store,
+                library: &request.vdj_folder,
+                journal_id: &journal_id,
+                item_id: &item_id,
+                original: &original,
+                target: &new_path_string,
+            },
             &old_path,
             &new_path,
-            &original,
-            &new_path_string,
             patch_error,
             &mut rename,
         );
@@ -406,7 +410,7 @@ where
                 &item_id,
                 MutationJournalPhase::FsApplied,
                 format!(
-                    "filesystem y database están aplicados, pero no se pudo cerrar el journal: {error}"
+                    "The filesystem and database changes are applied, but the journal could not be closed: {error}"
                 ),
             );
             RenameFileResult::new(
@@ -452,7 +456,7 @@ fn rename_preflight(
         return Err((
             RenameFileStatus::FailedValidation,
             String::new(),
-            "vdjFolder y originalFilePath deben ser rutas absolutas".to_string(),
+            "vdjFolder and originalFilePath must be absolute paths".to_string(),
         ));
     }
 
@@ -462,14 +466,14 @@ fn rename_preflight(
             return Err((
                 RenameFileStatus::FailedValidation,
                 old_path.to_string_lossy().to_string(),
-                "El origen debe ser un archivo regular".to_string(),
+                "The source must be a regular file".to_string(),
             ));
         }
         Err(error) => {
             return Err((
                 RenameFileStatus::FailedValidation,
                 old_path.to_string_lossy().to_string(),
-                format!("El archivo origen no existe o no se puede leer: {error}"),
+                format!("The source file does not exist or cannot be read: {error}"),
             ));
         }
     };
@@ -479,7 +483,7 @@ fn rename_preflight(
         return Err((
             RenameFileStatus::FailedValidation,
             old_path.to_string_lossy().to_string(),
-            "No se pudo obtener el directorio padre del origen".to_string(),
+            "The source parent directory could not be determined".to_string(),
         ));
     };
     let new_path = parent.join(&request.new_file_name);
@@ -492,7 +496,7 @@ fn rename_preflight(
         return Err((
             RenameFileStatus::FailedValidation,
             new_path.to_string_lossy().to_string(),
-            "El rename debe conservar exactamente el mismo directorio padre".to_string(),
+            "Rename must preserve the exact same parent directory".to_string(),
         ));
     }
     if parser::windows_paths_equal(
@@ -502,14 +506,14 @@ fn rename_preflight(
         return Err((
             RenameFileStatus::FailedValidation,
             new_path.to_string_lossy().to_string(),
-            "El nombre destino no cambia la ruta (no-op)".to_string(),
+            "The target name does not change the path (no-op)".to_string(),
         ));
     }
     if new_path.exists() {
         return Err((
             RenameFileStatus::TargetConflict,
             new_path.to_string_lossy().to_string(),
-            "Ya existe un archivo o directorio con ese nombre".to_string(),
+            "A file or directory with that name already exists".to_string(),
         ));
     }
 
@@ -518,19 +522,19 @@ fn rename_preflight(
 
 fn validate_windows_file_name(name: &str) -> Result<(), String> {
     if name.is_empty() || name == "." || name == ".." {
-        return Err("El nombre destino no puede estar vacío ni ser . o ..".to_string());
+        return Err("The target name cannot be empty, . or ..".to_string());
     }
     if name.encode_utf16().count() > 255 {
-        return Err("El nombre destino supera 255 unidades UTF-16".to_string());
+        return Err("The target name exceeds 255 UTF-16 code units".to_string());
     }
     if name.chars().any(|character| {
         character.is_control()
             || matches!(character, '<' | '>' | ':' | '"' | '/' | '\\' | '|' | '?' | '*')
     }) {
-        return Err("El nombre destino contiene caracteres inválidos para Windows".to_string());
+        return Err("The target name contains characters that are invalid on Windows".to_string());
     }
     if name.ends_with('.') || name.ends_with(' ') {
-        return Err("El nombre destino no puede terminar en punto ni espacio".to_string());
+        return Err("The target name cannot end with a period or space".to_string());
     }
 
     let stem = name.split('.').next().unwrap_or(name);
@@ -545,37 +549,46 @@ fn validate_windows_file_name(name: &str) -> Result<(), String> {
         })
     });
     if reserved {
-        return Err("El nombre destino está reservado por Windows".to_string());
+        return Err("The target name is reserved by Windows".to_string());
     }
     Ok(())
 }
 
+struct RenameJournalContext<'a> {
+    store: &'a MutationJournalStore,
+    library: &'a str,
+    journal_id: &'a str,
+    item_id: &'a str,
+    original: &'a str,
+    target: &'a str,
+}
+
 fn close_planned_as_rollback(
-    store: &MutationJournalStore,
-    library: &str,
-    journal_id: &str,
-    item_id: &str,
-    original: &str,
-    target: &str,
+    context: RenameJournalContext<'_>,
     status: RenameFileStatus,
     message: String,
 ) -> RenameFileResult {
-    match store.transition_item(library, journal_id, item_id, MutationJournalPhase::RolledBack) {
+    match context.store.transition_item(
+        context.library,
+        context.journal_id,
+        context.item_id,
+        MutationJournalPhase::RolledBack,
+    ) {
         Ok(operation) => RenameFileResult::new(
             status,
-            original,
-            target,
-            Some(journal_id.to_string()),
+            context.original,
+            context.target,
+            Some(context.journal_id.to_string()),
             Some(operation.phase),
             Some(message),
         ),
         Err(error) => RenameFileResult::new(
             RenameFileStatus::JournalFailure,
-            original,
-            target,
-            Some(journal_id.to_string()),
+            context.original,
+            context.target,
+            Some(context.journal_id.to_string()),
             Some(MutationJournalPhase::Planned),
-            Some(format!("{message}; no se pudo cerrar el journal: {error}")),
+            Some(format!("{message}; the journal could not be closed: {error}")),
         ),
     }
 }
@@ -610,21 +623,16 @@ fn persist_manual_review_or_report_actual(
         Err(error) => (
             observed_phase,
             format!(
-                "{message}; además no se pudo persistir manual_review_required: {error}"
+                "{message}; manual_review_required also could not be persisted: {error}"
             ),
         ),
     }
 }
 
 fn rollback_after_database_failure<R>(
-    store: &MutationJournalStore,
-    library: &str,
-    journal_id: &str,
-    item_id: &str,
+    context: RenameJournalContext<'_>,
     old_path: &Path,
     new_path: &Path,
-    original: &str,
-    target: &str,
     patch_error: String,
     rename: &mut R,
 ) -> RenameFileResult
@@ -632,36 +640,36 @@ where
     R: FnMut(&Path, &Path) -> Result<(), String>,
 {
     match rename(new_path, old_path) {
-        Ok(()) => match store.transition_item(
-            library,
-            journal_id,
-            item_id,
+        Ok(()) => match context.store.transition_item(
+            context.library,
+            context.journal_id,
+            context.item_id,
             MutationJournalPhase::RolledBack,
         ) {
             Ok(operation) => RenameFileResult::new(
                 RenameFileStatus::RolledBack,
-                original,
-                target,
-                Some(journal_id.to_string()),
+                context.original,
+                context.target,
+                Some(context.journal_id.to_string()),
                 Some(operation.phase),
-                Some(format!("El commit de database.xml falló y el archivo fue revertido: {patch_error}")),
+                Some(format!("The database.xml commit failed and the file was restored: {patch_error}")),
             ),
             Err(error) => {
                 let (phase, message) = persist_manual_review_or_report_actual(
-                    store,
-                    library,
-                    journal_id,
-                    item_id,
+                    context.store,
+                    context.library,
+                    context.journal_id,
+                    context.item_id,
                     MutationJournalPhase::FsApplied,
                     format!(
-                        "El archivo fue revertido, pero no se pudo persistir rolled_back: {error}; causa DB: {patch_error}"
+                        "The file was restored, but rolled_back could not be persisted: {error}; database cause: {patch_error}"
                     ),
                 );
                 RenameFileResult::new(
                     RenameFileStatus::ManualReviewRequired,
-                    original,
-                    target,
-                    Some(journal_id.to_string()),
+                    context.original,
+                    context.target,
+                    Some(context.journal_id.to_string()),
                     Some(phase),
                     Some(message),
                 )
@@ -669,21 +677,21 @@ where
         },
         Err(rollback_error) => {
             let message = format!(
-                "Falló el commit de database.xml ({patch_error}) y también el rollback físico: {rollback_error}"
+                "The database.xml commit failed ({patch_error}), and the physical rollback also failed: {rollback_error}"
             );
             let (phase, message) = persist_manual_review_or_report_actual(
-                store,
-                library,
-                journal_id,
-                item_id,
+                context.store,
+                context.library,
+                context.journal_id,
+                context.item_id,
                 MutationJournalPhase::FsApplied,
                 message,
             );
             RenameFileResult::new(
                 RenameFileStatus::ManualReviewRequired,
-                original,
-                target,
-                Some(journal_id.to_string()),
+                context.original,
+                context.target,
+                Some(context.journal_id.to_string()),
                 Some(phase),
                 Some(message),
             )
@@ -762,19 +770,19 @@ fn filesystem_entry_exists(path: &Path) -> bool {
 
 fn validate_regular_file(path: &Path) -> Result<(), String> {
     if !path.is_absolute() {
-        return Err("La ruta origen debe ser absoluta".to_string());
+        return Err("The source path must be absolute".to_string());
     }
     let metadata = std::fs::symlink_metadata(path)
-        .map_err(|error| format!("No se pudo validar el archivo origen: {error}"))?;
+        .map_err(|error| format!("The source file could not be validated: {error}"))?;
     if metadata.file_type().is_symlink() || !metadata.file_type().is_file() {
-        return Err("El origen debe ser un archivo regular, no un enlace o directorio".to_string());
+        return Err("The source must be a regular file, not a link or directory".to_string());
     }
     #[cfg(windows)]
     {
         use std::os::windows::fs::MetadataExt;
         use windows_sys::Win32::Storage::FileSystem::FILE_ATTRIBUTE_REPARSE_POINT;
         if metadata.file_attributes() & FILE_ATTRIBUTE_REPARSE_POINT != 0 {
-            return Err("El origen es un reparse point y requiere revisión manual".to_string());
+            return Err("The source is a reparse point and requires manual review".to_string());
         }
     }
     Ok(())
@@ -782,19 +790,19 @@ fn validate_regular_file(path: &Path) -> Result<(), String> {
 
 fn validate_target_directory(path: &Path) -> Result<(), String> {
     if !path.is_absolute() {
-        return Err("La carpeta destino debe ser absoluta".to_string());
+        return Err("The target folder must be absolute".to_string());
     }
     let metadata = std::fs::symlink_metadata(path)
-        .map_err(|error| format!("No se pudo validar la carpeta destino: {error}"))?;
+        .map_err(|error| format!("The target folder could not be validated: {error}"))?;
     if metadata.file_type().is_symlink() || !metadata.file_type().is_dir() {
-        return Err("El destino debe ser un directorio existente y no puede ser un enlace".to_string());
+        return Err("The target must be an existing directory and cannot be a link".to_string());
     }
     #[cfg(windows)]
     {
         use std::os::windows::fs::MetadataExt;
         use windows_sys::Win32::Storage::FileSystem::FILE_ATTRIBUTE_REPARSE_POINT;
         if metadata.file_attributes() & FILE_ATTRIBUTE_REPARSE_POINT != 0 {
-            return Err("La carpeta destino es un reparse point y requiere revisión manual".to_string());
+            return Err("The target folder is a reparse point and requires manual review".to_string());
         }
     }
     Ok(())
@@ -806,7 +814,7 @@ fn build_move_plan(request: &MoveBatchRequest) -> Result<Vec<PlannedMoveItem>, S
     let database = parser::parse_database(&database_path)?;
     let target_folder = PathBuf::from(&request.target_folder);
     let target_error = if !library_path.is_absolute() {
-        Some("vdjFolder debe ser una ruta absoluta".to_string())
+        Some("vdjFolder must be an absolute path".to_string())
     } else {
         validate_target_directory(&target_folder).err()
     };
@@ -846,9 +854,9 @@ fn build_move_plan(request: &MoveBatchRequest) -> Result<Vec<PlannedMoveItem>, S
             .collect();
         if matches.len() != 1 {
             planned.push(blocked(if matches.is_empty() {
-                "No se encontró la entrada por originalFilePath".to_string()
+                "No entry was found by originalFilePath".to_string()
             } else {
-                "originalFilePath coincide con varias entradas".to_string()
+                "originalFilePath matches multiple entries".to_string()
             }));
             continue;
         }
@@ -859,7 +867,7 @@ fn build_move_plan(request: &MoveBatchRequest) -> Result<Vec<PlannedMoveItem>, S
             continue;
         }
         let Some(file_name) = source_path.file_name() else {
-            planned.push(blocked("El origen no tiene nombre de archivo".to_string()));
+            planned.push(blocked("The source has no file name".to_string()));
             continue;
         };
         let target_path = target_folder.join(file_name);
@@ -867,7 +875,7 @@ fn build_move_plan(request: &MoveBatchRequest) -> Result<Vec<PlannedMoveItem>, S
             &source_path.to_string_lossy(),
             &target_path.to_string_lossy(),
         ) {
-            planned.push(blocked("El movimiento sería un no-op".to_string()));
+            planned.push(blocked("The move would be a no-op".to_string()));
             continue;
         }
         let target_file_path = target_path.to_string_lossy().to_string();
@@ -881,7 +889,7 @@ fn build_move_plan(request: &MoveBatchRequest) -> Result<Vec<PlannedMoveItem>, S
                 } else {
                     MoveItemStatus::Ready
                 },
-                message: target_conflict.then(|| "Ya existe una entrada en el destino".to_string()),
+                message: target_conflict.then(|| "An entry already exists at the target".to_string()),
                 journal_id: None,
                 transfer_method: None,
             },
@@ -903,7 +911,7 @@ fn build_move_plan(request: &MoveBatchRequest) -> Result<Vec<PlannedMoveItem>, S
                 > 1
         {
             item.result.status = MoveItemStatus::TargetConflict;
-            item.result.message = Some("Varios ítems del lote comparten el mismo destino".to_string());
+            item.result.message = Some("Multiple batch items share the same target".to_string());
         }
     }
     Ok(planned)
@@ -969,7 +977,7 @@ fn close_unapplied_move_item(
                 journal_id,
                 item_id,
                 MutationJournalPhase::Planned,
-                format!("{message}; no se pudo cerrar rolled_back: {error}"),
+                format!("{message}; rolled_back could not be closed: {error}"),
             );
             result.status = MoveItemStatus::ManualReviewRequired;
             result.message = Some(format!("fase journal={phase:?}: {message}"));
@@ -1019,7 +1027,7 @@ fn cleanup_copy_failure(to: &Path, message: String) -> MoveTransferFailure {
     match std::fs::remove_file(to) {
         Ok(()) => MoveTransferFailure::clean(message),
         Err(cleanup_error) => MoveTransferFailure::uncertain(format!(
-            "{message}; además no se pudo limpiar la copia: {cleanup_error}"
+            "{message}; the copy also could not be cleaned up: {cleanup_error}"
         )),
     }
 }
@@ -1052,7 +1060,7 @@ fn copy_delete_no_replace(from: &Path, to: &Path) -> Result<(), MoveTransferFail
             drop(target);
             return Err(cleanup_copy_failure(
                 to,
-                format!("No se pudo validar el origen copiado: {error}"),
+                format!("The copied source could not be validated: {error}"),
             ));
         }
     };
@@ -1062,7 +1070,7 @@ fn copy_delete_no_replace(from: &Path, to: &Path) -> Result<(), MoveTransferFail
             drop(target);
             return Err(cleanup_copy_failure(
                 to,
-                format!("No se pudo validar la copia: {error}"),
+                format!("The copy could not be validated: {error}"),
             ));
         }
     };
@@ -1070,13 +1078,13 @@ fn copy_delete_no_replace(from: &Path, to: &Path) -> Result<(), MoveTransferFail
     if source_len != target_len {
         return Err(cleanup_copy_failure(
             to,
-            "La copia no conserva el tamaño del archivo".to_string(),
+            "The copy does not preserve the file size".to_string(),
         ));
     }
     if let Err(error) = std::fs::remove_file(from) {
         return Err(cleanup_copy_failure(
             to,
-            format!("No se pudo remover el origen después de copiar: {error}"),
+            format!("The source could not be removed after copying: {error}"),
         ));
     }
     Ok(())
@@ -1088,21 +1096,21 @@ fn transfer_file_no_replace(
 ) -> Result<MoveTransferMethod, MoveTransferFailure> {
     let target_parent = to
         .parent()
-        .ok_or_else(|| MoveTransferFailure::clean("El destino no tiene directorio padre"))?;
+        .ok_or_else(|| MoveTransferFailure::clean("The target has no parent directory"))?;
     validate_target_directory(target_parent).map_err(MoveTransferFailure::clean)?;
     match rename_without_replace(from, to) {
         Ok(()) => Ok(MoveTransferMethod::Rename),
         Err(rename_error) => {
             if filesystem_entry_exists(to) {
                 return Err(MoveTransferFailure::conflict(format!(
-                    "El destino apareció durante el movimiento: {rename_error}"
+                    "The target appeared during the move: {rename_error}"
                 )));
             }
             copy_delete_no_replace(from, to)
                 .map(|()| MoveTransferMethod::CopyDelete)
                 .map_err(|mut copy_error| {
                     copy_error.message = format!(
-                        "Falló rename ({rename_error}) y fallback copy-delete ({})",
+                        "Rename failed ({rename_error}), as did the copy-delete fallback ({})",
                         copy_error.message
                     );
                     copy_error
@@ -1119,10 +1127,10 @@ pub(crate) fn recovery_transfer_file(
     validate_regular_file(from)?;
     let parent = to
         .parent()
-        .ok_or_else(|| "El destino de recovery no tiene directorio padre".to_string())?;
+        .ok_or_else(|| "The recovery target has no parent directory".to_string())?;
     validate_target_directory(parent)?;
     if filesystem_entry_exists(to) {
-        return Err("El destino de recovery ya existe".to_string());
+        return Err("The recovery target already exists".to_string());
     }
     match operation {
         MutationOperationKind::Rename => rename_without_replace(from, to),
@@ -1130,7 +1138,7 @@ pub(crate) fn recovery_transfer_file(
             .map(|_| ())
             .map_err(|error| error.message),
         MutationOperationKind::RemoveLibrary => {
-            Err("Recovery físico de remove_library no está soportado".to_string())
+            Err("Physical recovery for remove_library is not supported".to_string())
         }
     }
 }
@@ -1143,7 +1151,7 @@ pub async fn move_files_op(
     let app_data_dir = app
         .path()
         .app_data_dir()
-        .map_err(|error| format!("No se pudo resolver app-data para el journal: {error}"))?;
+        .map_err(|error| format!("App data could not be resolved for the journal: {error}"))?;
     let store = MutationJournalStore::new(app_data_dir);
     execute_move_batch_with_hooks(
         &store,
@@ -1156,7 +1164,7 @@ pub async fn move_files_op(
             } else {
                 Err(result
                     .message
-                    .unwrap_or_else(|| format!("El patch de database.xml terminó en {:?}", result.status)))
+                    .unwrap_or_else(|| format!("The database.xml patch ended with {:?}", result.status)))
             }
         },
     )
@@ -1174,7 +1182,7 @@ where
 {
     let _mutation_guard = store
         .begin_critical_mutation(&request.vdj_folder)
-        .map_err(|error| format!("No se pudo adquirir el lease de mutación: {error}"))?;
+        .map_err(|error| format!("The mutation lease could not be acquired: {error}"))?;
     let mut planned = build_move_plan(&request)?;
     let candidate_indices: Vec<usize> = planned
         .iter()
@@ -1220,7 +1228,7 @@ where
         Err(error) => {
             for index in ready_indices {
                 planned[index].result.status = MoveItemStatus::ManualReviewRequired;
-                planned[index].result.message = Some(format!("No se pudo crear el journal: {error}"));
+                planned[index].result.message = Some(format!("The journal could not be created: {error}"));
             }
             return Ok(public_move_report(&planned));
         }
@@ -1253,7 +1261,7 @@ where
                 &journal_item.item_id,
                 &mut planned[index].result,
                 MoveItemStatus::FailedValidation,
-                format!("La carpeta destino cambió después del preflight: {error}"),
+                format!("The target folder changed after preflight: {error}"),
             );
             continue;
         }
@@ -1265,7 +1273,7 @@ where
                 &journal_item.item_id,
                 &mut planned[index].result,
                 MoveItemStatus::TargetConflict,
-                "El destino apareció después del preflight".to_string(),
+                "The target appeared after preflight".to_string(),
             );
             continue;
         }
@@ -1280,7 +1288,7 @@ where
                         &operation.journal_id,
                         &journal_item.item_id,
                         MutationJournalPhase::Planned,
-                        format!("El transfer falló con estado físico incierto: {}", error.message),
+                        format!("The transfer failed with uncertain physical state: {}", error.message),
                     );
                     planned[index].result.status = MoveItemStatus::ManualReviewRequired;
                     planned[index].result.message = Some(format!("fase journal={phase:?}: {message}"));
@@ -1321,7 +1329,7 @@ where
                     &journal_item.item_id,
                     &mut planned[index].result,
                     MoveItemStatus::RolledBack,
-                    format!("No se pudo persistir fs_applied ({error}); archivo revertido"),
+                    format!("fs_applied could not be persisted ({error}); file restored"),
                 ),
                 Err(rollback_error) => {
                     let (phase, message) = persist_manual_review_or_report_actual(
@@ -1331,7 +1339,7 @@ where
                         &journal_item.item_id,
                         MutationJournalPhase::Planned,
                         format!(
-                            "No se pudo persistir fs_applied ({error}) ni revertir el archivo ({rollback_error})"
+                            "fs_applied could not be persisted ({error}), and the file could not be restored ({rollback_error})"
                         ),
                     );
                     planned[index].result.status = MoveItemStatus::ManualReviewRequired;
@@ -1357,7 +1365,7 @@ where
                     Ok(_) => {
                         planned[index].result.status = MoveItemStatus::RolledBack;
                         planned[index].result.message = Some(format!(
-                            "Falló database.xml y el archivo fue revertido: {error}"
+                            "database.xml failed and the file was restored: {error}"
                         ));
                     }
                     Err(journal_error) => {
@@ -1368,7 +1376,7 @@ where
                             &journal_item.item_id,
                             MutationJournalPhase::FsApplied,
                             format!(
-                                "Archivo revertido, pero falló rolled_back ({journal_error}); DB={error}"
+                                "File restored, but rolled_back failed ({journal_error}); DB={error}"
                             ),
                         );
                         planned[index].result.status = MoveItemStatus::ManualReviewRequired;
@@ -1382,7 +1390,7 @@ where
                         &operation.journal_id,
                         &journal_item.item_id,
                         MutationJournalPhase::FsApplied,
-                        format!("Falló DB ({error}) y rollback físico ({rollback_error})"),
+                        format!("The database failed ({error}), as did the physical rollback ({rollback_error})"),
                     );
                     planned[index].result.status = MoveItemStatus::ManualReviewRequired;
                     planned[index].result.message = Some(format!("fase journal={phase:?}: {message}"));
@@ -1408,7 +1416,7 @@ where
                     &operation.journal_id,
                     &journal_item.item_id,
                     MutationJournalPhase::FsApplied,
-                    format!("Filesystem y DB aplicados; no se pudo cerrar completed: {error}"),
+                    format!("Filesystem and database applied; completed could not be closed: {error}"),
                 );
                 planned[index].result.status = MoveItemStatus::ManualReviewRequired;
                 planned[index].result.message = Some(format!("fase journal={phase:?}: {message}"));
@@ -1544,7 +1552,7 @@ fn collect_scanned_files(scan_folders: &[String]) -> Vec<ScannedFile> {
         }
     }
 
-    scanned_files.sort_by(|left, right| path_key(&left.path).cmp(&path_key(&right.path)));
+    scanned_files.sort_by_key(|file| path_key(&file.path));
     scanned_files
 }
 
@@ -1573,7 +1581,7 @@ fn find_candidates_for_paths(
                 status: SimilarFileMatchStatus::NotFound,
                 original_file_path: original_file_path.clone(),
                 candidates: Vec::new(),
-                message: Some("No se encontró la entrada con la ruta original".to_string()),
+                message: Some("No entry was found for the original path".to_string()),
             });
             continue;
         }
@@ -1582,7 +1590,7 @@ fn find_candidates_for_paths(
                 status: SimilarFileMatchStatus::ManualReviewRequired,
                 original_file_path: original_file_path.clone(),
                 candidates: Vec::new(),
-                message: Some("La ruta original coincide con más de una entrada".to_string()),
+                message: Some("The original path matches more than one entry".to_string()),
             });
             continue;
         }
@@ -1741,7 +1749,7 @@ pub async fn find_relink_candidates(
         status: SimilarFileMatchStatus::NotFound,
         original_file_path,
         candidates: Vec::new(),
-        message: Some("No se encontró la entrada con la ruta original".to_string()),
+        message: Some("No entry was found for the original path".to_string()),
     }))
 }
 
@@ -1790,7 +1798,7 @@ async fn relocate_file_core(
             &original_file_path,
             &new_file_path,
             None,
-            Some("La ruta original y la ruta destino son obligatorias".to_string()),
+            Some("The original and target paths are required".to_string()),
             None,
         ));
     }
@@ -1800,7 +1808,7 @@ async fn relocate_file_core(
             &original_file_path,
             &new_file_path,
             None,
-            Some("La ruta destino debe ser distinta de la ruta original".to_string()),
+            Some("The target path must differ from the original path".to_string()),
             None,
         ));
     }
@@ -1813,7 +1821,7 @@ async fn relocate_file_core(
                 &original_file_path,
                 &new_file_path,
                 None,
-                Some("La ruta destino no apunta a un archivo regular".to_string()),
+                Some("The target path does not point to a regular file".to_string()),
                 None,
             ));
         }
@@ -1823,7 +1831,7 @@ async fn relocate_file_core(
                 &original_file_path,
                 &new_file_path,
                 None,
-                Some(format!("No se pudo leer metadata del destino: {}", error)),
+                Some(format!("Target metadata could not be read: {}", error)),
                 None,
             ));
         }
@@ -1841,7 +1849,7 @@ async fn relocate_file_core(
             &original_file_path,
             &new_file_path,
             Some(target_metadata.len()),
-            Some("No se encontró la entrada con la ruta original".to_string()),
+            Some("No entry was found for the original path".to_string()),
             None,
         ));
     }
@@ -1851,7 +1859,7 @@ async fn relocate_file_core(
             &original_file_path,
             &new_file_path,
             Some(target_metadata.len()),
-            Some("La ruta original coincide con más de una entrada".to_string()),
+            Some("The original path matches more than one entry".to_string()),
             None,
         ));
     }
@@ -1864,7 +1872,7 @@ async fn relocate_file_core(
             &original_file_path,
             &new_file_path,
             Some(target_metadata.len()),
-            Some("La ruta destino ya pertenece a otra entrada catalogada".to_string()),
+            Some("The target path already belongs to another cataloged entry".to_string()),
             Some(collision.file_path.clone()),
         ));
     }
@@ -1892,12 +1900,12 @@ async fn relocate_file_core(
 pub async fn list_subdirectories(folder_path: String) -> Result<Vec<String>, String> {
     let path = PathBuf::from(&folder_path);
     if !path.exists() || !path.is_dir() {
-        return Err(format!("Carpeta no válida: {}", folder_path));
+        return Err(format!("Invalid folder: {}", folder_path));
     }
 
     let mut dirs = Vec::new();
     let entries =
-        std::fs::read_dir(&path).map_err(|e| format!("Error leyendo directorio: {}", e))?;
+        std::fs::read_dir(&path).map_err(|e| format!("Could not read directory: {}", e))?;
 
     for entry in entries.flatten() {
         if let Ok(ft) = entry.file_type() {
@@ -1940,7 +1948,7 @@ pub async fn dry_run_rename(
 
     for &idx in &song_indices {
         if idx >= summaries.len() {
-            details.push(format!("⚠ Índice {} fuera de rango", idx));
+            details.push(format!("⚠ Index {} is out of range", idx));
             continue;
         }
         let song = &summaries[idx];
@@ -1966,7 +1974,7 @@ pub async fn dry_run_rename(
 
     Ok(DryRunResult {
         description: format!(
-            "Renombrar {} archivo(s) con patrón: {}",
+            "Rename {} file(s) with pattern: {}",
             song_indices.len(),
             rename_pattern
         ),
@@ -2105,7 +2113,7 @@ mod tests {
         .await
         .expect_err("malformed database must not be treated as an empty candidate set");
 
-        assert!(error.contains("parsear") || error.contains("XML"));
+        assert!(error.contains("parsed") || error.contains("XML"));
         std::fs::remove_dir_all(&dir).expect("temp directory should be removed");
     }
 
@@ -2591,7 +2599,7 @@ mod tests {
         assert!(result
             .message
             .as_deref()
-            .is_some_and(|message| message.contains("no se pudo persistir manual_review_required")));
+            .is_some_and(|message| message.contains("manual_review_required also could not be persisted")));
         std::fs::remove_dir_all(root).expect("temporary fixture should be removed");
     }
 

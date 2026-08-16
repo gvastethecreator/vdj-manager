@@ -35,7 +35,7 @@ export class ErrorBoundary extends Component<Props, State> {
 
             const error = createUiError(
                 "application",
-                "No se pudo mostrar esta vista.",
+                "This view could not be displayed.",
                 this.state.error ?? undefined,
             );
 
@@ -45,7 +45,7 @@ export class ErrorBoundary extends Component<Props, State> {
                         <UiErrorNotice
                             error={error}
                             onRetry={() => window.location.reload()}
-                            retryLabel="Recargar la aplicación"
+                            retryLabel="Reload the app"
                         />
                     </div>
                 </div>

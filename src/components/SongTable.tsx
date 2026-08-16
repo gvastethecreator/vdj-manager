@@ -62,18 +62,18 @@ export const ALL_COLUMNS: ColumnDef[] = [
             </button>
         ),
     },
-    { key: "file_name", label: "Archivo", width: 180, defaultVisible: true, cellClass: "overflow-hidden truncate text-text", render: (s) => <span title={s.file_path}>{s.file_name}</span> },
+    { key: "file_name", label: "File", width: 180, defaultVisible: true, cellClass: "overflow-hidden truncate text-text", render: (s) => <span title={s.file_path}>{s.file_name}</span> },
     { key: "waveform", label: "Wave", width: 124, defaultVisible: true, cellClass: "py-0.5", render: (s, h) => <WaveformPreview filePath={s.file_path} fileSize={s.file_size} cueMarkers={s.cue_markers} durationSecs={s.duration_secs} vdjFolder={h.vdjFolder} /> },
-    { key: "title", label: "Título", width: 150, defaultVisible: true, cellClass: "overflow-hidden truncate", editableTag: "title", render: (s, h) => <EditableCell song={s} columnKey="title" value={s.title} helpers={h} /> },
-    { key: "author", label: "Artista", width: 130, defaultVisible: true, cellClass: "overflow-hidden truncate", editableTag: "author", render: (s, h) => <EditableCell song={s} columnKey="author" value={s.author} helpers={h} /> },
-    { key: "album", label: "Álbum", width: 130, defaultVisible: true, cellClass: "overflow-hidden truncate", editableTag: "album", render: (s, h) => <EditableCell song={s} columnKey="album" value={s.album} helpers={h} /> },
-    { key: "genre", label: "Género", width: 90, defaultVisible: true, cellClass: "overflow-hidden truncate", editableTag: "genre", render: (s, h) => <EditableCell song={s} columnKey="genre" value={s.genre} helpers={h} /> },
-    { key: "year", label: "Año", width: 50, defaultVisible: true, cellClass: "tabular-nums", editableTag: "year", render: (s, h) => <EditableCell song={s} columnKey="year" value={s.year} helpers={h} /> },
+    { key: "title", label: "Title", width: 150, defaultVisible: true, cellClass: "overflow-hidden truncate", editableTag: "title", render: (s, h) => <EditableCell song={s} columnKey="title" value={s.title} helpers={h} /> },
+    { key: "author", label: "Artist", width: 130, defaultVisible: true, cellClass: "overflow-hidden truncate", editableTag: "author", render: (s, h) => <EditableCell song={s} columnKey="author" value={s.author} helpers={h} /> },
+    { key: "album", label: "Album", width: 130, defaultVisible: true, cellClass: "overflow-hidden truncate", editableTag: "album", render: (s, h) => <EditableCell song={s} columnKey="album" value={s.album} helpers={h} /> },
+    { key: "genre", label: "Genre", width: 90, defaultVisible: true, cellClass: "overflow-hidden truncate", editableTag: "genre", render: (s, h) => <EditableCell song={s} columnKey="genre" value={s.genre} helpers={h} /> },
+    { key: "year", label: "Year", width: 50, defaultVisible: true, cellClass: "tabular-nums", editableTag: "year", render: (s, h) => <EditableCell song={s} columnKey="year" value={s.year} helpers={h} /> },
     { key: "bpm", label: "BPM", width: 58, defaultVisible: true, cellClass: "tabular-nums", render: (s) => s.bpm ? s.bpm.toFixed(1) : "—" },
     { key: "key", label: "Key", width: 58, defaultVisible: true, render: (s) => <KeyBadge keyStr={s.key} /> },
-    { key: "duration_secs", label: "Duración", width: 72, defaultVisible: true, cellClass: "tabular-nums", render: (s) => formatDuration(s.duration_secs) },
+    { key: "duration_secs", label: "Duration", width: 72, defaultVisible: true, cellClass: "tabular-nums", render: (s) => formatDuration(s.duration_secs) },
     { key: "bitrate", label: "Bitrate", width: 62, defaultVisible: true, cellClass: "tabular-nums", render: (s) => s.bitrate ?? "—" },
-    { key: "file_size", label: "Tamaño", width: 72, defaultVisible: false, cellClass: "tabular-nums", render: (s) => formatSize(s.file_size) },
+    { key: "file_size", label: "Size", width: 72, defaultVisible: false, cellClass: "tabular-nums", render: (s) => formatSize(s.file_size) },
     { key: "play_count", label: "Plays", width: 52, defaultVisible: true, cellClass: "tabular-nums", render: (s) => s.play_count ?? "—" },
     {
         key: "stars", label: "★", width: 132, defaultVisible: true,
@@ -81,29 +81,29 @@ export const ALL_COLUMNS: ColumnDef[] = [
     },
     { key: "cue_count", label: "Cues", width: 48, defaultVisible: true, cellClass: "tabular-nums", render: (s) => s.cue_count || "—" },
     { key: "has_stems", label: "Stems", width: 52, defaultVisible: true, render: (s) => s.has_stems ? <span className="badge bg-purple-500/15 text-purple-400">S</span> : null },
-    { key: "label", label: "Sello", width: 100, defaultVisible: true, cellClass: "overflow-hidden truncate", editableTag: "label", render: (s, h) => <EditableCell song={s} columnKey="label" value={s.label} helpers={h} /> },
-    { key: "composer", label: "Compositor", width: 100, defaultVisible: true, cellClass: "overflow-hidden truncate", editableTag: "composer", render: (s, h) => <EditableCell song={s} columnKey="composer" value={s.composer} helpers={h} /> },
+    { key: "label", label: "Label", width: 100, defaultVisible: true, cellClass: "overflow-hidden truncate", editableTag: "label", render: (s, h) => <EditableCell song={s} columnKey="label" value={s.label} helpers={h} /> },
+    { key: "composer", label: "Composer", width: 100, defaultVisible: true, cellClass: "overflow-hidden truncate", editableTag: "composer", render: (s, h) => <EditableCell song={s} columnKey="composer" value={s.composer} helpers={h} /> },
     { key: "remix", label: "Remix", width: 100, defaultVisible: false, cellClass: "overflow-hidden truncate", editableTag: "remix", render: (s, h) => <EditableCell song={s} columnKey="remix" value={s.remix} helpers={h} /> },
     { key: "remixer", label: "Remixer", width: 100, defaultVisible: false, cellClass: "overflow-hidden truncate", editableTag: "remixer", render: (s, h) => <EditableCell song={s} columnKey="remixer" value={s.remixer} helpers={h} /> },
-    { key: "grouping", label: "Grupo", width: 80, defaultVisible: false, cellClass: "overflow-hidden truncate", editableTag: "grouping", render: (s, h) => <EditableCell song={s} columnKey="grouping" value={s.grouping} helpers={h} /> },
+    { key: "grouping", label: "Grouping", width: 80, defaultVisible: false, cellClass: "overflow-hidden truncate", editableTag: "grouping", render: (s, h) => <EditableCell song={s} columnKey="grouping" value={s.grouping} helpers={h} /> },
     { key: "track_number", label: "Track #", width: 56, defaultVisible: false, cellClass: "tabular-nums", editableTag: "trackNumber", render: (s, h) => <EditableCell song={s} columnKey="track_number" value={s.track_number} helpers={h} /> },
     {
         key: "color", label: "Color", width: 46, defaultVisible: true,
         render: (_s, { rowColor, onColorClick }) => rowColor
             ? (_s.in_database
-                ? <button type="button" className="inline-block h-[24px] w-[24px] rounded-[3px] border border-border/60 cursor-pointer hover:ring-2 hover:ring-primary/40" style={{ backgroundColor: rowColor }} aria-label={`Cambiar color de ${_s.file_name}; actual ${rowColor}`} title={`Color: ${rowColor} — click para cambiar`} onClick={(e) => onColorClick?.(_s.index, e)} />
+                ? <button type="button" className="inline-block h-[24px] w-[24px] rounded-[3px] border border-border/60 cursor-pointer hover:ring-2 hover:ring-primary/40" style={{ backgroundColor: rowColor }} aria-label={`Change color for ${_s.file_name}; current ${rowColor}`} title={`Color: ${rowColor} — click to change`} onClick={(e) => onColorClick?.(_s.index, e)} />
                 : <span className="inline-block h-3.5 w-3.5 rounded-[3px] border border-border/60" style={{ backgroundColor: rowColor }} title={`Color: ${rowColor}`} />)
             : (_s.in_database
-                ? <button type="button" className="inline-flex h-[24px] w-[24px] items-center justify-center text-text-muted hover:text-primary-light cursor-pointer" aria-label={`Asignar color a ${_s.file_name}`} title="Asignar color" onClick={(e) => onColorClick?.(_s.index, e)}>+</button>
+                ? <button type="button" className="inline-flex h-[24px] w-[24px] items-center justify-center text-text-muted hover:text-primary-light cursor-pointer" aria-label={`Assign a color to ${_s.file_name}`} title="Assign color" onClick={(e) => onColorClick?.(_s.index, e)}>+</button>
                 : <span className="text-text-muted">—</span>),
     },
     { key: "gain", label: "Gain", width: 52, defaultVisible: false, cellClass: "tabular-nums", render: (s) => s.gain ?? "—" },
-    { key: "comment", label: "Comentario", width: 100, defaultVisible: false, cellClass: "overflow-hidden truncate", editableTag: "commentText", render: (s, h) => <EditableCell song={s} columnKey="comment" value={s.comment} helpers={h} /> },
+    { key: "comment", label: "Comment", width: 100, defaultVisible: false, cellClass: "overflow-hidden truncate", editableTag: "commentText", render: (s, h) => <EditableCell song={s} columnKey="comment" value={s.comment} helpers={h} /> },
     { key: "user1", label: "User 1", width: 80, defaultVisible: false, cellClass: "overflow-hidden truncate", editableTag: "user1", render: (s, h) => <EditableCell song={s} columnKey="user1" value={s.user1} helpers={h} /> },
     { key: "user2", label: "User 2", width: 80, defaultVisible: false, cellClass: "overflow-hidden truncate", editableTag: "user2", render: (s, h) => <EditableCell song={s} columnKey="user2" value={s.user2} helpers={h} /> },
     { key: "first_seen", label: "1ra vez", width: 86, defaultVisible: false, cellClass: "tabular-nums text-xs text-text-muted", render: (s) => s.first_seen ?? "—" },
     { key: "first_play", label: "1er play", width: 86, defaultVisible: false, cellClass: "tabular-nums text-xs text-text-muted", render: (s) => s.first_play ?? "—" },
-    { key: "last_play", label: "Último play", width: 86, defaultVisible: false, cellClass: "tabular-nums text-xs text-text-muted", render: (s) => s.last_play ?? "—" },
+    { key: "last_play", label: "Last played", width: 86, defaultVisible: false, cellClass: "tabular-nums text-xs text-text-muted", render: (s) => s.last_play ?? "—" },
 ];
 
 const DEFAULT_VISIBLE = new Set(ALL_COLUMNS.filter((c) => c.defaultVisible).map((c) => c.key));
@@ -120,7 +120,7 @@ export function EditableCell({ song, columnKey, value, helpers }: {
     helpers: RenderHelpers;
 }) {
     if (!song.in_database) {
-        return <span title="Archivo externo (no está en database.xml)">{value ?? "—"}</span>;
+        return <span title="External file (not in database.xml)">{value ?? "—"}</span>;
     }
 
     const isEditing = helpers.editState?.songIndex === song.index && helpers.editState?.columnKey === columnKey;
@@ -129,7 +129,7 @@ export function EditableCell({ song, columnKey, value, helpers }: {
         return (
             <input
                 type="text"
-                aria-label={`Editar ${columnKey} de ${song.file_name}`}
+                aria-label={`Edit ${columnKey} for ${song.file_name}`}
                 className="w-full rounded border border-primary/50 bg-surface px-1 py-0 text-[13px] text-text outline-none focus:border-primary"
                 value={helpers.editState?.value ?? ""}
                 onChange={(e) => helpers.onEditChange?.(e.target.value)}
@@ -147,7 +147,7 @@ export function EditableCell({ song, columnKey, value, helpers }: {
         <span
             role="button"
             tabIndex={0}
-            aria-label={`Editar ${columnKey} de ${song.file_name}`}
+            aria-label={`Edit ${columnKey} for ${song.file_name}`}
             className="cursor-text rounded-sm"
             onDoubleClick={() => helpers.onStartEdit?.(song.index, columnKey)}
             onKeyDown={(event) => {
@@ -156,7 +156,7 @@ export function EditableCell({ song, columnKey, value, helpers }: {
                     helpers.onStartEdit?.(song.index, columnKey);
                 }
             }}
-            title="Doble click, Enter o F2 para editar"
+            title="Double-click, press Enter, or press F2 to edit"
         >
             {value ?? "—"}
         </span>
@@ -194,7 +194,7 @@ export function SongTableRow({
                 }
             }}
             tabIndex={onSelect ? 0 : undefined}
-            aria-label={onSelect ? `Seleccionar ${song.file_name}` : undefined}
+            aria-label={onSelect ? `Select ${song.file_name}` : undefined}
             aria-selected={onSelect ? active : undefined}
         >
             {children}
@@ -276,16 +276,16 @@ function ColorPickerPopup({ position, currentColor, onSelect, onClose }: {
             <div className="mt-2 flex items-center gap-1.5">
                 <input
                     type="color"
-                    aria-label="Color personalizado"
+                    aria-label="Custom color"
                     value={custom}
                     onChange={(e) => setCustom(e.target.value)}
                     className="h-[24px] w-[24px] cursor-pointer rounded border border-border/60 bg-transparent p-0"
                 />
                 <button type="button" className="btn btn-ghost btn-sm flex-1" onClick={() => onSelect(custom)}>
-                    Aplicar
+                    Apply
                 </button>
                 <button type="button" className="btn btn-ghost btn-sm text-error" onClick={() => onSelect(null)}>
-                    Quitar
+                    Remove
                 </button>
             </div>
         </div>
@@ -376,14 +376,14 @@ export function SongTable({
         try {
             const result = await services.updateSongTags(vdjFolder, song.file_path, { [col.editableTag]: editState.value });
             if (!shouldApplySongUpdate(result)) {
-                throw new Error(`Resultado de actualización: ${result.status}`);
+                throw new Error(`Update result: ${result.status}`);
             }
             patchSong(editState.songIndex, patchFromEditableTag(col.editableTag, editState.value));
             setEditState(null);
         } catch (err) {
             await refreshRecovery();
             console.error("Error updating tag:", err);
-            reportUiError("No se pudo actualizar el tag.", err);
+            reportUiError("The tag could not be updated.", err);
         }
     }, [editState, mutationsBlocked, vdjFolder, patchFromEditableTag, patchSong, refreshRecovery, reportUiError, services, songs]);
 
@@ -397,13 +397,13 @@ export function SongTable({
         try {
             const result = await services.updateSongTags(vdjFolder, song.file_path, { stars: stars > 0 ? String(stars) : "" });
             if (!shouldApplySongUpdate(result)) {
-                throw new Error(`Resultado de actualización: ${result.status}`);
+                throw new Error(`Update result: ${result.status}`);
             }
             patchSong(songIndex, { stars: stars > 0 ? String(stars) : null });
         } catch (err) {
             await refreshRecovery();
             console.error("Error updating stars:", err);
-            reportUiError("No se pudo actualizar la puntuación.", err);
+            reportUiError("The rating could not be updated.", err);
         }
     }, [mutationsBlocked, vdjFolder, patchSong, refreshRecovery, reportUiError, services, songs]);
 
@@ -426,11 +426,11 @@ export function SongTable({
             void audio.play().catch((error) => {
                 if (globalAudio === audio) globalAudio = null;
                 setPlayingPath(null);
-                reportUiError("No se pudo reproducir la vista previa de audio.", error);
+                reportUiError("The audio preview could not be played.", error);
             });
         } catch (error) {
             setPlayingPath(null);
-            reportUiError("No se pudo preparar la vista previa de audio.", error);
+            reportUiError("The audio preview could not be prepared.", error);
         }
     }, [playingPath, reportUiError, services]);
 
@@ -460,14 +460,14 @@ export function SongTable({
             }
             const result = await services.updateSongTags(vdjFolder, song.file_path, { color: colorValue });
             if (!shouldApplySongUpdate(result)) {
-                throw new Error(`Resultado de actualización: ${result.status}`);
+                throw new Error(`Update result: ${result.status}`);
             }
             patchSong(colorPicker.songIndex, { color: colorValue || null });
             setColorPicker(null);
         } catch (err) {
             await refreshRecovery();
             console.error("Error updating color:", err);
-            reportUiError("No se pudo actualizar el color.", err);
+            reportUiError("The color could not be updated.", err);
         }
     }, [colorPicker, mutationsBlocked, vdjFolder, patchSong, refreshRecovery, reportUiError, services, songs]);
 
@@ -617,23 +617,23 @@ export function SongTable({
             <div className="mb-2.5 flex items-center gap-2.5">
                 <input
                     type="text"
-                    aria-label="Buscar canciones"
+                    aria-label="Search songs"
                     value={search}
                     onChange={(e) => setSearch(e.target.value)}
-                    placeholder="Buscar por nombre, título, artista, álbum, género, sello, compositor..."
+                    placeholder="Search by name, title, artist, album, genre, label, or composer..."
                     className="input flex-1"
                 />
-                <span className="text-xs tabular-nums text-text-muted">{filtered.length} resultados</span>
+                <span className="text-xs tabular-nums text-text-muted">{filtered.length} results</span>
                 {(waveformQueue.pending > 0 || waveformQueue.active > 0) && (
                     <span className="flex items-center gap-1.5 rounded-md bg-primary/10 px-2 py-0.5 text-xs tabular-nums text-primary-light">
                         <span className="inline-block h-1.5 w-1.5 animate-pulse rounded-full bg-primary-light" />
-                        Waveforms: {waveformQueue.active} procesando, {waveformQueue.pending} en cola
+                        Waveforms: {waveformQueue.active} processing, {waveformQueue.pending} queued
                     </span>
                 )}
                 {selectable && (
                     <div className="flex gap-1.5">
-                        <button type="button" onClick={onSelectAll} className="btn btn-ghost btn-sm">Seleccionar todo</button>
-                        <button type="button" onClick={onDeselectAll} className="btn btn-ghost btn-sm">Deseleccionar</button>
+                        <button type="button" onClick={onSelectAll} className="btn btn-ghost btn-sm">Select all</button>
+                        <button type="button" onClick={onDeselectAll} className="btn btn-ghost btn-sm">Deselect all</button>
                     </div>
                 )}
             </div>
@@ -708,7 +708,7 @@ export function SongTable({
                                         <td className="px-1.5">
                                             <input
                                                 type="checkbox"
-                                                aria-label={`Seleccionar ${song.file_name}`}
+                                                aria-label={`Select ${song.file_name}`}
                                                 checked={selected?.has(song.index) ?? false}
                                                 onChange={() => onToggle?.(song.index)}
                                             />
@@ -729,7 +729,7 @@ export function SongTable({
                 </table>
                 {filtered.length === 0 && (
                     <div className="py-10 text-center text-sm text-text-muted">
-                        No se encontraron canciones
+                        No songs found
                     </div>
                 )}
             </div>
@@ -768,7 +768,7 @@ export function SongTable({
                                 persistVisibleColumns(all);
                             }}
                         >
-                            Mostrar todas
+                            Show all
                         </button>
                         <button
                             type="button"
@@ -942,7 +942,7 @@ export function SongMiniTable({
                     {cols.map((c) => (
                         <th key={c.key} className="px-2 py-1 text-left">{c.label}</th>
                     ))}
-                    <th className="px-2 py-1 text-left">Ubicación</th>
+                    <th className="px-2 py-1 text-left">Location</th>
                 </tr>
             </thead>
             <tbody>
@@ -962,7 +962,7 @@ export function SongMiniTable({
                                 <td className="px-2 py-0.5">
                                     <input
                                         type="checkbox"
-                                        aria-label={`Seleccionar ${s.file_name}`}
+                                        aria-label={`Select ${s.file_name}`}
                                         checked={selected?.has(s.index) ?? false}
                                         onChange={() => onToggle?.(s.index)}
                                     />

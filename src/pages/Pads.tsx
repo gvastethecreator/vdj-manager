@@ -103,7 +103,7 @@ function XmlNodeEditor({
         <div className="rounded border border-border/60 bg-surface-hover/20 p-3">
             <div className="mb-3 flex items-center justify-between gap-2">
                 <div className="text-sm font-semibold text-text">
-                    {isRoot ? "Nodo raíz" : "Nodo"}
+                    {isRoot ? "Root node" : "Node"}
                     <span className="ml-2 rounded bg-background px-2 py-0.5 font-mono text-xs text-text-muted">{node.name}</span>
                 </div>
                 <div className="flex items-center gap-1">
@@ -111,7 +111,7 @@ function XmlNodeEditor({
                         <Plus className="h-3.5 w-3.5" /> Hijo
                     </button>
                     {!isRoot && onRemove ? (
-                        <button type="button" onClick={() => onRemove(path)} className="btn btn-ghost btn-sm text-danger" aria-label={`Eliminar nodo ${node.name}`}>
+                        <button type="button" onClick={() => onRemove(path)} className="btn btn-ghost btn-sm text-danger" aria-label={`Remove node ${node.name}`}>
                             <Trash2 className="h-3.5 w-3.5" />
                         </button>
                     ) : null}
@@ -120,7 +120,7 @@ function XmlNodeEditor({
 
             <div className="grid gap-3 md:grid-cols-2">
                 <label className="space-y-1 text-xs text-text-muted">
-                    <span>Nombre del nodo</span>
+                    <span>Node name</span>
                     <input
                         className="input w-full font-mono"
                         value={node.name}
@@ -146,12 +146,12 @@ function XmlNodeEditor({
                     </button>
                 </div>
                 {attributeEntries.length === 0 ? (
-                    <div className="text-xs text-text-muted">Este nodo no tiene atributos.</div>
+                    <div className="text-xs text-text-muted">This node has no attributes.</div>
                 ) : attributeEntries.map(([key, value]) => (
                     <div key={`${path.join("-")}-${key}`} className="grid gap-2 md:grid-cols-[220px_1fr_auto] md:items-center">
                         <input className="input w-full font-mono" value={key} onChange={(e) => renameAttribute(key, e.target.value)} />
                         <input className="input w-full font-mono" value={value} onChange={(e) => setAttribute(key, e.target.value)} />
-                        <button type="button" onClick={() => removeAttribute(key)} className="btn btn-ghost btn-sm text-danger" aria-label={`Eliminar atributo ${key}`}>
+                        <button type="button" onClick={() => removeAttribute(key)} className="btn btn-ghost btn-sm text-danger" aria-label={`Remove attribute ${key}`}>
                             <Trash2 className="h-3.5 w-3.5" />
                         </button>
                     </div>
@@ -201,8 +201,8 @@ function PadPageEditor({
             <section className="card p-4">
                 <div className="mb-3 flex items-center justify-between gap-3">
                     <div>
-                        <h4 className="text-sm font-semibold text-text">Botones del pad</h4>
-                        <p className="mt-1 text-[12px] text-text-muted">Edita nombre, color y acción sin tocar XML.</p>
+                        <h4 className="text-sm font-semibold text-text">Pad buttons</h4>
+                        <p className="mt-1 text-[12px] text-text-muted">Edit name, color, and action without touching XML.</p>
                     </div>
                     <span className="badge bg-primary/12 text-primary-light">{padButtons.length} pads</span>
                 </div>
@@ -230,7 +230,7 @@ function PadPageEditor({
                                 />
                             </label>
                             <label className="mt-3 block space-y-1 text-xs text-text-muted">
-                                <span>Acción VDJScript</span>
+                                <span>VDJScript action</span>
                                 <textarea
                                     className="min-h-24 w-full rounded-lg border border-border bg-background p-2 font-mono text-[12px] text-text outline-none focus:border-primary/60"
                                     value={node.text ?? ""}
@@ -244,17 +244,17 @@ function PadPageEditor({
 
                 {padButtons.length === 0 ? (
                     <div className="rounded-lg border border-dashed border-border px-3 py-8 text-center text-sm text-text-muted">
-                        No se detectaron nodos de pad editables en este archivo.
+                        No editable pad nodes were found in this file.
                     </div>
                 ) : null}
             </section>
 
             <aside className="space-y-3">
                 <section className="card p-4">
-                    <h4 className="text-sm font-semibold text-text">Página</h4>
+                    <h4 className="text-sm font-semibold text-text">Page</h4>
                     <div className="mt-3 grid gap-2">
                         <label className="space-y-1 text-xs text-text-muted">
-                            <span>Nodo raíz</span>
+                            <span>Root node</span>
                             <input className="input w-full font-mono" value={documentTree.name} onChange={(event) => onChange([], (current) => ({ ...current, name: event.target.value }))} />
                         </label>
                         {Object.entries(documentTree.attributes).map(([key, value]) => (
@@ -267,7 +267,7 @@ function PadPageEditor({
                 </section>
 
                 <section className="card p-4">
-                    <h4 className="text-sm font-semibold text-text">Parámetros</h4>
+                    <h4 className="text-sm font-semibold text-text">Parameters</h4>
                     <div className="mt-3 space-y-2">
                         {params.map(({ node, path, index }) => (
                             <div key={`${node.name}-${index}`} className="rounded-lg border border-border/60 bg-background/45 p-2">
@@ -286,7 +286,7 @@ function PadPageEditor({
                                 />
                             </div>
                         ))}
-                        {params.length === 0 ? <p className="text-[12px] text-text-muted">Sin parámetros detectados.</p> : null}
+                        {params.length === 0 ? <p className="text-[12px] text-text-muted">No parameters found.</p> : null}
                     </div>
                 </section>
             </aside>
@@ -323,7 +323,7 @@ export function Pads() {
                 return relative.startsWith("pads/") || relative.startsWith("pads\\") || relative.endsWith(".vdjpad");
             }));
         } catch (err) {
-            reportUiError("No se pudieron cargar los recursos de pads.", err);
+            reportUiError("Pad resources could not be loaded.", err);
         } finally {
             setLoading(false);
         }
@@ -377,7 +377,7 @@ export function Pads() {
                 setRawDirty(false);
             })
             .catch((err) => {
-                if (!cancelled) reportUiError("No se pudo abrir el XML del pad.", err);
+                if (!cancelled) reportUiError("The pad XML could not be opened.", err);
             });
 
         if (isPadDocumentFile(selectedFile)) {
@@ -390,7 +390,7 @@ export function Pads() {
                 .catch((err) => {
                     if (!cancelled) {
                         setDocumentTree(null);
-                        reportUiError("No se pudo interpretar el documento de pads.", err);
+                        reportUiError("The pad document could not be parsed.", err);
                     }
                 });
         } else {
@@ -423,7 +423,7 @@ export function Pads() {
             await loadFiles();
             clearUiError();
         } catch (err) {
-            reportUiError("No se pudo guardar el XML del pad.", err);
+            reportUiError("The pad XML could not be saved.", err);
         } finally {
             setSaving(false);
         }
@@ -442,7 +442,7 @@ export function Pads() {
             await loadFiles();
             clearUiError();
         } catch (err) {
-            reportUiError("No se pudo guardar el documento de pads.", err);
+            reportUiError("The pad document could not be saved.", err);
         } finally {
             setSaving(false);
         }
@@ -464,7 +464,7 @@ export function Pads() {
             setDocumentDirty(false);
             clearUiError();
         } catch (err) {
-            reportUiError("No se pudo restaurar la última versión del pad.", err);
+            reportUiError("The last pad version could not be restored.", err);
             throw err;
         } finally {
             setSaving(false);
@@ -509,27 +509,27 @@ export function Pads() {
                 <div className="border-b border-border px-3 py-3">
                     <h2 className="text-sm font-semibold text-text">Pads</h2>
                     <p className="mt-0.5 text-xs text-text-muted">
-                        Editor visual para páginas y recursos de pads. Para opciones globales como <code>padsPagesOrder</code> o <code>padsSkinIndependent</code>, usa Configuración.
+                        Visual editor for pad pages and resources. For global options such as <code>padsPagesOrder</code> or <code>padsSkinIndependent</code>, use Settings.
                     </p>
                 </div>
                 <div className="border-b border-border/70 p-2">
                     <input
                         type="text"
                         className="input w-full"
-                        placeholder="Buscar archivo..."
+                        placeholder="Search files..."
                         value={search}
                         onChange={(e) => setSearch(e.target.value)}
                     />
                 </div>
                 <div className="flex-1 overflow-auto p-1.5">
                     {loading ? (
-                        <div className="p-2 text-xs text-text-muted">Cargando archivos...</div>
+                        <div className="p-2 text-xs text-text-muted">Loading files...</div>
                     ) : (
                         <TreeFileNavigator
                             items={treeItems}
                             selectedId={selectedId}
                             onSelect={(item) => requestFileSelection(item.path)}
-                            emptyLabel="No se encontraron archivos de pads en la carpeta VirtualDJ."
+                            emptyLabel="No pad files were found in the VirtualDJ folder."
                         />
                     )}
                 </div>
@@ -538,7 +538,7 @@ export function Pads() {
             <div className="min-w-0 flex-1 overflow-auto p-3">
                 {!selectedFile ? (
                     <div className="rounded border border-dashed border-border px-3 py-6 text-center text-sm text-text-muted">
-                        Selecciona un archivo de pads del árbol.
+                        Select a pad file from the tree.
                     </div>
                 ) : (
                     <div className="space-y-4">
@@ -546,7 +546,7 @@ export function Pads() {
                             <div>
                                 <h3 className="text-lg font-bold text-text">{selectedFile.name}</h3>
                                 <p className="mt-1 text-sm text-text-muted">{selectedFile.relative_path}</p>
-                                <p className="mt-1 text-xs text-text-muted">Tamaño: {formatSize(selectedFile.size_bytes)}</p>
+                                <p className="mt-1 text-xs text-text-muted">Size: {formatSize(selectedFile.size_bytes)}</p>
                             </div>
                         </div>
 
@@ -567,7 +567,7 @@ export function Pads() {
                                             <FileCode2 className="mr-1 inline h-3.5 w-3.5" /> XML
                                         </button>
                                     </div>
-                                    <span className="text-xs text-text-muted">El modo XML queda como respaldo avanzado.</span>
+                                    <span className="text-xs text-text-muted">XML mode remains available as an advanced fallback.</span>
                                 </div>
                                 {editorMode === "visual" ? (
                                     <PadPageEditor documentTree={documentTree} onChange={updateDocumentNode} />
@@ -578,7 +578,7 @@ export function Pads() {
                         ) : (
                             <div className="space-y-3">
                                 <div className="rounded-lg border border-warning/25 bg-warning/8 p-4 text-sm text-text-muted">
-                                    Este archivo no se pudo abrir como <code>.vdjpad</code> estructurado. Se muestra en modo texto para mantener compatibilidad.
+                                    This file could not be opened as a structured <code>.vdjpad</code>. It is shown as text to preserve compatibility.
                                 </div>
                                 <CodeEditor
                                     label={selectedFile.name}
@@ -596,9 +596,9 @@ export function Pads() {
             </div>
             <ConfirmDialog
                 open={pendingSelectedId !== null}
-                title="Cambios pendientes en este pad"
-                description="Antes de abrir otro archivo se restaurará la última versión cargada del pad actual."
-                confirmLabel="Descartar y abrir"
+                title="Pending changes in this pad"
+                description="The last loaded version of the current pad will be restored before opening another file."
+                confirmLabel="Discard and open"
                 destructive
                 onCancel={() => setPendingSelectedId(null)}
                 onConfirm={confirmFileSelection}

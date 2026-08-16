@@ -216,7 +216,7 @@ export const demoSongs: SongSummary[] = [
     label: null,
     track_number: null,
     grouping: null,
-    comment: "Archivo detectado fuera de database.xml",
+    comment: "File found outside database.xml",
     user1: null,
     user2: null,
     color: null,
@@ -318,7 +318,8 @@ const demoPages = new Set<Page>([
 ]);
 
 export function isDemoMode(): boolean {
-  return new URLSearchParams(window.location.search).has("demo");
+  return import.meta.env.VITE_DEMO_MODE === "true"
+    || new URLSearchParams(window.location.search).has("demo");
 }
 
 export function getDemoInitialPage(): Page {

@@ -33,7 +33,7 @@ export function Duplicates() {
     async function moveSelected() {
         if (mutationsBlocked) return;
         if (!vdjFolder || selected.size === 0) return;
-        const folder = await services.selectDirectory({ purpose: "destination", title: "Mover archivos seleccionados a…" });
+        const folder = await services.selectDirectory({ purpose: "destination", title: "Move selected files to…" });
         if (!folder) return;
         setActionRunning(true);
         setRemovalResults([]);
@@ -47,7 +47,7 @@ export function Duplicates() {
             updateIntegrityResults({ duplicates: nextResult });
             updateIntegrity({ duplicateGroups: nextResult.by_name.length + nextResult.by_size.length + nextResult.by_hash.length });
         } catch (err) {
-            reportUiError("No se pudieron mover los duplicados seleccionados.", err);
+            reportUiError("The selected duplicates could not be moved.", err);
         } finally {
             await refreshRecovery();
             setLoading(false);
@@ -66,7 +66,7 @@ export function Duplicates() {
             updateIntegrityResults({ duplicates: r });
             updateIntegrity({ duplicateGroups: r.by_name.length + r.by_size.length + r.by_hash.length });
         } catch (err) {
-            reportUiError("No se pudo completar el análisis de duplicados.", err, { retry: runScan });
+            reportUiError("Duplicate analysis could not be completed.", err, { retry: runScan });
         } finally {
             setLoading(false);
         }
@@ -82,9 +82,9 @@ export function Duplicates() {
     }, []);
 
     const tabs: { key: DupTab; label: string }[] = [
-        { key: "by_name", label: "Por Nombre" },
-        { key: "by_size", label: "Por Tamaño" },
-        { key: "by_hash", label: "Por Hash (exactos)" },
+        { key: "by_name", label: "By name" },
+        { key: "by_size", label: "By size" },
+        { key: "by_hash", label: "By hash (exact)" },
     ];
 
     const groups = result ? result[tab] : [];
@@ -178,7 +178,7 @@ export function Duplicates() {
             updateIntegrityResults({ duplicates: nextResult });
             updateIntegrity({ duplicateGroups: nextResult.by_name.length + nextResult.by_size.length + nextResult.by_hash.length });
         } catch (err) {
-            reportUiError("No se pudieron eliminar las referencias seleccionadas.", err);
+            reportUiError("The selected references could not be removed.", err);
         } finally {
             await refreshRecovery();
             setLoading(false);
@@ -191,24 +191,24 @@ export function Duplicates() {
         <div className="space-y-3">
             <MutationBlockedNotice />
             <div className="flex items-center justify-between">
-                <h2 className="text-lg font-bold text-text">Duplicados</h2>
+                <h2 className="text-lg font-bold text-text">Duplicates</h2>
                 <button onClick={runScan} disabled={loading || !vdjFolder} className="btn btn-primary">
-                    {loading ? "Analizando..." : "Buscar Duplicados"}
+                    {loading ? "Analyzing..." : "Find duplicates"}
                 </button>
             </div>
 
             {loading && (
                 <div className="flex items-center gap-2 text-sm text-text-muted">
                     <div className="spinner" />
-                    Analizando la base de datos...
+                    Analyzing the database...
                 </div>
             )}
 
             {!loading && result === null ? (
                 <div className="rounded-lg border border-dashed border-border bg-surface px-6 py-10 text-center">
-                    <h3 className="text-base font-semibold text-text">Todavía no se analizaron duplicados</h3>
-                    <p className="mx-auto mt-2 max-w-xl text-sm leading-relaxed text-text-muted">El análisis compara nombre, tamaño y hash. Ningún resultado se interpreta como cero hasta ejecutar la búsqueda.</p>
-                    <button type="button" onClick={() => void runScan()} disabled={!vdjFolder} className="btn btn-primary mt-4">Ejecutar análisis</button>
+                    <h3 className="text-base font-semibold text-text">Duplicates have not been analyzed yet</h3>
+                    <p className="mx-auto mt-2 max-w-xl text-sm leading-relaxed text-text-muted">The analysis compares name, size, and hash. No result is treated as zero until the search runs.</p>
+                    <button type="button" onClick={() => void runScan()} disabled={!vdjFolder} className="btn btn-primary mt-4">Run analysis</button>
                 </div>
             ) : null}
 
@@ -228,35 +228,35 @@ export function Duplicates() {
                     <div className="card flex flex-wrap items-center gap-2.5 p-2.5">
                         <span className="text-xs font-semibold text-text-muted">Filtrar:</span>
                         <select value={filterLocation} onChange={(e) => setFilterLocation(e.target.value)}>
-                            <option value="">Todas las ubicaciones</option>
+                            <option value="">All locations</option>
                             {allLocations.map((loc) => <option key={loc} value={loc}>{loc}</option>)}
                         </select>
                         <label className="flex items-center gap-1.5 text-xs text-text-secondary">
                             <input type="checkbox" checked={filterHotcues}
                                 onChange={(e) => { setFilterHotcues(e.target.checked); if (e.target.checked) setFilterNoCues(false); }} />
-                            Con hotcues
+                            With hotcues
                         </label>
                         <label className="flex items-center gap-1.5 text-xs text-text-secondary">
                             <input type="checkbox" checked={filterNoCues}
                                 onChange={(e) => { setFilterNoCues(e.target.checked); if (e.target.checked) setFilterHotcues(false); }} />
-                            Sin hotcues
+                            No hotcues
                         </label>
                         <label className="flex items-center gap-1.5 text-xs text-text-secondary">
                             <input type="checkbox" checked={filterStems}
                                 onChange={(e) => setFilterStems(e.target.checked)} />
-                            Con stems
+                            With stems
                         </label>
 
                         <div className="ml-auto flex items-center gap-1.5">
                             <span className="text-xs font-semibold text-text-muted">Sel.:</span>
                             {filterLocation && (
                                 <button onClick={() => selectByLocation(filterLocation)} className="btn btn-ghost btn-sm">
-                                    En ubicación
+                                    In location
                                 </button>
                             )}
-                            <button onClick={selectWithHotcues} className="btn btn-ghost btn-sm">Con cues</button>
-                            <button onClick={selectWithoutCues} className="btn btn-ghost btn-sm">Sin cues</button>
-                            <button onClick={selectWithStems} className="btn btn-ghost btn-sm">Con stems</button>
+                            <button onClick={selectWithHotcues} className="btn btn-ghost btn-sm">With cues</button>
+                            <button onClick={selectWithoutCues} className="btn btn-ghost btn-sm">No cues</button>
+                            <button onClick={selectWithStems} className="btn btn-ghost btn-sm">With stems</button>
                             <button onClick={() => setSelected(new Set())} className="btn btn-danger btn-sm">
                                 Limpiar ({selected.size})
                             </button>
@@ -267,37 +267,37 @@ export function Duplicates() {
                     {selected.size > 0 && (
                         <div className="card flex flex-wrap items-center gap-3 border-warning/30 bg-warning/5 p-2.5">
                             <span className="text-[12px] font-semibold text-warning">
-                                {selected.size} seleccionados
+                                {selected.size} selected
                             </span>
                             <button
                                 onClick={moveSelected}
                                 disabled={actionRunning || mutationsBlocked}
                                 className="btn btn-ghost btn-sm"
                             >
-                                Mover a directorio…
+                                Move to folder…
                             </button>
                             <button
                                 onClick={() => setDeleteModal({ open: true, dbOnly: true })}
                                 disabled={actionRunning || mutationsBlocked}
                                 className="btn btn-ghost btn-sm"
                             >
-                                Eliminar de la BD
+                                Remove from database
                             </button>
                             <button
                                 onClick={() => setDeleteModal({ open: true, dbOnly: false })}
                                 disabled={actionRunning || mutationsBlocked}
                                 className="btn btn-danger btn-sm"
                             >
-                                Eliminar de BD + Papelera
+                                Remove from database + Recycle Bin
                             </button>
-                            {actionRunning && <span className="text-xs text-text-muted">Procesando...</span>}
+                            {actionRunning && <span className="text-xs text-text-muted">Processing...</span>}
                         </div>
                     )}
 
                     {moveReport && (
                         <div className="max-h-48 overflow-auto rounded-lg border border-border bg-surface p-2.5">
                             <div className="mb-2 text-xs font-semibold text-text">
-                                Movimiento: {moveReport.summary.completed} completados · {moveReport.summary.blocked} bloqueados · {moveReport.summary.manualReview} revisión manual
+                                Move: {moveReport.summary.completed} completed · {moveReport.summary.blocked} blocked · {moveReport.summary.manualReview} manual review
                             </div>
                             {moveReport.items.map((item) => {
                                 const method = transferMethodLabel(item.transferMethod);
@@ -313,14 +313,14 @@ export function Duplicates() {
                     {removalResults.length > 0 && (
                         <div className="max-h-48 overflow-auto rounded-lg border border-border bg-surface p-2.5">
                             <div className="mb-2 text-xs font-semibold text-text">
-                                Remoción: {removalSummary.completed} completadas · {removalSummary.attention} requieren atención
+                                Removal: {removalSummary.completed} completed · {removalSummary.attention} need attention
                             </div>
                             {removalResults.map((item) => (
                                 <div
                                     key={`${item.mode}:${item.originalFilePath}`}
                                     className={`text-xs ${item.status === "completed" ? "text-success" : item.status === "trash_failed" ? "text-error" : "text-warning"}`}
                                 >
-                                    {item.mode === "db_only" ? "Sólo biblioteca" : "Papelera + biblioteca"} · {removalStatusLabel(item.status)} · {item.originalFilePath}{item.message ? ` — ${item.message}` : ""}
+                                    {item.mode === "db_only" ? "Library only" : "Recycle Bin + library"} · {removalStatusLabel(item.status)} · {item.originalFilePath}{item.message ? ` — ${item.message}` : ""}
                                 </div>
                             ))}
                         </div>
@@ -330,14 +330,14 @@ export function Duplicates() {
                     <div className="space-y-2.5">
                         {filteredGroups.length === 0 && (
                             <div className="card p-8 text-center text-sm text-text-muted">
-                                No se encontraron duplicados en esta categoría
+                                No duplicates found in this category
                             </div>
                         )}
                         {filteredGroups.map((group: DuplicateGroup, i: number) => (
                             <div key={i} className="card p-3">
                                 <div className="mb-2 flex items-center justify-between">
                                     <span className="text-xs font-semibold text-warning">
-                                        {group.songs.length} archivos — {group.key}
+                                        {group.songs.length} files — {group.key}
                                     </span>
                                 </div>
                                 <SongMiniTable
@@ -354,11 +354,11 @@ export function Duplicates() {
 
             <ConfirmDialog
                 open={deleteModal.open}
-                title="Confirmar eliminación"
+                title="Confirm removal"
                 description={deleteModal.open && deleteModal.dbOnly
-                    ? `Se quitarán ${selectedPaths.length} canciones de database.xml. Los archivos físicos no serán afectados.`
-                    : `Se enviarán ${selectedPaths.length} archivos a la papelera y también se quitarán de database.xml.`}
-                confirmLabel={deleteModal.open && deleteModal.dbOnly ? "Eliminar de la biblioteca" : "Enviar a la papelera"}
+                    ? `${selectedPaths.length} songs will be removed from database.xml. Physical files will not be affected.`
+                    : `${selectedPaths.length} files will be sent to the Recycle Bin and removed from database.xml.`}
+                confirmLabel={deleteModal.open && deleteModal.dbOnly ? "Remove from library" : "Send to Recycle Bin"}
                 destructive
                 busy={actionRunning}
                 onCancel={() => setDeleteModal({ open: false })}

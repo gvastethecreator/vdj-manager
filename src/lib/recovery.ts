@@ -22,7 +22,7 @@ export function getDemoRecoveryState(): MutationRecoveryState | null {
         journalId: "demo-recovery-001",
         operation: "move",
         phase: "fs_applied",
-        outcomeSummary: "Movimiento físico aplicado; database.xml todavía conserva la ruta original.",
+        outcomeSummary: "Physical move applied; database.xml still contains the original path.",
         createdAtMs: now - 90_000,
         updatedAtMs: now - 30_000,
         items: [{
@@ -32,7 +32,7 @@ export function getDemoRecoveryState(): MutationRecoveryState | null {
           sourceFileSize: 8_421_376,
           sourceSha256: "demo-sha256-verified",
           phase: manualReview ? "manual_review_required" : "fs_applied",
-          lastError: manualReview ? "El archivo destino cambió desde que se registró la operación." : null,
+          lastError: manualReview ? "The target file changed after the operation was recorded." : null,
           manualReviewAcknowledged: false,
         }],
       },
@@ -61,8 +61,8 @@ export function pendingRecoveryItemCount(state: MutationRecoveryState | null): n
 
 export function recoveryActionLabel(action: MutationRecoveryAction): string {
   return {
-    resume: "Reanudar y completar",
-    rollback: "Revertir cambios",
-    manual_review_acknowledged: "Confirmar revisión manual",
+    resume: "Resume and complete",
+    rollback: "Revert changes",
+    manual_review_acknowledged: "Confirm manual review",
   }[action];
 }

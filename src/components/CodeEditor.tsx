@@ -27,10 +27,10 @@ export function CodeEditor({
                     <span className="badge bg-background px-2 py-0.5 text-xs text-text-muted">{language}</span>
                 </div>
                 <span className={`badge px-2 py-0.5 text-xs ${dirty ? "bg-warning/15 text-warning" : "bg-success/12 text-success"}`}>
-                    {dirty ? "Cambios pendientes" : (
+                    {dirty ? "Pending changes" : (
                         <>
                             <CheckCircle2 className="mr-1 h-3 w-3" />
-                            Sin cambios
+                            No changes
                         </>
                     )}
                 </span>

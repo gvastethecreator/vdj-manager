@@ -12,7 +12,7 @@ pub async fn load_database(vdj_folder: String) -> Result<Vec<SongSummary>, Strin
     let db_path = PathBuf::from(&vdj_folder).join("database.xml");
     if !db_path.exists() {
         return Err(format!(
-            "No se encontró database.xml en {}",
+            "database.xml was not found in {}",
             vdj_folder
         ));
     }
@@ -115,19 +115,19 @@ fn dedupe_removal_paths(items: &[String]) -> Vec<String> {
 
 fn validate_trash_candidate(path: &std::path::Path) -> Result<(), String> {
     if !path.is_absolute() {
-        return Err("La ruta física debe ser absoluta para usar la papelera".to_string());
+        return Err("The physical path must be absolute to use the Recycle Bin".to_string());
     }
     let metadata = std::fs::symlink_metadata(path)
-        .map_err(|error| format!("No se pudo validar el archivo físico: {error}"))?;
+        .map_err(|error| format!("The physical file could not be validated: {error}"))?;
     if metadata.file_type().is_symlink() || !metadata.file_type().is_file() {
-        return Err("La papelera sólo acepta un archivo regular, no enlaces ni directorios".to_string());
+        return Err("The Recycle Bin accepts only regular files, not links or directories".to_string());
     }
     #[cfg(windows)]
     {
         use std::os::windows::fs::MetadataExt;
         use windows_sys::Win32::Storage::FileSystem::FILE_ATTRIBUTE_REPARSE_POINT;
         if metadata.file_attributes() & FILE_ATTRIBUTE_REPARSE_POINT != 0 {
-            return Err("La ruta física es un reparse point y requiere revisión manual".to_string());
+            return Err("The physical path is a reparse point and requires manual review".to_string());
         }
     }
     Ok(())
@@ -185,7 +185,7 @@ where
                 original_file_path,
                 status: LibraryRemovalStatus::FailedValidation,
                 mode,
-                message: Some("La ruta original es obligatoria".to_string()),
+                message: Some("The original path is required".to_string()),
             }));
             continue;
         }
@@ -199,12 +199,12 @@ where
         let blocked = match matches.len() {
             0 => Some((
                 LibraryRemovalStatus::NotFound,
-                "No se encontró la entrada con la ruta original",
+                "No entry was found for the original path",
             )),
             1 => None,
             _ => Some((
                 LibraryRemovalStatus::ManualReviewRequired,
-                "La ruta original coincide con más de una entrada",
+                "The original path matches more than one entry",
             )),
         };
         let trash_validation = if blocked.is_none() && mode == LibraryRemovalMode::TrashThenUnindex {
@@ -261,7 +261,7 @@ where
                 original_file_path,
                 status: LibraryRemovalStatus::FailedValidation,
                 mode,
-                message: Some(format!("No se pudo procesar este ítem de forma segura: {error}")),
+                message: Some(format!("This item could not be processed safely: {error}")),
             }),
         }
     }
@@ -277,7 +277,7 @@ pub async fn remove_library_entries_command(
     let _mutation_guard = super::recovery::acquire_mutation_guard(&app, &request.vdj_folder)?;
     let db_path = PathBuf::from(request.vdj_folder).join("database.xml");
     remove_library_entries(&db_path, &request.items, request.mode, |path| {
-        trash::delete(path).map_err(|error| format!("No se pudo enviar a papelera: {}", error))
+        trash::delete(path).map_err(|error| format!("The file could not be sent to the Recycle Bin: {}", error))
     })
 }
 
@@ -579,7 +579,7 @@ mod tests {
             &files[0].to_string_lossy(),
             |_| {
                 Err(parser::RemoveSongPreCommitError::FailedValidation(
-                    "target cambió antes de papelera".to_string(),
+                    "The target changed before the Recycle Bin step".to_string(),
                 ))
             },
         )

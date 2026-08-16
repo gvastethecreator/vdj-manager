@@ -1,148 +1,110 @@
-# Arquitectura — VDJ Database Manager
+# VDJ Manager architecture
 
-Actualizado: 2026-07-15.
+Updated: 2026-08-14.
 
-## Visión general
+## Overview
 
-VDJ Manager es una aplicación de escritorio **Tauri 2**. El backend Rust conserva la autoridad sobre lectura, validación y mutaciones de Recursos VirtualDJ; el frontend React organiza esas capacidades en workspaces operativos.
+VDJ Manager is a Tauri 2 desktop application. Rust owns all VirtualDJ parsing, validation, filesystem access, and mutations. React organizes those capabilities into task-focused workspaces.
 
 ```text
-React 19 / Vite 8 / Tailwind 4
-  NavigationState + AppContext
-  workspaces + feedback accesible
-              │
-              │ RuntimeServices
-              ▼
-  Tauri adapter                 Demo adapter
-  IPC/dialog/asset URLs         fixtures deterministas in-memory
-              │
-              ▼
+React 19 / Vite 8 / Tailwind CSS 4
+  navigation + app state + accessible feedback
+                 │
+                 │ RuntimeServices
+                 ▼
+  Tauri adapter                 In-memory demo adapter
+  IPC/dialog/asset URLs         deterministic fixtures, no local I/O
+                 │
+                 ▼
 Rust / Tauri commands
-  parser patch-in-place + journal + recovery + recursos
+  patch-in-place XML + journal + recovery + resources
 ```
 
-El rediseño de workspaces cambió sólo la organización frontend. No modificó comandos Rust, formatos XML ni contratos de mutación.
+The workspace redesign changed frontend organization only. It did not change the Rust command boundary, XML formats, or mutation contracts.
 
-## Navegación y shell
+## Navigation and shell
 
-`App.tsx` mantiene un `NavigationState` con `workspace` y `section`:
+`App.tsx` owns a `NavigationState` with these workspaces:
 
-- `dashboard`
-- `library`: Canciones, Playlists e History dentro del Browser
-- `integrity`: Faltantes, Tracks movidos, Duplicados y Huérfanos
-- `operations`: Batch
-- `resources`: Configuración, Pads y Mappers
-- `home`: entrada sin shell cuando aún no corresponde operar una biblioteca
+- `dashboard`: prioritized attention queue and library metrics.
+- `library`: songs, playlists, and history in one browser.
+- `integrity`: missing files, moved tracks, duplicates, and orphans.
+- `operations`: preview-gated batch work.
+- `resources`: settings, pads, and mappers.
+- `home`: entry screen before a library is active.
 
-Los valores legacy de `Page` existen sólo como adaptadores para aliases visuales `?demo&page=`. Las vistas trabajan con `NavigationState`; no existe `page/setPage` como contrato UI.
+Legacy `Page` values remain only as adapters for visual demo URLs. Product views use `NavigationState`.
 
-El shell usa un rail de 72 px. La expansión es overlay y no cambia la geometría del workspace. El header muestra biblioteca, tracks, recarga y seguridad de escritura. Integridad de archivos y seguridad de mutaciones son estados separados.
+## Runtime boundary
 
-## Borde de runtime
+`RuntimeServices` is the only interface views use for Tauri operations:
 
-`RuntimeServices` es la única interfaz consumida por las vistas para operaciones Tauri:
+- the native adapter delegates to typed IPC, dialogs, and asset URLs;
+- the demo adapter never invokes Tauri or accesses local files;
+- demo writes remain in memory so save and reload behavior can be tested safely;
+- deterministic scenarios cover healthy, problem, unverified, loading, error, empty, dense, first-run, and recovery states.
 
-- el adaptador real delega en `lib/api.ts`, diálogos y URLs de assets;
-- el adaptador demo no invoca Tauri ni toca archivos;
-- el demo conserva escrituras de settings, mapper, pad y raw dentro de su instancia para que save/reload sea verificable sin I/O real;
-- los fixtures `healthy`, `problem`, `unverified`, `loading`, `error`, `empty`, `dense` y `first-run`, más `recovery`, `recovery=manual` y `recovery=error`, producen estados reproducibles;
-- recovery demo vive dentro de la instancia del adaptador, por lo que resume/rollback puede terminar en `clean` sin reaparecer al recargar.
+Imports from `@tauri-apps/*` are restricted to `lib/api.ts` and `lib/runtimeServices.ts`.
 
-Los imports `@tauri-apps/*` quedan restringidos a `lib/api.ts` y `lib/runtimeServices.ts`.
+## Frontend state
 
-## Estado frontend
+`AppContext` owns the active library, songs, metrics, navigation, scoped errors, runtime services, theme, external music folders, recovery state, mutation locks, and integrity results. It keeps “not checked” distinct from zero and prevents stale asynchronous responses from replacing current state.
 
-`AppContext` conserva:
+A navigation blocker protects dirty resource drafts before navigation, reload, or library changes.
 
-- biblioteca activa, canciones, stats y loading;
-- `NavigationState` y scope de error actual;
-- `RuntimeServices`;
-- `UiError` contextual con resumen, detalle opt-in y una recuperación separada ligada al mismo scope;
-- tema `dark | light`;
-- carpetas externas de música;
-- recovery, bloqueo de mutaciones y resultados;
-- snapshot de integridad (`null | 0 | >0`) y resultados compartidos por biblioteca activa, para no convertir “sin verificar” en cero ni perder scans al cambiar de tab;
-- handoff de ruta entre Faltantes y Reconciliación.
-
-Un blocker temporal protege drafts del Estudio de recursos antes de navegar, recargar o cambiar biblioteca. Los editores también protegen el cambio de archivo o modo cuando corresponde.
-
-## Workspaces frontend
+## Workspaces
 
 ### Dashboard
 
-La cola de atención deriva de `IntegritySnapshot`. Recovery y referencias rotas tienen prioridad; scans no ejecutados muestran `Sin verificar`. Las métricas son secundarias y no disparan I/O al renderizar.
+The attention queue derives from the integrity snapshot. Recovery and broken references are prioritized. Checks that have not run show `Not checked` instead of zero.
 
-### Browser de Biblioteca
+### Library browser
 
-`Songs.tsx` es el owner del Browser unificado. Presenta árbol, `SongTable` virtualizada y detalle contextual:
+`Songs.tsx` owns the unified browser. `@tanstack/react-virtual` keeps the table DOM bounded. `PaneLayout` validates and clamps persisted panel widths. Splitters support pointer, arrow, Home, End, and Enter controls. At the desktop minimum width, the interface uses three panels; below that width, detail becomes a drawer for the web demo.
 
-- `@tanstack/react-virtual` mantiene el DOM acotado;
-- `PaneLayout` persiste en `vdj-layout-v2`, valida payload y aplica clamping;
-- los splitters soportan pointer, flechas, Home/End y reset con Enter; sus límites ARIA son los límites efectivos disponibles;
-- desde 1200 px se muestran tres paneles; bajo 1200 el detalle pasa a drawer;
-- inline edit, rating, color, waveform y backend tipado se preservan.
+### Resolve issues
 
-### Resolver problemas
+`IntegrityWorkspace` groups diagnosis without changing ownership. Missing files can hand an exact path to reconciliation, duplicate removal keeps its explicit mode, and orphan checks compare disk and catalog state.
 
-`IntegrityWorkspace` agrupa diagnóstico sin cambiar ownership:
+### Operations
 
-- `MissingFiles` verifica y transfiere una ruta exacta;
-- `RelinkTracks` busca candidatos y confirma reconciliación;
-- `Duplicates` conserva remoción `db_only` / `trash_then_unindex` y movimiento seguro;
-- `OrphanFiles` compara disco y catálogo.
+`BatchOperations` binds every preview to the current action, selection, and parameters. Execution stays disabled when that signature is stale. Results are reported per item and every destructive action uses confirmation and recovery gates.
 
-### Operaciones
+### Resource studio
 
-`BatchOperations` mantiene selección, preview y reporte por ítem. Cada preview queda ligado a una firma de acción, selección y parámetros, y las respuestas asíncronas obsoletas se descartan. Ejecutar permanece deshabilitado sin una firma vigente. El árbol de destino es colapsable y toda ejecución pasa por `ConfirmDialog` y respeta recovery.
+`ResourceStudio` groups settings, pads, and mappers with local feedback and dirty/save/revert controls. Each editor keeps its specialized API; raw XML remains an advanced fallback.
 
-### Estudio de recursos
+## Accessibility
 
-`ResourceStudio` agrupa `Configs`, `Pads` y `Mappers` con tabs, feedback local y action bar dirty/save/revert. Cada editor conserva su API pública especializada; raw queda como fallback avanzado.
+- Dialogs contain focus, close with Escape when safe, make the background inert, and restore focus.
+- Scoped errors expose a short summary, optional details, and a retry for the same operation.
+- Dense interactive targets have accessible names and visible focus.
+- Essential content is never revealed only on hover.
+- Reduced-motion mode removes nonessential animation.
+- Dark and light are the only themes.
 
-## Feedback y accesibilidad
+The Tauri window has a supported minimum of 1180×720. Internal tables and workbenches own their overflow instead of the document.
 
-- `Dialog`/`ConfirmDialog`: Cancelar recibe foco, Tab/Shift+Tab quedan contenidos, Escape cierra cuando no está busy, el fondo queda inert y el foco vuelve al origen.
-- `UiError`: scope por sección, resumen accionable, detalle desplegable y retry que repite la operación fallida; respuestas tardías de otro scope se descartan.
-- Tipografía base 14 px; 13 px para tablas y 12 px para metadata.
-- Targets densos interactivos miden al menos 24×24 px y tienen nombre accesible.
-- Contenido esencial no parte invisible. `prefers-reduced-motion` reduce animación a 1 ms/una iteración.
-- Los únicos temas son oscuro y claro; valores heredados distintos de `light` migran a `dark`.
+## Rust backend
 
-La ventana Tauri tiene mínimo 1180×720. El documento no hace scroll horizontal; tablas/workbenches son dueños de su scroll interno.
+- `database/models.rs`: Serde types for the VirtualDJ schema.
+- `database/parser.rs`: parser and patch-in-place/atomic writers.
+- `commands/database.rs`: load, metrics, tags, and explicit removal.
+- `commands/files.rs`: verification, scan, relink, rename, move, orphan checks, and planners.
+- `commands/recovery.rs`: recovery state and actions.
+- `mutation_journal.rs`: append-only generations, leases, and state machine.
+- `commands/duplicates.rs`: name, size, and hash detection.
+- `commands/playlists.rs`: M3U, M3U8, and VirtualDJ formats.
+- `commands/configs.rs`: settings, mappers, and pads.
+- `commands/waveforms.rs`: peaks, FFT, and cache.
 
-## Backend Rust
+## Write-safety invariants
 
-### Módulos
+- `database.xml` is patched in place with backup, validation, optimistic reread, and atomic commit.
+- Write identity is `originalFilePath`, never a rendered row index.
+- Rename and move never replace a destination and use a per-library journal and lease.
+- Cross-drive moves are journaled copy/delete operations and stop for manual review when uncertain.
+- Pending recovery allows reading and diagnosis but blocks new critical mutations.
+- The WebView CSP limits content to application-owned sources and approved schemes.
 
-- `database/models.rs`: structs serde del schema VirtualDJ.
-- `database/parser.rs`: parser y writers patch-in-place/atómicos.
-- `commands/database.rs`: load/stats, tags y remoción explícita.
-- `commands/files.rs`: verify, scan, relink, rename, move, orphans y planners.
-- `commands/recovery.rs`: estado y acciones de recovery.
-- `mutation_journal.rs`: generaciones append-only, leases y state machine.
-- `commands/duplicates.rs`: detección por nombre/tamaño/hash.
-- `commands/playlists.rs`: M3U/M3U8/formatos VirtualDJ.
-- `commands/configs.rs`: settings, mappers y pads.
-- `commands/waveforms.rs`: peaks + FFT y cache.
-
-### Invariantes de seguridad
-
-- `database.xml` se modifica patch-in-place con backup, validación, relectura optimista y commit atómico.
-- La identidad de escritura es `originalFilePath`, no el índice renderizado.
-- Rename/move no reemplazan destinos y usan journal/lease por biblioteca.
-- Cross-drive es copy + delete por ítem y deja revisión manual ante incertidumbre.
-- Recovery pendiente permite lectura/diagnóstico y pausa nuevas mutaciones críticas.
-- CSP limita recursos del WebView a orígenes propios y esquemas autorizados.
-
-## Persistencia local
-
-- `vdj-theme`: `dark | light` con migración.
-- `vdj-layout-v2`: anchos versionados del Browser.
-- preferencias de columnas versionadas por tabla.
-- última biblioteca y carpetas de música.
-
-El journal de mutaciones vive en app-data; nunca se escribe dentro de música ni de la carpeta VirtualDJ como parte de la UI.
-
-## Verificación
-
-El harness DOM usa Bun + Happy DOM + Testing Library. El browser demo cubre los viewports 1180×720, 1280×800 y 1440×900. Las suites Rust usan fixtures y directorios temporales. Ver `docs/ui/view-contracts.md` y `docs/implementation-status.md` para aceptación y evidencia.
+The mutation journal lives in application data. VDJ Manager never stores it in the VirtualDJ or music folders.

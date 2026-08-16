@@ -27,7 +27,7 @@ export function MissingFiles() {
         mismatched: verification.filter((entry) => entry.exists && !entry.size_match).length,
       });
     } catch (error) {
-      reportUiError("No se pudo verificar la integridad de la biblioteca.", error, { retry: runVerify });
+      reportUiError("Library integrity could not be verified.", error, { retry: runVerify });
     } finally {
       setLoading(false);
     }
@@ -59,27 +59,27 @@ export function MissingFiles() {
         <div>
           <div className="flex items-center gap-2">
             <FileWarning className="h-5 w-5 text-warning" />
-            <h2 className="text-lg font-bold text-text">Verificación de integridad</h2>
+            <h2 className="text-lg font-bold text-text">Integrity check</h2>
           </div>
           <p className="mt-1 max-w-2xl text-sm text-text-muted">
-            Diagnostica referencias ausentes o con tamaño distinto. Esta pantalla no modifica la Biblioteca VirtualDJ.
+            Diagnose missing references or size mismatches. This screen does not change the VirtualDJ library.
           </p>
         </div>
         <div className="flex gap-2">
           {counts && counts.missing > 0 && (
             <button type="button" onClick={() => setNavigation({ workspace: "integrity", section: "relink" })} className="btn btn-warning">
               <Link2 className="h-4 w-4" />
-              Abrir Reconciliación de rutas
+              Open path reconciliation
             </button>
           )}
           <button type="button" onClick={() => void runVerify()} disabled={loading || !vdjFolder} className="btn btn-primary">
             <RefreshCw className={`h-4 w-4 ${loading ? "animate-spin" : ""}`} />
-            {loading ? "Verificando..." : "Verificar archivos"}
+            {loading ? "Checking..." : "Check files"}
           </button>
         </div>
       </div>
 
-      {loading && <div className="text-sm text-text-muted">Leyendo referencias y metadata física...</div>}
+      {loading && <div className="text-sm text-text-muted">Reading references and physical metadata...</div>}
 
       {counts && (
         <>
@@ -87,8 +87,8 @@ export function MissingFiles() {
             {([
               ["all", "Total", "text-text"],
               ["ok", "OK", "text-success"],
-              ["missing", "Faltantes", "text-error"],
-              ["mismatch", "Tamaño diferente", "text-warning"],
+              ["missing", "Missing", "text-error"],
+              ["mismatch", "Size mismatch", "text-warning"],
             ] as const).map(([key, label, color]) => (
               <button
                 key={key}
@@ -105,12 +105,12 @@ export function MissingFiles() {
           {counts.missing > 0 && (
             <div className="flex flex-wrap items-center justify-between gap-3 rounded-lg border border-warning/40 bg-warning/8 px-4 py-3">
               <div>
-                <div className="text-sm font-semibold text-text">Hay referencias que necesitan reconciliación</div>
-                <div className="mt-1 text-xs text-text-muted">Selecciona una entrada en el owner dedicado para revisar candidatos y confirmar una ruta.</div>
+                <div className="text-sm font-semibold text-text">Some references need reconciliation</div>
+                <div className="mt-1 text-xs text-text-muted">Select an entry in the dedicated workspace to review candidates and confirm a path.</div>
               </div>
               <button type="button" onClick={() => setNavigation({ workspace: "integrity", section: "relink" })} className="btn btn-warning btn-sm">
                 <Link2 className="h-3.5 w-3.5" />
-                Revisar faltantes
+                Review missing files
               </button>
             </div>
           )}
@@ -119,13 +119,13 @@ export function MissingFiles() {
             <table className="w-full text-[13px]">
               <thead className="bg-surface-hover">
                 <tr>
-                  <th className="px-3 py-2 text-left text-xs font-medium text-text-muted">Estado</th>
-                  <th className="px-3 py-2 text-left text-xs font-medium text-text-muted">Archivo</th>
-                  <th className="px-3 py-2 text-left text-xs font-medium text-text-muted">Título</th>
-                  <th className="px-3 py-2 text-left text-xs font-medium text-text-muted">Artista</th>
+                  <th className="px-3 py-2 text-left text-xs font-medium text-text-muted">Status</th>
+                  <th className="px-3 py-2 text-left text-xs font-medium text-text-muted">File</th>
+                  <th className="px-3 py-2 text-left text-xs font-medium text-text-muted">Title</th>
+                  <th className="px-3 py-2 text-left text-xs font-medium text-text-muted">Artist</th>
                   <th className="px-3 py-2 text-right text-xs font-medium text-text-muted">Esperado</th>
                   <th className="px-3 py-2 text-right text-xs font-medium text-text-muted">Real</th>
-                  <th className="px-3 py-2 text-right text-xs font-medium text-text-muted">Próxima acción</th>
+                  <th className="px-3 py-2 text-right text-xs font-medium text-text-muted">Next action</th>
                 </tr>
               </thead>
               <tbody>
@@ -148,9 +148,9 @@ export function MissingFiles() {
                     <td className="px-3 py-2 text-right">
                       {!entry.exists ? (
                         <button type="button" className="btn btn-ghost btn-sm" onClick={() => openRelinkTarget(entry.file_path)}>
-                          <Link2 className="h-3.5 w-3.5" /> Ver candidatos
+                          <Link2 className="h-3.5 w-3.5" /> View candidates
                         </button>
-                      ) : <span className="text-xs text-text-muted">Sin acción</span>}
+                      ) : <span className="text-xs text-text-muted">No action</span>}
                     </td>
                   </tr>
                 ))}
@@ -158,7 +158,7 @@ export function MissingFiles() {
             </table>
             {filtered.length === 0 && (
               <div className="px-4 py-10 text-center text-sm text-text-muted">
-                {results ? "No hay entradas en esta categoría." : "Ejecuta una verificación para diagnosticar la Biblioteca VirtualDJ."}
+                {results ? "No entries in this category." : "Run a check to diagnose the VirtualDJ library."}
               </div>
             )}
           </div>

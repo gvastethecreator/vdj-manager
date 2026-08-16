@@ -65,7 +65,7 @@ fn build_cache_key(
     vdj_folder: Option<&Path>,
 ) -> Result<String, String> {
     let metadata = fs::metadata(path)
-        .map_err(|err| format!("No se pudo leer metadata de {}: {}", path.display(), err))?;
+        .map_err(|err| format!("Could not read metadata for {}: {}", path.display(), err))?;
     let modified = metadata
         .modified()
         .ok()
@@ -182,7 +182,7 @@ fn open_virtualdj_cache_readonly(db_path: &Path) -> Result<Connection, String> {
             Connection::open_with_flags(uri, flags | OpenFlags::SQLITE_OPEN_URI).map_err(
                 |second_err| {
                     format!(
-                        "No se pudo abrir cache.db en modo lectura ({}; fallback immutable: {})",
+                        "Could not open cache.db in read-only mode ({}; immutable fallback: {})",
                         first_err, second_err
                     )
                 },
@@ -206,7 +206,7 @@ fn decode_virtualdj_type_one_waveform(
         .collect();
 
     if samples.is_empty() {
-        return Err("El waveform cacheado de VirtualDJ está vacío".to_string());
+        return Err("The cached VirtualDJ waveform is empty".to_string());
     }
 
     let bucket_count = bucket_count.max(1);
@@ -279,7 +279,7 @@ fn load_virtualdj_cached_waveform_from_db(
     let conn = open_virtualdj_cache_readonly(db_path)?;
     let mut stmt = conn
         .prepare(&sql)
-        .map_err(|err| format!("No se pudo preparar consulta de waveform cacheado: {err}"))?;
+        .map_err(|err| format!("Could not prepare cached waveform query: {err}"))?;
 
     let mut params: Vec<&dyn rusqlite::ToSql> = Vec::with_capacity(parent_candidates.len() + 2);
     params.push(&filename);
@@ -296,7 +296,7 @@ fn load_virtualdj_cached_waveform_from_db(
             Ok((values_per_second, waveform))
         })
         .optional()
-        .map_err(|err| format!("No se pudo leer waveform cacheado de VirtualDJ: {err}"))?;
+        .map_err(|err| format!("Could not read the cached VirtualDJ waveform: {err}"))?;
 
     let Some((values_per_second, waveform)) = row else {
         return Ok(None);
@@ -353,7 +353,7 @@ fn persist_waveform_to_disk(cache_key: &str, preview: &WaveformPreview) -> Resul
     let cache_dir = waveform_cache_dir();
     fs::create_dir_all(&cache_dir).map_err(|err| {
         format!(
-            "No se pudo crear el directorio de caché {}: {}",
+            "Could not create cache directory {}: {}",
             cache_dir.display(),
             err
         )
@@ -367,11 +367,11 @@ fn persist_waveform_to_disk(cache_key: &str, preview: &WaveformPreview) -> Resul
     };
 
     let payload = serde_json::to_vec(&persisted)
-        .map_err(|err| format!("No se pudo serializar el caché persistente: {}", err))?;
+        .map_err(|err| format!("Could not serialize the persistent cache: {}", err))?;
 
     fs::write(&cache_file, payload).map_err(|err| {
         format!(
-            "No se pudo escribir el caché persistente {}: {}",
+            "Could not write persistent cache {}: {}",
             cache_file.display(),
             err
         )
@@ -525,7 +525,7 @@ fn compute_frequency_bands(samples: &[f32], band_count: usize) -> Vec<u8> {
 
 fn extract_waveform_preview(path: &Path, bucket_count: usize) -> Result<WaveformPreview, String> {
     let src =
-        File::open(path).map_err(|err| format!("No se pudo abrir {}: {}", path.display(), err))?;
+        File::open(path).map_err(|err| format!("Could not open {}: {}", path.display(), err))?;
 
     let mut hint = Hint::new();
     if let Some(extension) = path.extension().and_then(|ext| ext.to_str()) {
@@ -538,7 +538,7 @@ fn extract_waveform_preview(path: &Path, bucket_count: usize) -> Result<Waveform
 
     let probed = symphonia::default::get_probe()
         .format(&hint, mss, &fmt_opts, &meta_opts)
-        .map_err(|err| format!("Formato no soportado para {}: {}", path.display(), err))?;
+        .map_err(|err| format!("Unsupported format for {}: {}", path.display(), err))?;
 
     let mut format = probed.format;
     let track = format
@@ -547,7 +547,7 @@ fn extract_waveform_preview(path: &Path, bucket_count: usize) -> Result<Waveform
         .find(|track| track.codec_params.codec != CODEC_TYPE_NULL)
         .ok_or_else(|| {
             format!(
-                "No se encontró una pista de audio soportada en {}",
+                "No supported audio track was found in {}",
                 path.display()
             )
         })?;
@@ -555,7 +555,7 @@ fn extract_waveform_preview(path: &Path, bucket_count: usize) -> Result<Waveform
     let track_id = track.id;
     let mut decoder = symphonia::default::get_codecs()
         .make(&track.codec_params, &DecoderOptions::default())
-        .map_err(|err| format!("Codec no soportado para {}: {}", path.display(), err))?;
+        .map_err(|err| format!("Unsupported codec for {}: {}", path.display(), err))?;
 
     let mut coarse_peaks: Vec<f32> = Vec::new();
     let mut spectrum_samples: Vec<f32> = Vec::with_capacity(FFT_SIZE * MAX_SPECTRUM_WINDOWS);
@@ -567,14 +567,14 @@ fn extract_waveform_preview(path: &Path, bucket_count: usize) -> Result<Waveform
             Ok(packet) => packet,
             Err(Error::ResetRequired) => {
                 return Err(format!(
-                    "El stream cambió durante el decode de {} y no se pudo continuar",
+                    "The stream changed while decoding {} and could not continue",
                     path.display(),
                 ));
             }
             Err(Error::IoError(_)) => break,
             Err(err) => {
                 return Err(format!(
-                    "No se pudo leer paquetes de audio de {}: {}",
+                    "Could not read audio packets from {}: {}",
                     path.display(),
                     err,
                 ));
@@ -594,7 +594,7 @@ fn extract_waveform_preview(path: &Path, bucket_count: usize) -> Result<Waveform
             Err(Error::IoError(_)) | Err(Error::DecodeError(_)) => continue,
             Err(err) => {
                 return Err(format!(
-                    "No se pudo decodificar audio de {}: {}",
+                    "Could not decode audio from {}: {}",
                     path.display(),
                     err,
                 ));
@@ -633,7 +633,7 @@ fn extract_waveform_preview(path: &Path, bucket_count: usize) -> Result<Waveform
 
     if coarse_peaks.is_empty() {
         return Err(format!(
-            "No se pudieron extraer muestras útiles de {}",
+            "No usable samples could be extracted from {}",
             path.display(),
         ));
     }
@@ -675,7 +675,7 @@ pub async fn get_waveform_preview(
 
     if metadata.as_ref().is_none_or(|metadata| !metadata.is_file()) {
         return Err(format!(
-            "El archivo no existe o no es válido y no se encontró waveform cacheado: {}",
+            "The file does not exist or is invalid, and no cached waveform was found: {}",
             file_path
         ));
     }
@@ -697,7 +697,7 @@ pub async fn get_waveform_preview(
 
     let _permit = waveform_semaphore().acquire().await.map_err(|err| {
         format!(
-            "No se pudo reservar worker de waveform para {}: {}",
+            "Could not reserve a waveform worker for {}: {}",
             file_path, err
         )
     })?;
@@ -706,7 +706,7 @@ pub async fn get_waveform_preview(
     let waveform =
         tokio::task::spawn_blocking(move || extract_waveform_preview(&path_for_task, bucket_count))
             .await
-            .map_err(|err| format!("La tarea de waveform falló para {}: {}", file_path, err))??;
+            .map_err(|err| format!("The waveform task failed for {}: {}", file_path, err))??;
 
     if let Ok(mut cache) = waveform_cache().lock() {
         cache.insert(cache_key.clone(), waveform.clone());

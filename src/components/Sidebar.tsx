@@ -23,10 +23,10 @@ interface PrimaryNavItem {
 
 export const PRIMARY_NAV_ITEMS: PrimaryNavItem[] = [
   { workspace: "dashboard", label: "Dashboard", icon: LayoutDashboard, navigation: { workspace: "dashboard" } },
-  { workspace: "library", label: "Biblioteca", icon: Database, navigation: { workspace: "library", section: "songs" } },
-  { workspace: "integrity", label: "Resolver problemas", icon: AlertTriangle, navigation: { workspace: "integrity", section: "missing" } },
-  { workspace: "operations", label: "Operaciones", icon: Wrench, navigation: { workspace: "operations", section: "batch" } },
-  { workspace: "resources", label: "Recursos", icon: Layers3, navigation: { workspace: "resources", section: "configs" } },
+  { workspace: "library", label: "Library", icon: Database, navigation: { workspace: "library", section: "songs" } },
+  { workspace: "integrity", label: "Resolve issues", icon: AlertTriangle, navigation: { workspace: "integrity", section: "missing" } },
+  { workspace: "operations", label: "Operations", icon: Wrench, navigation: { workspace: "operations", section: "batch" } },
+  { workspace: "resources", label: "Resources", icon: Layers3, navigation: { workspace: "resources", section: "configs" } },
 ];
 
 /** Compact 72 px rail. Expansion overlays content so workspace geometry never shifts. */
@@ -49,7 +49,7 @@ export function Sidebar() {
   };
 
   return (
-    <aside className="relative z-50 w-[72px] shrink-0 border-r border-border" aria-label="Navegación principal">
+    <aside className="relative z-50 w-[72px] shrink-0 border-r border-border" aria-label="Main navigation">
       <div className={`absolute inset-y-0 left-0 flex flex-col border-r border-border bg-surface ${expanded ? "w-60 shadow-2xl" : "w-[71px]"}`}>
         <div className="flex h-14 shrink-0 items-center border-b border-border px-[18px]">
           <button
@@ -57,7 +57,7 @@ export function Sidebar() {
             className="icon-button shrink-0 text-primary-light"
             onClick={() => setExpanded((value) => !value)}
             aria-expanded={expanded}
-            aria-label={expanded ? "Contraer navegación" : "Expandir navegación"}
+            aria-label={expanded ? "Collapse navigation" : "Expand navigation"}
           >
             {expanded ? <PanelLeftClose className="h-5 w-5" /> : <Menu className="h-5 w-5" />}
           </button>
@@ -100,11 +100,11 @@ export function Sidebar() {
             onClick={() => void selectFolder()}
             disabled={loading}
             className={`flex h-10 w-full items-center rounded-md bg-primary-dark text-white hover:bg-primary ${expanded ? "px-3" : "justify-center"}`}
-            aria-label="Cambiar biblioteca"
-            title={expanded ? undefined : "Cambiar biblioteca"}
+            aria-label="Switch library"
+            title={expanded ? undefined : "Switch library"}
           >
             <FolderOpen className="h-[18px] w-[18px] shrink-0" />
-            {expanded ? <span className="ml-3 text-sm font-semibold">Cambiar biblioteca</span> : null}
+            {expanded ? <span className="ml-3 text-sm font-semibold">Switch library</span> : null}
           </button>
         </div>
       </div>

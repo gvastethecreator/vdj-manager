@@ -60,10 +60,10 @@ fn selected_recovery_entries(
             .entries
             .iter()
             .find(|entry| entry.journal.journal_id == journal_id)
-            .ok_or_else(|| format!("No existe el journal solicitado: {journal_id}"))?;
+            .ok_or_else(|| format!("The requested journal does not exist: {journal_id}"))?;
         if !entry.allowed_actions.contains(&action) {
             return Err(format!(
-                "La acción {:?} no está permitida para el journal {}",
+                "Action {:?} is not allowed for journal {}",
                 action, journal_id
             ));
         }
@@ -71,7 +71,7 @@ fn selected_recovery_entries(
     }
     if !state.allowed_actions.contains(&action) {
         return Err(format!(
-            "La acción {:?} no está permitida para todos los journals pendientes",
+            "Action {:?} is not allowed for every pending journal",
             action
         ));
     }
@@ -82,7 +82,7 @@ fn store_for_app(app: &tauri::AppHandle) -> Result<MutationJournalStore, String>
     let app_data_dir = app
         .path()
         .app_data_dir()
-        .map_err(|error| format!("No se pudo resolver app-data para recovery: {error}"))?;
+        .map_err(|error| format!("App data could not be resolved for recovery: {error}"))?;
     Ok(MutationJournalStore::new(app_data_dir))
 }
 
@@ -170,7 +170,7 @@ fn patch_reference(database_path: &Path, from: &str, to: &str) -> Result<(), Str
     } else {
         Err(result
             .message
-            .unwrap_or_else(|| format!("El patch terminó en {:?}", result.status)))
+            .unwrap_or_else(|| format!("The patch ended with {:?}", result.status)))
     }
 }
 
@@ -190,6 +190,9 @@ fn outcome(
     }
 }
 
+// The outcome is the user-facing recovery record itself. Boxing it would add
+// allocation and call-site noise to a control-flow error that is returned intact.
+#[allow(clippy::result_large_err)]
 fn verify_journal_file_identity(
     store: &MutationJournalStore,
     library: &str,
@@ -204,7 +207,7 @@ fn verify_journal_file_identity(
             library,
             journal_id,
             item,
-            "La identidad SHA-256/tamaño no coincide o el journal antiguo no conserva identidad; no se movió ningún archivo".to_string(),
+            "The SHA-256/size identity does not match, or the legacy journal has no identity; no files were moved".to_string(),
         )),
         Err(error) => Err(require_manual(store, library, journal_id, item, error)),
     }
@@ -234,7 +237,7 @@ fn require_manual(
         status,
         match persisted {
             Ok(_) => message,
-            Err(error) => format!("{message}; no se pudo persistir revisión manual: {error}"),
+            Err(error) => format!("{message}; manual review could not be persisted: {error}"),
         },
     )
 }
@@ -253,7 +256,7 @@ fn resume_item(
             library,
             journal_id,
             item,
-            "El journal no contiene targetFilePath".to_string(),
+            "The journal does not contain targetFilePath".to_string(),
         );
     };
     if item.phase == MutationJournalPhase::ManualReviewRequired {
@@ -261,7 +264,7 @@ fn resume_item(
             journal_id,
             item,
             RecoveryItemOutcomeStatus::Failed,
-            "Este ítem requiere rollback o acknowledgement manual",
+            "This item requires rollback or manual acknowledgement",
         );
     }
     let source = PathBuf::from(&item.original_file_path);
@@ -274,7 +277,7 @@ fn resume_item(
                 library,
                 journal_id,
                 item,
-                format!("Referencias de database.xml incompatibles con resume: {state:?}"),
+                format!("database.xml references are incompatible with resume: {state:?}"),
             );
         }
         Err(error) => return require_manual(store, library, journal_id, item, error),
@@ -292,7 +295,7 @@ fn resume_item(
                     library,
                     journal_id,
                     item,
-                    format!("No se pudo reanudar el movimiento físico: {error}"),
+                    format!("The physical move could not be resumed: {error}"),
                 );
             }
             if let Err(error) = store.transition_item(
@@ -307,7 +310,7 @@ fn resume_item(
                     library,
                     journal_id,
                     item,
-                    format!("No se pudo persistir fs_applied: {error}; rollback={rollback:?}"),
+                    format!("fs_applied could not be persisted: {error}; rollback={rollback:?}"),
                 );
             }
         }
@@ -327,7 +330,7 @@ fn resume_item(
                         library,
                         journal_id,
                         item,
-                        format!("El archivo ya estaba movido, pero no se pudo registrar: {error}"),
+                        format!("The file was already moved, but the state could not be recorded: {error}"),
                     );
                 }
             }
@@ -338,7 +341,7 @@ fn resume_item(
                 library,
                 journal_id,
                 item,
-                format!("Estado físico incompatible con resume: {state:?}"),
+                format!("Physical state is incompatible with resume: {state:?}"),
             );
         }
     }
@@ -360,7 +363,7 @@ fn resume_item(
                                 item,
                                 RecoveryItemOutcomeStatus::Resolved,
                                 format!(
-                                    "Resume no pudo completar database.xml ({error}); el archivo fue revertido de forma segura"
+                                    "Resume could not complete database.xml ({error}); the file was safely restored"
                                 ),
                             );
                         }
@@ -371,7 +374,7 @@ fn resume_item(
                                 journal_id,
                                 item,
                                 format!(
-                                    "El archivo fue revertido tras fallo DB ({error}), pero no se pudo cerrar rolled_back: {journal_error}"
+                                    "The file was restored after the database failure ({error}), but rolled_back could not be closed: {journal_error}"
                                 ),
                             );
                         }
@@ -382,7 +385,7 @@ fn resume_item(
                     library,
                     journal_id,
                     item,
-                    format!("No se pudo completar database.xml: {error}; rollback={rollback:?}"),
+                    format!("database.xml could not be completed: {error}; rollback={rollback:?}"),
                 );
             }
         }
@@ -393,7 +396,7 @@ fn resume_item(
                 library,
                 journal_id,
                 item,
-                format!("Referencias de database.xml incompatibles con resume: {state:?}"),
+                format!("database.xml references are incompatible with resume: {state:?}"),
             );
         }
         Err(error) => {
@@ -411,14 +414,14 @@ fn resume_item(
             journal_id,
             item,
             RecoveryItemOutcomeStatus::Resolved,
-            "Mutación reanudada y completada",
+            "Mutation resumed and completed",
         ),
         Err(error) => require_manual(
             store,
             library,
             journal_id,
             item,
-            format!("Filesystem y DB están aplicados, pero no se pudo cerrar completed: {error}"),
+            format!("Filesystem and database changes are applied, but completed could not be closed: {error}"),
         ),
     }
 }
@@ -437,7 +440,7 @@ fn rollback_item(
             library,
             journal_id,
             item,
-            "El journal no contiene targetFilePath".to_string(),
+            "The journal does not contain targetFilePath".to_string(),
         );
     };
     let source = PathBuf::from(&item.original_file_path);
@@ -450,7 +453,7 @@ fn rollback_item(
                 library,
                 journal_id,
                 item,
-                format!("Referencias de database.xml incompatibles con rollback: {state:?}"),
+                format!("database.xml references are incompatible with rollback: {state:?}"),
             );
         }
         Err(error) => return require_manual(store, library, journal_id, item, error),
@@ -466,7 +469,7 @@ fn rollback_item(
                     library,
                     journal_id,
                     item,
-                    format!("No se pudo revertir el archivo físico: {error}"),
+                    format!("The physical file could not be restored: {error}"),
                 );
             }
         }
@@ -481,7 +484,7 @@ fn rollback_item(
                 library,
                 journal_id,
                 item,
-                format!("Estado físico incompatible con rollback: {state:?}"),
+                format!("Physical state is incompatible with rollback: {state:?}"),
             );
         }
     }
@@ -494,7 +497,7 @@ fn rollback_item(
                     library,
                     journal_id,
                     item,
-                    format!("Archivo revertido, pero database.xml no pudo revertirse: {error}"),
+                    format!("The file was restored, but database.xml could not be restored: {error}"),
                 );
             }
         }
@@ -505,7 +508,7 @@ fn rollback_item(
                 library,
                 journal_id,
                 item,
-                format!("Referencias de database.xml incompatibles con rollback: {state:?}"),
+                format!("database.xml references are incompatible with rollback: {state:?}"),
             );
         }
         Err(error) => return require_manual(store, library, journal_id, item, error),
@@ -521,14 +524,14 @@ fn rollback_item(
             journal_id,
             item,
             RecoveryItemOutcomeStatus::Resolved,
-            "Mutación revertida",
+            "Mutation rolled back",
         ),
         Err(error) => require_manual(
             store,
             library,
             journal_id,
             item,
-            format!("Estado físico y DB revertidos, pero falló rolled_back: {error}"),
+            format!("Physical and database state restored, but rolled_back failed: {error}"),
         ),
     }
 }
@@ -585,7 +588,7 @@ pub async fn apply_mutation_recovery_action(
                             &entry.journal.journal_id,
                             item,
                             RecoveryItemOutcomeStatus::Resolved,
-                            "Revisión manual confirmada por el usuario",
+                            "Manual review confirmed by the user",
                         ),
                         Err(error) => outcome(
                             &entry.journal.journal_id,

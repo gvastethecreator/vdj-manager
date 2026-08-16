@@ -26,10 +26,10 @@ export function Home() {
             <div className="flex h-10 w-10 items-center justify-center rounded-lg border border-primary/30 bg-primary/12"><Database className="h-5 w-5" /></div>
             <span className="text-sm font-bold text-text">VDJ Manager</span>
           </div>
-          <p className="mt-6 text-xs font-semibold uppercase tracking-[0.16em] text-primary-light">Centro operativo para VirtualDJ</p>
-          <h1 className="mt-2 max-w-xl text-3xl font-bold tracking-tight text-text">Vuelve a tu biblioteca y decide el próximo paso.</h1>
+          <p className="mt-6 text-xs font-semibold uppercase tracking-[0.16em] text-primary-light">VirtualDJ operations center</p>
+          <h1 className="mt-2 max-w-xl text-3xl font-bold tracking-tight text-text">Return to your library and decide what comes next.</h1>
           <p className="mt-3 max-w-xl text-sm leading-relaxed text-text-secondary">
-            Navega pistas, verifica integridad y ejecuta operaciones protegidas desde un único workspace de escritorio.
+            Browse tracks, verify integrity, and run protected operations from one desktop workspace.
           </p>
 
           <div className="mt-5 space-y-2">
@@ -37,17 +37,17 @@ export function Home() {
               <button type="button" onClick={() => void loadFromFolder(lastVdjFolder)} disabled={loading} className="btn btn-primary btn-lg w-full justify-start">
                 <History className="h-5 w-5" />
                 <span className="min-w-0 text-left">
-                  <strong className="block">Reanudar última biblioteca</strong>
+                  <strong className="block">Resume last library</strong>
                   <span className="mt-1 block truncate text-xs font-normal opacity-85" title={lastVdjFolder}>{lastVdjFolder}</span>
                 </span>
               </button>
             ) : null}
             <button type="button" onClick={() => void selectFolder()} disabled={loading} className="btn btn-ghost btn-lg w-full justify-start">
-              <FolderOpen className="h-5 w-5" /> Seleccionar carpeta de VirtualDJ
+              <FolderOpen className="h-5 w-5" /> Select VirtualDJ folder
             </button>
           </div>
 
-          {loading ? <div className="mt-3 flex items-center gap-2 text-sm text-text-muted"><div className="spinner" /> Cargando biblioteca…</div> : null}
+          {loading ? <div className="mt-3 flex items-center gap-2 text-sm text-text-muted"><div className="spinner" /> Loading library…</div> : null}
           {uiError?.scope === currentScope ? (
             <div className="mt-3">
               <UiErrorNotice
@@ -67,7 +67,7 @@ export function Home() {
             <ShieldCheck className="mt-0.5 h-5 w-5 shrink-0 text-success" />
             <div>
               <h2 className="text-sm font-semibold text-text">Escrituras protegidas</h2>
-              <p className="mt-1 text-sm leading-relaxed text-text-secondary">Backup previo, escritura atómica y recuperación explícita. Los análisis de integridad siguen siendo acciones independientes.</p>
+              <p className="mt-1 text-sm leading-relaxed text-text-secondary">Backup first, atomic writes, and explicit recovery. Integrity scans remain independent actions.</p>
             </div>
           </div>
         </section>
@@ -75,22 +75,22 @@ export function Home() {
         <aside className="border-t border-border bg-background/55 p-6 lg:border-l lg:border-t-0 lg:p-8">
           <div className="flex items-start justify-between gap-3">
             <div>
-              <h2 className="text-sm font-semibold text-text">Carpetas de música</h2>
-              <p className="mt-1 text-sm leading-relaxed text-text-muted">Se usan para buscar faltantes, candidatos y huérfanos.</p>
+              <h2 className="text-sm font-semibold text-text">Music folders</h2>
+              <p className="mt-1 text-sm leading-relaxed text-text-muted">Used to find missing tracks, relink candidates, and orphans.</p>
             </div>
-            <button type="button" className="icon-button shrink-0" onClick={() => void selectMusicFolder()} aria-label="Agregar carpeta de música" title="Agregar carpeta">
+            <button type="button" className="icon-button shrink-0" onClick={() => void selectMusicFolder()} aria-label="Add music folder" title="Add folder">
               <FolderOpen className="h-4 w-4" />
             </button>
           </div>
 
           <div className="mt-5 space-y-2">
             {musicFolders.length === 0 ? (
-              <div className="rounded-lg border border-dashed border-border p-5 text-center text-sm text-text-muted">Todavía no hay carpetas adicionales.</div>
+              <div className="rounded-lg border border-dashed border-border p-5 text-center text-sm text-text-muted">No additional folders yet.</div>
             ) : musicFolders.map((folder) => (
               <div key={folder} className="flex items-center gap-3 rounded-md border border-border bg-surface px-3 py-3">
                 <Music2 className="h-4 w-4 shrink-0 text-primary-light" />
                 <span className="min-w-0 flex-1 truncate text-sm text-text-secondary" title={folder}>{folder}</span>
-                <button type="button" className="icon-button h-7 w-7 shrink-0" onClick={() => removeMusicFolder(folder)} aria-label={`Quitar ${folder}`}><X className="h-3.5 w-3.5" /></button>
+                <button type="button" className="icon-button h-7 w-7 shrink-0" onClick={() => removeMusicFolder(folder)} aria-label={`Remove ${folder}`}><X className="h-3.5 w-3.5" /></button>
               </div>
             ))}
           </div>

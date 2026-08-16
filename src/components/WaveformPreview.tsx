@@ -200,7 +200,7 @@ export function WaveformPreview({
             <div
                 aria-hidden
                 className={`${heightClass} w-full animate-pulse rounded bg-surface-hover/70`}
-                title="Cargando waveform…"
+                title="Loading waveform…"
             />
         );
     }
@@ -209,13 +209,13 @@ export function WaveformPreview({
         return (
             <div
                 className={`${heightClass} w-full rounded border border-dashed border-border/70 bg-surface-hover/30`}
-                title="Waveform no disponible para este archivo"
+                title="Waveform unavailable for this file"
             />
         );
     }
 
     return (
-        <div className={`flex ${heightClass} w-full items-center`} title="Waveform + espectro de frecuencias del archivo">
+        <div className={`flex ${heightClass} w-full items-center`} title="File waveform and frequency spectrum">
             <svg
                 aria-label="Waveform"
                 className={`${svgClassName} w-full overflow-visible text-primary-light opacity-90`}

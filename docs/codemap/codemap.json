@@ -1,6 +1,6 @@
 {
-  "generated_at": "2026-08-12T09:10:31Z",
-  "generated_from_commit": "46fba711736324f0c19bbc335664ffbb6a8cea55",
+  "generated_at": "2026-08-15T09:32:04Z",
+  "generated_from_commit": "f1b10cc587c5e850ad7a4966514b8b9d876454bb",
   "scope": [
     "."
   ],
@@ -35,7 +35,7 @@
       "type": "module",
       "boundary": "Index",
       "entrypoints": [
-        "index.html:VDJ Database Manager"
+        "index.html:VDJ Manager"
       ],
       "tests": [],
       "constraints": [
@@ -46,7 +46,7 @@
         "locations": [
           {
             "path": "index.html",
-            "symbol": "VDJ Database Manager"
+            "symbol": "VDJ Manager"
           }
         ]
       }
@@ -58,7 +58,7 @@
       "type": "module",
       "boundary": "Repository",
       "entrypoints": [
-        "README.md:VDJ Manager"
+        "README.md:Product tour"
       ],
       "tests": [],
       "constraints": [
@@ -69,7 +69,7 @@
         "locations": [
           {
             "path": "README.md",
-            "symbol": "VDJ Manager"
+            "symbol": "Product tour"
           }
         ]
       }

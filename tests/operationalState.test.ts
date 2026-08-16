@@ -4,7 +4,7 @@ import { buildAttentionQueue, demoIntegritySnapshot, displayScanCount } from "..
 describe("operational attention queue", () => {
   test("never represents an unexecuted scan as zero", () => {
     const snapshot = demoIntegritySnapshot("unverified");
-    expect(displayScanCount(snapshot.missing)).toBe("Sin verificar");
+    expect(displayScanCount(snapshot.missing)).toBe("Not checked");
     expect(buildAttentionQueue(snapshot, false).map((item) => item.id)).toEqual([
       "verify",
       "duplicates-unverified",
@@ -16,9 +16,9 @@ describe("operational attention queue", () => {
     "keeps integrity metrics unverified for the %s visual fixture",
     (scenario) => {
       const snapshot = demoIntegritySnapshot(scenario);
-      expect(displayScanCount(snapshot.missing)).toBe("Sin verificar");
-      expect(displayScanCount(snapshot.duplicateGroups)).toBe("Sin verificar");
-      expect(displayScanCount(snapshot.orphans)).toBe("Sin verificar");
+      expect(displayScanCount(snapshot.missing)).toBe("Not checked");
+      expect(displayScanCount(snapshot.duplicateGroups)).toBe("Not checked");
+      expect(displayScanCount(snapshot.orphans)).toBe("Not checked");
     },
   );
 

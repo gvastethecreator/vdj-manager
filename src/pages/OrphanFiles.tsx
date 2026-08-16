@@ -42,7 +42,7 @@ export function OrphanFiles() {
             updateIntegrityResults({ orphanFiles: { orphans: orphanPaths, allFiles: uniqueFiles } });
             updateIntegrity({ orphans: orphanPaths.length });
         } catch (err) {
-            reportUiError("No se pudo completar el escaneo de huérfanos.", err, { retry: runScan });
+            reportUiError("The orphan scan could not be completed.", err, { retry: runScan });
         } finally {
             setLoading(false);
         }
@@ -50,28 +50,28 @@ export function OrphanFiles() {
 
     return (
         <div className="space-y-3">
-            <h2 className="text-lg font-bold text-text">Archivos Huérfanos</h2>
+            <h2 className="text-lg font-bold text-text">Orphan files</h2>
             <p className="text-[13px] text-text-secondary">
-                Archivos de audio en disco que no están registrados en la base de datos de VirtualDJ.
+                Audio files on disk that are not registered in the VirtualDJ database.
             </p>
 
             <div className="card space-y-3 p-3">
                 <div className="flex items-center justify-between gap-3">
                     <div>
-                        <label className="mb-1 block text-xs text-text-muted">Carpetas a escanear</label>
+                        <label className="mb-1 block text-xs text-text-muted">Folders to scan</label>
                         <p className="text-xs text-text-secondary">
-                            Se usan las carpetas musicales persistentes configuradas desde el inicio de la app.
+                            Uses the persistent music folders configured from the app home.
                         </p>
                     </div>
                     <button onClick={() => void addScanFolder()} className="btn btn-ghost btn-sm">
                         <Music className="h-4 w-4" />
-                        Agregar carpeta
+                        Add folder
                     </button>
                 </div>
 
                 {scanFolders.length === 0 ? (
                     <div className="rounded-[5px] border border-dashed border-border/70 bg-surface-hover/30 px-3 py-2 text-xs text-text-muted">
-                        No hay carpetas de música configuradas todavía.
+                        No music folders are configured yet.
                     </div>
                 ) : (
                     <div className="space-y-1.5">
@@ -85,7 +85,7 @@ export function OrphanFiles() {
                                     type="button"
                                     onClick={() => { removeMusicFolder(folder); invalidateScan(); }}
                                     className="btn btn-ghost btn-sm shrink-0"
-                                    title="Quitar carpeta"
+                                    title="Remove folder"
                                 >
                                     <X className="h-3.5 w-3.5" />
                                 </button>
@@ -100,7 +100,7 @@ export function OrphanFiles() {
                         disabled={loading || scanFolders.length === 0}
                         className="btn btn-primary"
                     >
-                        {loading ? "Escaneando..." : `Buscar Huérfanos${scanFolders.length > 0 ? ` (${scanFolders.length})` : ""}`}
+                        {loading ? "Scanning..." : `Find orphans${scanFolders.length > 0 ? ` (${scanFolders.length})` : ""}`}
                     </button>
                 </div>
             </div>
@@ -108,7 +108,7 @@ export function OrphanFiles() {
             {loading && (
                 <div className="flex items-center gap-2 text-sm text-text-muted">
                     <div className="spinner" />
-                    Escaneando archivos...
+                    Scanning files...
                 </div>
             )}
 
@@ -117,15 +117,15 @@ export function OrphanFiles() {
                     <div className="grid grid-cols-3 gap-2.5">
                         <div className="card p-2.5 text-center">
                             <div className="text-lg font-bold text-text">{allFiles.length}</div>
-                            <div className="text-xs text-text-muted">Archivos en disco</div>
+                            <div className="text-xs text-text-muted">Files on disk</div>
                         </div>
                         <div className="card p-2.5 text-center">
                             <div className="text-lg font-bold text-success">{allFiles.length - orphans.length}</div>
-                            <div className="text-xs text-text-muted">En la base de datos</div>
+                            <div className="text-xs text-text-muted">In the database</div>
                         </div>
                         <div className="card p-2.5 text-center">
                             <div className="text-lg font-bold text-warning">{orphans.length}</div>
-                            <div className="text-xs text-text-muted">Huérfanos</div>
+                            <div className="text-xs text-text-muted">Orphans</div>
                         </div>
                     </div>
 
@@ -134,9 +134,9 @@ export function OrphanFiles() {
                             <thead className="sticky top-0 bg-surface-hover">
                                 <tr>
                                     <th className="px-2.5 py-1.5 text-left text-[13px] font-medium text-text-muted">#</th>
-                                    <th className="px-2.5 py-1.5 text-left text-[13px] font-medium text-text-muted">Archivo</th>
-                                    <th className="px-2.5 py-1.5 text-left text-[13px] font-medium text-text-muted">Formato</th>
-                                    <th className="px-2.5 py-1.5 text-left text-[13px] font-medium text-text-muted">Carpeta</th>
+                                    <th className="px-2.5 py-1.5 text-left text-[13px] font-medium text-text-muted">File</th>
+                                    <th className="px-2.5 py-1.5 text-left text-[13px] font-medium text-text-muted">Format</th>
+                                    <th className="px-2.5 py-1.5 text-left text-[13px] font-medium text-text-muted">Folder</th>
                                 </tr>
                             </thead>
                             <tbody>
@@ -178,7 +178,7 @@ export function OrphanFiles() {
                         </table>
                         {orphans.length === 0 && (
                             <div className="py-8 text-center text-sm text-text-muted">
-                                Todos los archivos están en la base de datos
+                                All files are in the database
                             </div>
                         )}
                     </div>

@@ -1,59 +1,40 @@
-# Deuda técnica
+# Technical debt
 
-Actualizado: 2026-07-15, después del rediseño de workspaces.
+Updated: 2026-08-14.
 
-No quedan blockers ni P1 conocidos del rediseño. Esta lista contiene mejoras posteriores que no invalidan los contratos actuales.
+There are no known blocker or P1 issues from the workspace redesign. These are follow-up improvements, not hidden release requirements.
 
-## Prioridad alta
+## High priority
 
-### Descomponer superficies grandes
+### Split large surfaces
 
-- `SongTable.tsx` todavía reúne virtualización, columnas, audio, edición, rating y color.
-- `Songs.tsx`, `Pads.tsx` y `Mappers.tsx` combinan carga, navegación y editor.
-- Extraer hooks y subcomponentes sólo con pruebas de comportamiento; no duplicar estado ni romper la identidad por `originalFilePath`.
+`SongTable.tsx` still combines virtualization, columns, audio, inline editing, ratings, and colors. `Songs.tsx`, `Pads.tsx`, and `Mappers.tsx` combine loading, navigation, and editing. Extract behavior only behind focused tests and preserve identity by `originalFilePath`.
 
-### Automatizar navegador en CI
+### Add browser checks to CI
 
-- El harness DOM cubre Dialog, errores, navegación, tema, paneles y teclado de tabla.
-- La verificación browser real existe como misión local y evidencia PNG, pero aún no corre en CI.
-- Añadir una matriz representativa 1180/1280/1440, dark/light y reduced motion sin convertir cada combinación en una captura redundante.
+DOM tests cover dialogs, errors, navigation, themes, panels, and keyboard interaction. Real-browser review exists locally, but CI does not yet run a representative matrix for desktop widths, themes, and reduced motion.
 
-### Observabilidad del backend
+### Add safe backend observability
 
-- Rust todavía carece de logging estructurado de cargas, parsing y mutaciones.
-- Adoptar `tracing` o `log` sin registrar rutas sensibles ni contenido XML completo.
+Rust does not yet provide structured logging for load, parse, and mutation operations. Adopt `tracing` or `log` without recording private paths or full XML content.
 
-### Hardening residual de mutaciones
+### Continue mutation hardening
 
-- Aislar el serializer histórico completo, mantenido sólo para pruebas de pérdida de fidelidad.
-- Definir soporte controlado para insertar tags en entradas `<Song .../>` autocerradas; hoy se aborta de forma segura.
-- Evaluar aliases físicos extremos de Windows (junctions y nombres 8.3) más allá de la normalización léxica.
-- Decidir si settings, mappers y pads deben compartir el mismo gate de recovery que `database.xml`.
+- Isolate the historical full serializer that remains only for fidelity-loss tests.
+- Define safe support for inserting tags into self-closing `<Song .../>` entries; the writer currently stops instead.
+- Evaluate extreme Windows aliases such as junctions and 8.3 names beyond lexical normalization.
+- Decide whether settings, mappers, and pads should use the same recovery gate as `database.xml`.
 
-## Prioridad media
+## Medium priority
 
-### Invalidación y tareas asíncronas
+- Share request-token handling across integrity, playlists, library load, and batch previews.
+- Reduce full reloads after mutations without losing metrics, partial reports, or recovery evidence.
+- Add semantic mapper validation and a more specialized pad editor.
+- Implement playlist content editing; the browser currently lists, imports, and reads playlists.
+- Add automated semantic and contrast checks, then test virtual tables with screen readers.
 
-- Integridad conserva resultados por biblioteca activa y los invalida al recargar o cambiar alcance.
-- Playlists, carga de biblioteca y previews Batch descartan respuestas tardías, pero conviene extraer un helper común de request tokens y ampliar pruebas de carrera con servicios controlados.
-- Reducir recargas globales después de mutaciones sin perder stats, reportes parciales ni evidencia de recovery.
+## Low priority
 
-### Recursos y playlists
-
-- Añadir validaciones semánticas de bindings de Mappers y un editor de Pads más específico que el árbol XML genérico.
-- Implementar CRUD de playlists y edición de contenido; hoy el Browser sólo lista, importa y lee.
-
-### Accesibilidad continua
-
-- La base actual incluye foco visible, diálogos con trap/restauración, filas y edición inline por teclado, splitters Home/End y contraste ≥4.5:1.
-- Siguiente paso: automatizar auditoría semántica/contraste en CI y probar screen readers sobre las tablas virtualizadas.
-
-### Internacionalización
-
-- El producto está en español hardcoded. Extraer strings sólo si aparece un requisito real de segundo idioma.
-
-## Prioridad baja
-
-- Revisar periódicamente dependencias Rust/JS y presupuesto de bundle.
-- Añadir telemetría local opt-in para tiempos de scans si puede hacerse sin exponer rutas.
-- Evaluar una caché persistente de waveforms/resultados con invalidación por identidad física.
+- Review Rust and JavaScript dependencies and bundle size regularly.
+- Consider local opt-in scan timing that never records private paths.
+- Evaluate a persistent waveform/result cache with physical-identity invalidation.

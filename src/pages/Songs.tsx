@@ -164,7 +164,7 @@ export function Songs() {
       .catch((error) => {
         if (playlistListRequest.current !== request) return;
         setPlaylists([]);
-        reportUiError("No se pudieron cargar las playlists.", error);
+        reportUiError("Playlists could not be loaded.", error);
       })
       .finally(() => {
         if (playlistListRequest.current === request) setPlaylistLoading(false);
@@ -187,7 +187,7 @@ export function Songs() {
     } catch (error) {
       if (playlistReadRequest.current !== request) return;
       setPlaylistEntries([]);
-      reportUiError("No se pudo abrir la playlist seleccionada.", error, {
+      reportUiError("The selected playlist could not be opened.", error, {
         retry: () => selectPlaylist(playlist),
       });
     } finally {
@@ -204,7 +204,7 @@ export function Songs() {
 
   const importPlaylist = useCallback(async () => {
     const selected = await services.selectFile({
-      title: "Importar playlist",
+      title: "Import playlist",
       extensions: ["m3u", "m3u8", "vdjplaylist", "vdjlist"],
     });
     if (!selected) return;
@@ -213,7 +213,7 @@ export function Songs() {
     const imported: PlaylistInfo = {
       name: dot > 0 ? fileName.slice(0, dot) : fileName,
       path: selected,
-      folder: "Importadas",
+      folder: "Imported",
       count: 0,
       format: dot >= 0 ? fileName.slice(dot + 1).toLowerCase() : "playlist",
     };
@@ -251,7 +251,7 @@ export function Songs() {
       }
       if (!cancelled) {
         setExternalSongs([...discovered.values()].sort(compareDriveAwarePaths).map((path, index) => (
-          externalSong(path, -1 - index, "Archivo detectado fuera de database.xml")
+          externalSong(path, -1 - index, "File found outside database.xml")
         )));
       }
     })().finally(() => { if (!cancelled) setExternalLoading(false); });
@@ -268,7 +268,7 @@ export function Songs() {
       const songsByPath = new Map(songs.map((song) => [song.file_path.toLowerCase(), song]));
       return playlistEntries.map((entry, index) => (
         songsByPath.get(entry.file_path.toLowerCase())
-        ?? externalSong(entry.file_path, -10_000 - index, "Entrada proveniente de playlist")
+        ?? externalSong(entry.file_path, -10_000 - index, "Entry loaded from a playlist")
       ));
     }
     if (mode === "folders" && selectedFolder) {
@@ -300,8 +300,8 @@ export function Songs() {
   }, [playlists]);
 
   const sourceLabel = mode === "playlists"
-    ? selectedPlaylist?.name ?? "Todas las canciones"
-    : selectedFolder ? getPathLeafName(selectedFolder) : "Toda la biblioteca";
+    ? selectedPlaylist?.name ?? "All songs"
+    : selectedFolder ? getPathLeafName(selectedFolder) : "Entire library";
 
   const selectSong = (song: SongSummary) => {
     setSelectedSongIndex(song.index);
@@ -313,44 +313,44 @@ export function Songs() {
       <header className="flex h-14 shrink-0 items-center justify-between gap-3 border-b border-border bg-surface px-4">
         <div className="flex items-center gap-4">
           <div>
-            <h1 className="text-sm font-semibold text-text">Browser de Biblioteca</h1>
-            <p className="text-xs text-text-muted">{sourceLabel} · {filteredSongs.length.toLocaleString()} pistas</p>
+            <h1 className="text-sm font-semibold text-text">Library browser</h1>
+            <p className="text-xs text-text-muted">{sourceLabel} · {filteredSongs.length.toLocaleString()} tracks</p>
           </div>
-          <div className="tab-group min-w-64" aria-label="Fuente de biblioteca">
+          <div className="tab-group min-w-64" aria-label="Library source">
             <button type="button" className={`tab-item flex items-center justify-center gap-2 ${mode === "folders" ? "tab-active" : ""}`} onClick={() => { setNavigation({ workspace: "library", section: "songs" }); clearPlaylistSelection(); }}>
-              <Folders className="h-4 w-4" /> Canciones
+              <Folders className="h-4 w-4" /> Songs
             </button>
             <button type="button" className={`tab-item flex items-center justify-center gap-2 ${mode === "playlists" ? "tab-active" : ""}`} onClick={() => { setNavigation({ workspace: "library", section: "playlists" }); setSelectedFolder(""); }}>
               <ListMusic className="h-4 w-4" /> Playlists
             </button>
           </div>
         </div>
-        <button type="button" className="btn btn-ghost btn-sm" onClick={resetLayout} title="También disponible con Enter sobre un separador">
-          <RotateCcw className="h-4 w-4" /> Restablecer paneles
+        <button type="button" className="btn btn-ghost btn-sm" onClick={resetLayout} title="Also available by pressing Enter on a separator">
+          <RotateCcw className="h-4 w-4" /> Reset panels
         </button>
       </header>
 
       <div className="relative flex min-h-0 flex-1 overflow-hidden">
-        <aside className="flex min-h-0 shrink-0 flex-col bg-surface" style={{ width: paneLayout.treeWidth }} aria-label="Fuentes de biblioteca">
+        <aside className="flex min-h-0 shrink-0 flex-col bg-surface" style={{ width: paneLayout.treeWidth }} aria-label="Library sources">
           <div className="flex items-center justify-between border-b border-border px-3 py-2">
-            <span className="text-xs font-semibold uppercase tracking-wide text-text-muted">{mode === "folders" ? "Carpetas" : "Playlists e historial"}</span>
-            <button type="button" className="icon-button h-7 w-7" onClick={() => void (mode === "folders" ? selectMusicFolder() : importPlaylist())} aria-label={mode === "folders" ? "Agregar carpeta" : "Importar playlist"}>
+            <span className="text-xs font-semibold uppercase tracking-wide text-text-muted">{mode === "folders" ? "Folders" : "Playlists and history"}</span>
+            <button type="button" className="icon-button h-7 w-7" onClick={() => void (mode === "folders" ? selectMusicFolder() : importPlaylist())} aria-label={mode === "folders" ? "Add folder" : "Import playlist"}>
               {mode === "folders" ? <FolderPlus className="h-4 w-4" /> : <Upload className="h-4 w-4" />}
             </button>
           </div>
           {mode === "folders" ? (
             <div className="min-h-0 flex-1 overflow-auto p-2">
               <button type="button" className={`mb-2 flex w-full items-center justify-between rounded-md px-2.5 py-2 text-left text-sm ${selectedFolder === "" ? "bg-primary/14 text-primary-light" : "text-text-secondary hover:bg-surface-hover"}`} onClick={() => setSelectedFolder("")}>
-                Toda la biblioteca <span className="text-xs tabular-nums text-text-muted">{librarySongs.length}</span>
+                Entire library <span className="text-xs tabular-nums text-text-muted">{librarySongs.length}</span>
               </button>
               <FolderTree roots={treeRoots} onSelect={setSelectedFolder} selectedPath={selectedFolder} maxHeightClass="max-h-none" />
             </div>
           ) : (
             <div className="min-h-0 flex-1 overflow-auto py-2">
-              {playlistLoading ? <div className="p-3 text-sm text-text-muted">Cargando playlists…</div> : null}
-              {!playlistLoading && playlists.length === 0 ? <div className="m-2 rounded-md border border-dashed border-border p-4 text-center text-sm text-text-muted">No hay playlists en esta biblioteca.</div> : null}
+              {playlistLoading ? <div className="p-3 text-sm text-text-muted">Loading playlists…</div> : null}
+              {!playlistLoading && playlists.length === 0 ? <div className="m-2 rounded-md border border-dashed border-border p-4 text-center text-sm text-text-muted">This library has no playlists.</div> : null}
               <button type="button" className={`flex w-full items-center justify-between px-3 py-2 text-left text-sm ${!selectedPlaylist ? "bg-primary/14 text-primary-light" : "text-text-secondary hover:bg-surface-hover"}`} onClick={clearPlaylistSelection}>
-                Todas las canciones <span className="text-xs tabular-nums text-text-muted">{songs.length}</span>
+                All songs <span className="text-xs tabular-nums text-text-muted">{songs.length}</span>
               </button>
               {playlistFolders.map(([folder, entries]) => (
                 <section key={folder}>
@@ -367,28 +367,28 @@ export function Songs() {
           )}
         </aside>
 
-        <PaneSeparator label="Ajustar ancho del árbol" value={paneLayout.treeWidth} min={paneLimits.tree.min} max={paneLimits.tree.max} onMove={(delta) => updateLayout("tree", delta)} onSet={(value) => setLayoutPane("tree", value)} onReset={resetLayout} onPointerDown={(event) => beginResize("tree", event)} />
+        <PaneSeparator label="Resize tree" value={paneLayout.treeWidth} min={paneLimits.tree.min} max={paneLimits.tree.max} onMove={(delta) => updateLayout("tree", delta)} onSet={(value) => setLayoutPane("tree", value)} onReset={resetLayout} onPointerDown={(event) => beginResize("tree", event)} />
 
-        <section className="min-h-0 min-w-0 flex-1 overflow-auto p-3" aria-label="Tabla de canciones">
-          {externalLoading ? <div className="mb-2 text-xs text-text-muted">Escaneando archivos externos…</div> : null}
-          {playlistEntriesLoading ? <div className="mb-2 text-[13px] text-text-muted">Cargando contenido de la playlist…</div> : null}
+        <section className="min-h-0 min-w-0 flex-1 overflow-auto p-3" aria-label="Song table">
+          {externalLoading ? <div className="mb-2 text-xs text-text-muted">Scanning external files…</div> : null}
+          {playlistEntriesLoading ? <div className="mb-2 text-[13px] text-text-muted">Loading playlist contents…</div> : null}
           <SongTable songs={filteredSongs} storageKey="library" activeSongIndex={selectedSongIndex} onRowSelect={selectSong} />
         </section>
 
         {!compactDetail ? (
           <>
-            <PaneSeparator label="Ajustar ancho del detalle" value={paneLayout.detailWidth} min={paneLimits.detail.min} max={paneLimits.detail.max} onMove={(delta) => updateLayout("detail", delta)} onSet={(value) => setLayoutPane("detail", value)} onReset={resetLayout} onPointerDown={(event) => beginResize("detail", event)} />
-            <aside className="min-h-0 shrink-0 overflow-auto bg-surface p-3" style={{ width: paneLayout.detailWidth }} aria-label="Detalle de pista">
-              {selectedSong ? <SongDetailsCard song={selectedSong} /> : <div className="rounded-md border border-dashed border-border p-5 text-center text-sm text-text-muted">Selecciona una pista para ver sus detalles.</div>}
+            <PaneSeparator label="Resize details" value={paneLayout.detailWidth} min={paneLimits.detail.min} max={paneLimits.detail.max} onMove={(delta) => updateLayout("detail", delta)} onSet={(value) => setLayoutPane("detail", value)} onReset={resetLayout} onPointerDown={(event) => beginResize("detail", event)} />
+            <aside className="min-h-0 shrink-0 overflow-auto bg-surface p-3" style={{ width: paneLayout.detailWidth }} aria-label="Track details">
+              {selectedSong ? <SongDetailsCard song={selectedSong} /> : <div className="rounded-md border border-dashed border-border p-5 text-center text-sm text-text-muted">Select a track to view its details.</div>}
             </aside>
           </>
         ) : null}
 
         {compactDetail && detailDrawerOpen && selectedSong ? (
           <>
-            <button type="button" className="absolute inset-0 z-20 bg-black/45" aria-label="Cerrar detalle" onClick={() => setDetailDrawerOpen(false)} />
-            <aside className="absolute inset-y-0 right-0 z-30 overflow-auto border-l border-border-strong bg-surface p-3 shadow-2xl" style={{ width: "min(420px, 90%)" }} aria-label="Detalle de pista">
-              <div className="mb-2 flex justify-end"><button type="button" className="icon-button" onClick={() => setDetailDrawerOpen(false)} aria-label="Cerrar detalle de pista"><PanelRightClose className="h-4 w-4" /></button></div>
+            <button type="button" className="absolute inset-0 z-20 bg-black/45" aria-label="Close details" onClick={() => setDetailDrawerOpen(false)} />
+            <aside className="absolute inset-y-0 right-0 z-30 overflow-auto border-l border-border-strong bg-surface p-3 shadow-2xl" style={{ width: "min(420px, 90%)" }} aria-label="Track details">
+              <div className="mb-2 flex justify-end"><button type="button" className="icon-button" onClick={() => setDetailDrawerOpen(false)} aria-label="Close track details"><PanelRightClose className="h-4 w-4" /></button></div>
               <SongDetailsCard song={selectedSong} />
             </aside>
           </>

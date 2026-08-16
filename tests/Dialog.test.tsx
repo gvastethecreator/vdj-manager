@@ -7,17 +7,17 @@ function DialogHarness({ onConfirm = () => undefined }: { onConfirm?: () => void
   const [open, setOpen] = useState(false);
   return (
     <div data-testid="background">
-      <button type="button" onClick={() => setOpen(true)}>Abrir</button>
+      <button type="button" onClick={() => setOpen(true)}>Open</button>
       <ConfirmDialog
         open={open}
-        title="Confirmar remoción"
-        description="Esta acción cambia la Biblioteca VirtualDJ."
-        confirmLabel="Remover"
+        title="Confirm removal"
+        description="This action changes the VirtualDJ library."
+        confirmLabel="Remove"
         destructive
         onCancel={() => setOpen(false)}
         onConfirm={onConfirm}
       >
-        <p>2 pistas seleccionadas</p>
+        <p>2 tracks selected</p>
       </ConfirmDialog>
     </div>
   );
@@ -25,13 +25,13 @@ function DialogHarness({ onConfirm = () => undefined }: { onConfirm?: () => void
 
 test("focuses Cancel, traps Tab, marks background inert and restores focus on Escape", () => {
   const view = render(<DialogHarness />);
-  const opener = screen.getByRole("button", { name: "Abrir" });
+  const opener = screen.getByRole("button", { name: "Open" });
   opener.focus();
   fireEvent.click(opener);
 
-  const cancel = screen.getByRole("button", { name: "Cancelar" });
-  const close = screen.getByRole("button", { name: "Cerrar diálogo" });
-  const confirm = screen.getByRole("button", { name: "Remover" });
+  const cancel = screen.getByRole("button", { name: "Cancel" });
+  const close = screen.getByRole("button", { name: "Close dialog" });
+  const confirm = screen.getByRole("button", { name: "Remove" });
   expect(cancel).toHaveFocus();
   expect((view.container as HTMLElement & { inert?: boolean }).inert).toBe(true);
 
@@ -52,18 +52,18 @@ test("confirms once and blocks dismissal while the async action is busy", async 
   let release: (() => void) | undefined;
   const pending = new Promise<void>((resolve) => { release = resolve; });
   render(<DialogHarness onConfirm={() => { calls += 1; return pending; }} />);
-  fireEvent.click(screen.getByRole("button", { name: "Abrir" }));
-  const confirm = screen.getByRole("button", { name: "Remover" });
+  fireEvent.click(screen.getByRole("button", { name: "Open" }));
+  const confirm = screen.getByRole("button", { name: "Remove" });
   fireEvent.click(confirm);
   fireEvent.click(confirm);
   expect(calls).toBe(1);
   expect(screen.getByRole("dialog")).toHaveAttribute("aria-busy", "true");
-  expect(screen.getByRole("button", { name: "Cancelar" })).toBeDisabled();
+  expect(screen.getByRole("button", { name: "Cancel" })).toBeDisabled();
   fireEvent.keyDown(document, { key: "Escape", code: "Escape" });
   expect(screen.getByRole("dialog")).toBeInTheDocument();
   await act(async () => {
     release?.();
     await pending;
   });
-  expect(screen.getByRole("button", { name: "Remover" })).not.toBeDisabled();
+  expect(screen.getByRole("button", { name: "Remove" })).not.toBeDisabled();
 });

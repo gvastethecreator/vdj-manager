@@ -145,9 +145,9 @@ impl MutationJournalItem {
 
     pub fn with_source_identity_from(mut self, path: &Path) -> Result<Self, String> {
         let metadata = fs::symlink_metadata(path)
-            .map_err(|error| format!("No se pudo identificar el archivo fuente: {error}"))?;
+            .map_err(|error| format!("The source file could not be identified: {error}"))?;
         if !metadata.file_type().is_file() || metadata.file_type().is_symlink() {
-            return Err("La fuente no es un archivo regular seguro".to_string());
+            return Err("The source is not a safe regular file".to_string());
         }
         self.source_file_size = Some(metadata.len());
         self.source_sha256 = Some(sha256_file(path)?);
@@ -162,7 +162,7 @@ impl MutationJournalItem {
             return Ok(false);
         };
         let metadata = fs::symlink_metadata(path)
-            .map_err(|error| format!("No se pudo verificar identidad física: {error}"))?;
+            .map_err(|error| format!("Physical identity could not be verified: {error}"))?;
         if !metadata.file_type().is_file()
             || metadata.file_type().is_symlink()
             || metadata.len() != expected_size
@@ -363,12 +363,12 @@ impl MutationJournalOperation {
     pub fn validate(&self) -> Result<(), MutationJournalError> {
         if self.journal_id.trim().is_empty() {
             return Err(MutationJournalError::InvalidJournal(
-                "journalId no puede estar vacío".to_string(),
+                "journalId cannot be empty".to_string(),
             ));
         }
         if self.items.is_empty() {
             return Err(MutationJournalError::InvalidJournal(
-                "una operación debe contener al menos un ítem".to_string(),
+                "an operation must contain at least one item".to_string(),
             ));
         }
 
@@ -377,7 +377,7 @@ impl MutationJournalOperation {
             validate_item(self.operation, item)?;
             if !item_ids.insert(item.item_id.clone()) {
                 return Err(MutationJournalError::InvalidJournal(format!(
-                    "itemId duplicado: {}",
+                    "duplicate itemId: {}",
                     item.item_id
                 )));
             }
@@ -525,7 +525,7 @@ impl MutationJournalDocument {
         for operation in &self.operations {
             if !journal_ids.insert(operation.journal_id.clone()) {
                 return Err(MutationJournalError::InvalidJournal(format!(
-                    "journalId duplicado: {}",
+                    "duplicate journalId: {}",
                     operation.journal_id
                 )));
             }
@@ -845,7 +845,7 @@ impl MutationJournalStore {
     ) -> Result<LibraryLock, MutationJournalError> {
         let directory = self.directory_for_key(&library.key);
         fs::create_dir_all(&directory).map_err(|source| MutationJournalError::Io {
-            context: "crear directorio del journal",
+            context: "create the journal directory",
             path: directory.clone(),
             source,
         })?;
@@ -854,9 +854,10 @@ impl MutationJournalStore {
             .read(true)
             .write(true)
             .create(true)
+            .truncate(false)
             .open(&lock_path)
             .map_err(|source| MutationJournalError::Io {
-                context: "abrir lock del journal",
+                context: "open the journal lock",
                 path: lock_path.clone(),
                 source,
             })?;
@@ -865,7 +866,7 @@ impl MutationJournalStore {
             LockMode::Exclusive => FileExt::lock_exclusive(&file),
         };
         lock_result.map_err(|source| MutationJournalError::Io {
-            context: "adquirir lock del journal",
+            context: "acquire the journal lock",
             path: lock_path,
             source,
         })?;
@@ -897,7 +898,7 @@ impl MutationJournalStore {
                     // remain an explicit corruption/recovery error.
                     if !errors.is_empty() && document.pending_operations().is_empty() {
                         errors.push(format!(
-                            "{}: la última generación válida está clean pero existen generaciones posteriores inválidas",
+                            "{}: the latest valid generation is clean, but later invalid generations exist",
                             path.display()
                         ));
                         return Err(MutationJournalError::NoValidGeneration {
@@ -923,7 +924,7 @@ impl MutationJournalStore {
     ) -> Result<u64, MutationJournalError> {
         let directory = self.directory_for_key(&document.library.key);
         fs::create_dir_all(&directory).map_err(|source| MutationJournalError::Io {
-            context: "crear directorio del journal",
+            context: "create the journal directory",
             path: directory.clone(),
             source,
         })?;
@@ -945,14 +946,14 @@ impl MutationJournalStore {
             .create_new(true)
             .open(&path)
             .map_err(|source| MutationJournalError::Io {
-                context: "crear generación del journal",
+                context: "create the journal generation",
                 path: path.clone(),
                 source,
             })?;
         file.write_all(&payload)
             .and_then(|()| file.sync_all())
             .map_err(|source| MutationJournalError::Io {
-                context: "persistir generación del journal",
+                context: "persist the journal generation",
                 path: path.clone(),
                 source,
             })?;
@@ -1101,62 +1102,62 @@ impl fmt::Display for MutationJournalError {
     fn fmt(&self, formatter: &mut fmt::Formatter<'_>) -> fmt::Result {
         match self {
             Self::InvalidLibraryPath(message) => {
-                write!(formatter, "ruta de biblioteca inválida: {message}")
+                write!(formatter, "invalid library path: {message}")
             }
             Self::InvalidItemPath { item_id, message } => {
-                write!(formatter, "ruta inválida en ítem {item_id}: {message}")
+                write!(formatter, "invalid path in item {item_id}: {message}")
             }
-            Self::InvalidJournal(message) => write!(formatter, "journal inválido: {message}"),
+            Self::InvalidJournal(message) => write!(formatter, "invalid journal: {message}"),
             Self::UnsupportedSchema(version) => {
-                write!(formatter, "schema de journal no soportado: {version}")
+                write!(formatter, "unsupported journal schema: {version}")
             }
             Self::LibraryMismatch { expected, actual } => write!(
                 formatter,
-                "el journal pertenece a otra biblioteca (esperada {expected}, actual {actual})"
+                "the journal belongs to another library (expected {expected}, actual {actual})"
             ),
             Self::OperationNotFound(id) => {
-                write!(formatter, "operación de journal no encontrada: {id}")
+                write!(formatter, "journal operation not found: {id}")
             }
-            Self::ItemNotFound(id) => write!(formatter, "ítem de journal no encontrado: {id}"),
+            Self::ItemNotFound(id) => write!(formatter, "journal item not found: {id}"),
             Self::InvalidTransition { current, next } => {
-                write!(formatter, "transición inválida: {current:?} -> {next:?}")
+                write!(formatter, "invalid transition: {current:?} -> {next:?}")
             }
             Self::ActionNotAllowed { action, phase } => {
-                write!(formatter, "acción {action:?} no permitida para {phase:?}")
+                write!(formatter, "action {action:?} is not allowed for {phase:?}")
             }
             Self::MixedAcknowledgementNotAllowed(id) => write!(
                 formatter,
-                "el journal {id} mezcla revisión manual con otros pendientes; use acknowledgement por ítem"
+                "journal {id} mixes manual review with other pending items; acknowledge each item separately"
             ),
             Self::PendingRecoveryBlocksMutation {
                 library_key,
                 journal_id,
             } => write!(
                 formatter,
-                "la biblioteca {library_key} tiene recovery pendiente en {journal_id}"
+                "library {library_key} has pending recovery in {journal_id}"
             ),
             Self::ConcurrentModification {
                 expected_revision,
                 actual_revision,
             } => write!(
                 formatter,
-                "revisión desactualizada: esperada {expected_revision}, actual {actual_revision}"
+                "stale revision: expected {expected_revision}, actual {actual_revision}"
             ),
             Self::NoValidGeneration {
                 library_key,
                 details,
             } => write!(
                 formatter,
-                "no existe una generación válida para {library_key}: {details}"
+                "no valid generation exists for {library_key}: {details}"
             ),
-            Self::RevisionOverflow => write!(formatter, "se agotaron las revisiones del journal"),
+            Self::RevisionOverflow => write!(formatter, "journal revisions are exhausted"),
             Self::Io {
                 context,
                 path,
                 source,
-            } => write!(formatter, "no se pudo {context} {}: {source}", path.display()),
+            } => write!(formatter, "could not {context} {}: {source}", path.display()),
             Self::Serialization(error) => {
-                write!(formatter, "journal no se pudo serializar: {error}")
+                write!(formatter, "the journal could not be serialized: {error}")
             }
         }
     }
@@ -1184,7 +1185,7 @@ fn validate_item(
 ) -> Result<(), MutationJournalError> {
     if item.item_id.trim().is_empty() {
         return Err(MutationJournalError::InvalidJournal(
-            "itemId no puede estar vacío".to_string(),
+            "itemId cannot be empty".to_string(),
         ));
     }
     let original =
@@ -1205,7 +1206,7 @@ fn validate_item(
             .filter(|path| !path.trim().is_empty())
             .ok_or_else(|| MutationJournalError::InvalidItemPath {
                 item_id: item.item_id.clone(),
-                message: "rename/move requiere targetFilePath".to_string(),
+                message: "rename/move requires targetFilePath".to_string(),
             })?;
         let target = normalize_windows_absolute_path(Path::new(target)).map_err(|error| {
             MutationJournalError::InvalidItemPath {
@@ -1216,7 +1217,7 @@ fn validate_item(
         if original == target {
             return Err(MutationJournalError::InvalidItemPath {
                 item_id: item.item_id.clone(),
-                message: "targetFilePath debe ser distinto de originalFilePath".to_string(),
+                message: "targetFilePath must differ from originalFilePath".to_string(),
             });
         }
         if operation == MutationOperationKind::Rename
@@ -1224,7 +1225,7 @@ fn validate_item(
         {
             return Err(MutationJournalError::InvalidItemPath {
                 item_id: item.item_id.clone(),
-                message: "rename debe conservar el mismo directorio padre; use move para cambiar de carpeta"
+                message: "rename must preserve the same parent directory; use move to change folders"
                     .to_string(),
             });
         }
@@ -1240,7 +1241,7 @@ fn normalize_windows_absolute_path(path: &Path) -> Result<String, MutationJourna
     let mut raw = path.to_string_lossy().replace('\\', "/");
     if raw.trim().is_empty() {
         return Err(MutationJournalError::InvalidLibraryPath(
-            "la ruta no puede estar vacía".to_string(),
+            "the path cannot be empty".to_string(),
         ));
     }
 
@@ -1251,20 +1252,20 @@ fn normalize_windows_absolute_path(path: &Path) -> Result<String, MutationJourna
         raw = raw[4..].to_string();
     } else if lower.starts_with("//./") {
         return Err(MutationJournalError::InvalidLibraryPath(
-            "los device paths de Windows no son una biblioteca válida".to_string(),
+            "Windows device paths are not valid library paths".to_string(),
         ));
     }
 
-    let (prefix, rest) = if raw.starts_with("//") {
-        let mut components = raw[2..].split('/').filter(|part| !part.is_empty());
+    let (prefix, rest) = if let Some(unc_path) = raw.strip_prefix("//") {
+        let mut components = unc_path.split('/').filter(|part| !part.is_empty());
         let server = components.next().ok_or_else(|| {
             MutationJournalError::InvalidLibraryPath(
-                "una ruta UNC requiere servidor y share".to_string(),
+                "a UNC path requires a server and share".to_string(),
             )
         })?;
         let share = components.next().ok_or_else(|| {
             MutationJournalError::InvalidLibraryPath(
-                "una ruta UNC requiere servidor y share".to_string(),
+                "a UNC path requires a server and share".to_string(),
             )
         })?;
         let prefix_len = 2 + server.len() + 1 + share.len();
@@ -1277,7 +1278,7 @@ fn normalize_windows_absolute_path(path: &Path) -> Result<String, MutationJourna
             || bytes[2] != b'/'
         {
             return Err(MutationJournalError::InvalidLibraryPath(
-                "se requiere ruta Windows absoluta; las rutas relativas y drive-relative no son válidas"
+                "an absolute Windows path is required; relative and drive-relative paths are invalid"
                     .to_string(),
             ));
         }
@@ -1292,7 +1293,7 @@ fn normalize_windows_absolute_path(path: &Path) -> Result<String, MutationJourna
         if component == ".." {
             if components.pop().is_none() {
                 return Err(MutationJournalError::InvalidLibraryPath(
-                    "la ruta intenta escapar de su raíz".to_string(),
+                    "the path attempts to escape its root".to_string(),
                 ));
             }
         } else {
@@ -1344,14 +1345,14 @@ fn load_generation(
     library: &MutationJournalLibrary,
 ) -> Result<MutationJournalDocument, MutationJournalError> {
     let payload = fs::read(path).map_err(|source| MutationJournalError::Io {
-        context: "leer generación del journal",
+        context: "read the journal generation",
         path: path.to_path_buf(),
         source,
     })?;
     let document: MutationJournalDocument = serde_json::from_slice(&payload)?;
     if document.revision != expected_revision {
         return Err(MutationJournalError::InvalidJournal(format!(
-            "revision interna {} no coincide con archivo {expected_revision}",
+            "internal revision {} does not match file {expected_revision}",
             document.revision
         )));
     }
@@ -1371,7 +1372,7 @@ fn revision_files(directory: &Path) -> Result<Vec<(u64, PathBuf)>, MutationJourn
         Err(source) if source.kind() == std::io::ErrorKind::NotFound => return Ok(Vec::new()),
         Err(source) => {
             return Err(MutationJournalError::Io {
-                context: "listar generaciones del journal",
+                context: "list journal generations",
                 path: directory.to_path_buf(),
                 source,
             })
@@ -1381,7 +1382,7 @@ fn revision_files(directory: &Path) -> Result<Vec<(u64, PathBuf)>, MutationJourn
     let mut revisions = Vec::new();
     for entry in entries {
         let entry = entry.map_err(|source| MutationJournalError::Io {
-            context: "leer entrada del journal",
+            context: "read the journal entry",
             path: directory.to_path_buf(),
             source,
         })?;
@@ -1413,12 +1414,12 @@ fn sync_directory(directory: &Path) -> Result<(), MutationJournalError> {
     #[cfg(unix)]
     {
         let file = File::open(directory).map_err(|source| MutationJournalError::Io {
-            context: "abrir directorio del journal",
+            context: "open the journal directory",
             path: directory.to_path_buf(),
             source,
         })?;
         file.sync_all().map_err(|source| MutationJournalError::Io {
-            context: "sincronizar directorio del journal",
+            context: "sync the journal directory",
             path: directory.to_path_buf(),
             source,
         })?;
@@ -1449,14 +1450,14 @@ fn new_id(prefix: &str) -> String {
 
 fn sha256_file(path: &Path) -> Result<String, String> {
     let file = File::open(path)
-        .map_err(|error| format!("No se pudo abrir el archivo para identificarlo: {error}"))?;
+        .map_err(|error| format!("The file could not be opened for identification: {error}"))?;
     let mut reader = std::io::BufReader::new(file);
     let mut digest = Sha256::new();
     let mut buffer = [0_u8; 64 * 1024];
     loop {
         let read = reader
             .read(&mut buffer)
-            .map_err(|error| format!("No se pudo calcular identidad SHA-256: {error}"))?;
+            .map_err(|error| format!("The SHA-256 identity could not be calculated: {error}"))?;
         if read == 0 {
             break;
         }
@@ -1513,7 +1514,7 @@ mod tests {
     fn library_directory_is_fixed_length_for_long_unicode_paths() {
         let root = temp_dir("long-key");
         let store = MutationJournalStore::new(&root);
-        let long = format!(r"C:\{}\VirtualDJ", "音楽 colección ".repeat(200));
+        let long = format!(r"C:\{}\VirtualDJ", "音楽 collection ".repeat(200));
         let directory = store
             .library_journal_directory(&long)
             .expect("long absolute path should hash");
@@ -1524,7 +1525,7 @@ mod tests {
         assert_eq!(name.len(), 64);
         assert!(name.bytes().all(|byte| byte.is_ascii_hexdigit()));
         let isolated = store
-            .library_journal_directory(format!(r"D:\{}\VirtualDJ", "音楽 colección ".repeat(200)))
+            .library_journal_directory(format!(r"D:\{}\VirtualDJ", "音楽 collection ".repeat(200)))
             .expect("different library should hash independently");
         assert_ne!(directory, isolated);
         cleanup(&root);

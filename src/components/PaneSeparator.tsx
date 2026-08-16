@@ -21,7 +21,7 @@ export function PaneSeparator({ label, value, min, max, onMove, onSet, onReset, 
       aria-valuemin={min}
       aria-valuemax={max}
       aria-valuenow={Math.round(value)}
-      title="Flechas para ajustar, Inicio/Fin para límites, Enter para restablecer"
+      title="Arrow keys to resize, Home/End for limits, Enter to reset"
       tabIndex={0}
       className="pane-separator"
       onPointerDown={onPointerDown}

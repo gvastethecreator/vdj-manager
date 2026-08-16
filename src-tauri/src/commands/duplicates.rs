@@ -97,11 +97,11 @@ pub async fn find_duplicates(vdj_folder: String) -> Result<DuplicateResult, Stri
 /// Compute MD5 hash of the first 64KB of a file
 fn compute_partial_hash(path: &PathBuf) -> Result<String, String> {
     let mut file =
-        std::fs::File::open(path).map_err(|e| format!("Error abriendo archivo: {}", e))?;
+        std::fs::File::open(path).map_err(|e| format!("Could not open file: {}", e))?;
     let mut buffer = vec![0u8; 65536];
     let bytes_read = file
         .read(&mut buffer)
-        .map_err(|e| format!("Error leyendo archivo: {}", e))?;
+        .map_err(|e| format!("Could not read file: {}", e))?;
     buffer.truncate(bytes_read);
 
     let mut hasher = Md5::new();

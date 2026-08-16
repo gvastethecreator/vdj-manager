@@ -13,10 +13,10 @@ import { formatSize } from "../lib/api";
 import { buildAttentionQueue, displayScanCount, type AttentionTone } from "../lib/operationalState";
 
 const TONE_STYLES: Record<AttentionTone, { border: string; icon: string; label: string }> = {
-  critical: { border: "border-error/40", icon: "bg-error/12 text-error", label: "Urgente" },
-  warning: { border: "border-warning/40", icon: "bg-warning/12 text-warning", label: "Revisar" },
-  neutral: { border: "border-border", icon: "bg-surface-active text-text-muted", label: "Pendiente" },
-  success: { border: "border-success/35", icon: "bg-success/12 text-success", label: "Al día" },
+  critical: { border: "border-error/40", icon: "bg-error/12 text-error", label: "Urgent" },
+  warning: { border: "border-warning/40", icon: "bg-warning/12 text-warning", label: "Review" },
+  neutral: { border: "border-border", icon: "bg-surface-active text-text-muted", label: "Pending" },
+  success: { border: "border-success/35", icon: "bg-success/12 text-success", label: "Up to date" },
 };
 
 /** Action-first operational dashboard. Counts from scans remain unverified until run. */
@@ -26,7 +26,7 @@ export function Dashboard() {
   if (!stats) {
     return (
       <div className="flex min-h-64 items-center justify-center rounded-lg border border-dashed border-border text-sm text-text-muted">
-        No hay una biblioteca cargada.
+        No library is loaded.
       </div>
     );
   }
@@ -34,8 +34,8 @@ export function Dashboard() {
   const attention = buildAttentionQueue(integrity, mutationsBlocked);
   const missingMetadata = songs.filter((song) => song.in_database && (!song.title || !song.author || !song.bpm)).length;
   const updatedLabel = integrity.updatedAt
-    ? new Intl.DateTimeFormat("es-AR", { dateStyle: "medium", timeStyle: "short" }).format(new Date(integrity.updatedAt))
-    : "Nunca";
+    ? new Intl.DateTimeFormat("en-US", { dateStyle: "medium", timeStyle: "short" }).format(new Date(integrity.updatedAt))
+    : "Never";
 
   const actOn = (itemId: string, navigation: Parameters<typeof setNavigation>[0]) => {
     if (itemId === "recovery") {
@@ -49,12 +49,12 @@ export function Dashboard() {
     <div className="mx-auto max-w-[1500px] space-y-5">
       <header className="flex items-end justify-between gap-4">
         <div>
-          <p className="text-xs font-semibold uppercase tracking-[0.14em] text-primary-light">Centro operativo</p>
-          <h1 className="mt-1 text-2xl font-bold tracking-tight text-text">Qué necesita atención</h1>
-          <p className="mt-1 text-sm text-text-secondary">Prioridades de esta biblioteca y la próxima acción segura.</p>
+          <p className="text-xs font-semibold uppercase tracking-[0.14em] text-primary-light">Operations center</p>
+          <h1 className="mt-1 text-2xl font-bold tracking-tight text-text">What needs attention</h1>
+          <p className="mt-1 text-sm text-text-secondary">This library's priorities and the next safe action.</p>
         </div>
         <div className="text-right text-xs text-text-muted">
-          <div className="flex items-center justify-end gap-1.5"><Clock3 className="h-3.5 w-3.5" /> Último análisis</div>
+          <div className="flex items-center justify-end gap-1.5"><Clock3 className="h-3.5 w-3.5" /> Last scan</div>
           <div className="mt-1 font-medium text-text-secondary">{updatedLabel}</div>
         </div>
       </header>
@@ -62,8 +62,8 @@ export function Dashboard() {
       <div className="grid min-h-[360px] gap-4 xl:grid-cols-[minmax(0,1.65fr)_minmax(320px,.75fr)]">
         <section className="overflow-hidden rounded-lg border border-border bg-surface" aria-labelledby="attention-title">
           <div className="flex items-center justify-between border-b border-border px-4 py-3">
-            <h2 id="attention-title" className="text-sm font-semibold text-text">Cola de atención</h2>
-            <span className="text-xs text-text-muted">{attention.length} {attention.length === 1 ? "acción" : "acciones"}</span>
+            <h2 id="attention-title" className="text-sm font-semibold text-text">Attention queue</h2>
+            <span className="text-xs text-text-muted">{attention.length} {attention.length === 1 ? "action" : "actions"}</span>
           </div>
           <div className="divide-y divide-border">
             {attention.map((item, index) => {
@@ -93,41 +93,41 @@ export function Dashboard() {
 
         <aside className="rounded-lg border border-border bg-surface" aria-labelledby="next-title">
           <div className="border-b border-border px-4 py-3">
-            <h2 id="next-title" className="text-sm font-semibold text-text">Próximos pasos</h2>
-            <p className="mt-0.5 text-xs text-text-muted">Estado real de los análisis de sesión.</p>
+            <h2 id="next-title" className="text-sm font-semibold text-text">Next steps</h2>
+            <p className="mt-0.5 text-xs text-text-muted">Actual status of this session's scans.</p>
           </div>
           <div className="divide-y divide-border">
             <button type="button" className="flex w-full items-center gap-3 px-4 py-4 text-left hover:bg-surface-hover" onClick={() => setNavigation({ workspace: "integrity", section: "missing" })}>
               <FileSearch className="h-5 w-5 text-primary-light" />
-              <span className="min-w-0 flex-1"><strong className="block text-sm text-text">Rutas y tamaños</strong><span className="text-xs text-text-muted">Faltantes: {displayScanCount(integrity.missing)}</span></span>
+              <span className="min-w-0 flex-1"><strong className="block text-sm text-text">Paths and sizes</strong><span className="text-xs text-text-muted">Missing: {displayScanCount(integrity.missing)}</span></span>
               <ArrowRight className="h-4 w-4 text-text-muted" />
             </button>
             <button type="button" className="flex w-full items-center gap-3 px-4 py-4 text-left hover:bg-surface-hover" onClick={() => setNavigation({ workspace: "integrity", section: "duplicates" })}>
               <Copy className="h-5 w-5 text-primary-light" />
-              <span className="min-w-0 flex-1"><strong className="block text-sm text-text">Duplicados</strong><span className="text-xs text-text-muted">Grupos: {displayScanCount(integrity.duplicateGroups)}</span></span>
+              <span className="min-w-0 flex-1"><strong className="block text-sm text-text">Duplicates</strong><span className="text-xs text-text-muted">Groups: {displayScanCount(integrity.duplicateGroups)}</span></span>
               <ArrowRight className="h-4 w-4 text-text-muted" />
             </button>
             <button type="button" className="flex w-full items-center gap-3 px-4 py-4 text-left hover:bg-surface-hover" onClick={() => setNavigation({ workspace: "integrity", section: "orphans" })}>
               <FolderSearch className="h-5 w-5 text-primary-light" />
-              <span className="min-w-0 flex-1"><strong className="block text-sm text-text">Archivos huérfanos</strong><span className="text-xs text-text-muted">Detectados: {displayScanCount(integrity.orphans)}</span></span>
+              <span className="min-w-0 flex-1"><strong className="block text-sm text-text">Orphan files</strong><span className="text-xs text-text-muted">Found: {displayScanCount(integrity.orphans)}</span></span>
               <ArrowRight className="h-4 w-4 text-text-muted" />
             </button>
           </div>
           <div className="m-4 rounded-md border border-border bg-background p-3">
-            <div className="flex items-center gap-2 text-sm font-semibold text-text"><Music2 className="h-4 w-4 text-primary-light" /> Metadata habitual</div>
-            <p className="mt-1 text-xs leading-relaxed text-text-muted">{missingMetadata} pista{missingMetadata === 1 ? "" : "s"} sin título, artista o BPM.</p>
-            <button type="button" className="mt-3 inline-flex min-h-8 items-center rounded px-2 text-sm font-semibold text-primary-light hover:bg-primary/10" onClick={() => setNavigation({ workspace: "library", section: "songs" })}>Abrir Browser</button>
+            <div className="flex items-center gap-2 text-sm font-semibold text-text"><Music2 className="h-4 w-4 text-primary-light" /> Metadata quality</div>
+            <p className="mt-1 text-xs leading-relaxed text-text-muted">{missingMetadata} track{missingMetadata === 1 ? "" : "s"} missing a title, artist, or BPM.</p>
+            <button type="button" className="mt-3 inline-flex min-h-8 items-center rounded px-2 text-sm font-semibold text-primary-light hover:bg-primary/10" onClick={() => setNavigation({ workspace: "library", section: "songs" })}>Open browser</button>
           </div>
         </aside>
       </div>
 
-      <section className="grid grid-cols-5 divide-x divide-border overflow-hidden rounded-lg border border-border bg-surface" aria-label="Métricas de biblioteca">
+      <section className="grid grid-cols-5 divide-x divide-border overflow-hidden rounded-lg border border-border bg-surface" aria-label="Library metrics">
         {[
           ["Tracks", stats.total_songs.toLocaleString()],
-          ["Tamaño", formatSize(stats.total_size_bytes)],
-          ["Con cues", stats.songs_with_cues.toLocaleString()],
-          ["Con tags", stats.songs_with_tags.toLocaleString()],
-          ["BPM promedio", stats.avg_bpm ? stats.avg_bpm.toFixed(1) : "—"],
+          ["Size", formatSize(stats.total_size_bytes)],
+          ["With cues", stats.songs_with_cues.toLocaleString()],
+          ["With tags", stats.songs_with_tags.toLocaleString()],
+          ["Average BPM", stats.avg_bpm ? stats.avg_bpm.toFixed(1) : "—"],
         ].map(([label, value]) => (
           <div key={label} className="px-4 py-3">
             <div className="text-xs text-text-muted">{label}</div>

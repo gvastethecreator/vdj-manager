@@ -49,7 +49,7 @@ pub fn validate_database_integrity(db: &VdjDatabase) -> Result<(), String> {
     for (idx, song) in db.songs.iter().enumerate() {
         if song.file_path.trim().is_empty() {
             return Err(format!(
-                "Entrada inválida en índice {}: FilePath vacío",
+                "Invalid entry at index {}: empty FilePath",
                 idx
             ));
         }
@@ -61,19 +61,19 @@ pub fn validate_database_integrity(db: &VdjDatabase) -> Result<(), String> {
 /// Parse a VDJ database.xml file
 pub fn parse_database(path: &Path) -> Result<VdjDatabase, String> {
     let content =
-        fs::read_to_string(path).map_err(|e| format!("No se pudo leer el archivo: {}", e))?;
+        fs::read_to_string(path).map_err(|e| format!("The file could not be read: {}", e))?;
 
     // Remove BOM if present
     let content = content.trim_start_matches('\u{feff}');
 
     from_str::<VdjDatabase>(content)
-        .map_err(|e| format!("Error al parsear la base de datos XML: {}", e))
+        .map_err(|e| format!("The XML database could not be parsed: {}", e))
 }
 
 /// Serialize and write the database back to XML
 pub fn write_database(path: &Path, db: &VdjDatabase) -> Result<(), String> {
     let xml_header = r#"<?xml version="1.0" encoding="UTF-8"?>"#;
-    let body = to_string(db).map_err(|e| format!("Error al serializar XML: {}", e))?;
+    let body = to_string(db).map_err(|e| format!("The XML could not be serialized: {}", e))?;
     let output = format!("{}\n{}", xml_header, body);
     safety::atomic_write_string(path, &output)
 }
@@ -123,7 +123,7 @@ fn database_patch_lock(path: &Path) -> Result<Arc<Mutex<()>>, String> {
     let registry = DATABASE_PATCH_LOCKS.get_or_init(|| Mutex::new(HashMap::new()));
     let mut registry = registry
         .lock()
-        .map_err(|_| "Registro de writers de database.xml bloqueado".to_string())?;
+        .map_err(|_| "The database.xml writer registry is locked".to_string())?;
     Ok(registry
         .entry(key)
         .or_insert_with(|| Arc::new(Mutex::new(())))
@@ -145,22 +145,21 @@ fn find_bytes(source: &[u8], needle: &[u8], from: usize) -> Option<usize> {
 /// Return the end of a markup construct, respecting quoted attribute values.
 fn find_tag_end(source: &[u8], start: usize) -> Result<usize, String> {
     let mut quote = None;
-    for index in start + 1..source.len() {
-        match (quote, source[index]) {
+    for (index, byte) in source.iter().copied().enumerate().skip(start + 1) {
+        match (quote, byte) {
             (Some(current), byte) if byte == current => quote = None,
-            (None, b'"' | b'\'') => quote = Some(source[index]),
+            (None, b'"' | b'\'') => quote = Some(byte),
             (None, b'>') => return Ok(index + 1),
             _ => {}
         }
     }
-    Err("XML truncado: no se encontró el cierre de una etiqueta".to_string())
+    Err("Truncated XML: no tag terminator was found".to_string())
 }
 
 fn find_declaration_end(source: &[u8], start: usize) -> Result<usize, String> {
     let mut quote = None;
     let mut subset_depth = 0usize;
-    for index in start + 2..source.len() {
-        let byte = source[index];
+    for (index, byte) in source.iter().copied().enumerate().skip(start + 2) {
         match quote {
             Some(current) if byte == current => quote = None,
             Some(_) => {}
@@ -171,24 +170,24 @@ fn find_declaration_end(source: &[u8], start: usize) -> Result<usize, String> {
             _ => {}
         }
     }
-    Err("XML truncado: declaración sin cierre".to_string())
+    Err("Truncated XML: unterminated declaration".to_string())
 }
 
 fn find_markup_end(source: &[u8], start: usize) -> Result<usize, String> {
     if source.get(start + 1..start + 4) == Some(b"!--") {
         return find_bytes(source, b"-->", start + 4)
             .map(|index| index + 3)
-            .ok_or_else(|| "XML truncado: comentario sin cierre".to_string());
+            .ok_or_else(|| "Truncated XML: unterminated comment".to_string());
     }
     if source.get(start + 1..start + 9) == Some(b"![CDATA[") {
         return find_bytes(source, b"]]>", start + 9)
             .map(|index| index + 3)
-            .ok_or_else(|| "XML truncado: CDATA sin cierre".to_string());
+            .ok_or_else(|| "Truncated XML: unterminated CDATA".to_string());
     }
     if matches!(source.get(start + 1), Some(b'?')) {
         return find_bytes(source, b"?>", start + 2)
             .map(|index| index + 2)
-            .ok_or_else(|| "XML truncado: instrucción sin cierre".to_string());
+            .ok_or_else(|| "Truncated XML: unterminated instruction".to_string());
     }
     if matches!(source.get(start + 1), Some(b'!')) {
         return find_declaration_end(source, start);
@@ -200,25 +199,25 @@ fn find_markup_end(source: &[u8], start: usize) -> Result<usize, String> {
 /// processing instructions are returned as `None` and skipped by the scanner.
 fn parse_xml_tag(source: &[u8], start: usize) -> Result<Option<XmlTag>, String> {
     if source.get(start) != Some(&b'<') {
-        return Err("Posición XML inválida".to_string());
+        return Err("Invalid XML position".to_string());
     }
 
     if source.get(start + 1..start + 4) == Some(b"!--") {
         let _end = find_bytes(source, b"-->", start + 4)
             .map(|index| index + 3)
-            .ok_or_else(|| "XML truncado: comentario sin cierre".to_string())?;
+            .ok_or_else(|| "Truncated XML: unterminated comment".to_string())?;
         return Ok(None);
     }
     if source.get(start + 1..start + 9) == Some(b"![CDATA[") {
         let _end = find_bytes(source, b"]]>", start + 9)
             .map(|index| index + 3)
-            .ok_or_else(|| "XML truncado: CDATA sin cierre".to_string())?;
+            .ok_or_else(|| "Truncated XML: unterminated CDATA".to_string())?;
         return Ok(None);
     }
     if matches!(source.get(start + 1), Some(b'?')) {
         let _end = find_bytes(source, b"?>", start + 2)
             .map(|index| index + 2)
-            .ok_or_else(|| "XML truncado: instrucción sin cierre".to_string())?;
+            .ok_or_else(|| "Truncated XML: unterminated instruction".to_string())?;
         return Ok(None);
     }
     if matches!(source.get(start + 1), Some(b'!')) {
@@ -242,10 +241,10 @@ fn parse_xml_tag(source: &[u8], start: usize) -> Result<Option<XmlTag>, String> 
         cursor += 1;
     }
     if cursor == name_start {
-        return Err(format!("Etiqueta XML sin nombre en byte {}", start));
+        return Err(format!("Unnamed XML tag at byte {}", start));
     }
     let name = std::str::from_utf8(&source[name_start..cursor])
-        .map_err(|_| "Nombre de etiqueta XML no UTF-8".to_string())?
+        .map_err(|_| "XML tag name is not UTF-8".to_string())?
         .to_string();
 
     if is_end {
@@ -281,16 +280,16 @@ fn parse_xml_tag(source: &[u8], start: usize) -> Result<Option<XmlTag>, String> 
             attr_cursor += 1;
         }
         if attr_cursor == attr_name_start {
-            return Err(format!("Atributo XML inválido en byte {}", attr_cursor));
+            return Err(format!("Invalid XML attribute at byte {}", attr_cursor));
         }
         let attr_name = std::str::from_utf8(&source[attr_name_start..attr_cursor])
-            .map_err(|_| "Nombre de atributo XML no UTF-8".to_string())?
+            .map_err(|_| "XML attribute name is not UTF-8".to_string())?
             .to_string();
         while attr_cursor < content_end && is_xml_space(source[attr_cursor]) {
             attr_cursor += 1;
         }
         if source.get(attr_cursor) != Some(&b'=') {
-            return Err(format!("Atributo XML sin '=' en byte {}", attr_cursor));
+            return Err(format!("XML attribute without '=' at byte {}", attr_cursor));
         }
         attr_cursor += 1;
         while attr_cursor < content_end && is_xml_space(source[attr_cursor]) {
@@ -298,9 +297,9 @@ fn parse_xml_tag(source: &[u8], start: usize) -> Result<Option<XmlTag>, String> 
         }
         let quote = *source
             .get(attr_cursor)
-            .ok_or_else(|| "Atributo XML sin comillas".to_string())?;
+            .ok_or_else(|| "Unquoted XML attribute".to_string())?;
         if !matches!(quote, b'"' | b'\'') {
-            return Err(format!("Atributo XML sin comillas en byte {}", attr_cursor));
+            return Err(format!("Unquoted XML attribute at byte {}", attr_cursor));
         }
         attr_cursor += 1;
         let value_start = attr_cursor;
@@ -308,7 +307,7 @@ fn parse_xml_tag(source: &[u8], start: usize) -> Result<Option<XmlTag>, String> 
             attr_cursor += 1;
         }
         if attr_cursor >= content_end {
-            return Err(format!("Atributo XML sin cierre en byte {}", value_start));
+            return Err(format!("Unterminated XML attribute at byte {}", value_start));
         }
         attrs.push(XmlAttr {
             name: attr_name,
@@ -353,10 +352,10 @@ fn scan_xml_tags(source: &[u8]) -> Result<Vec<XmlTag>, String> {
         if tag.is_end {
             let open_index = stack
                 .pop()
-                .ok_or_else(|| format!("Cierre XML inesperado para </{}>", tag.name))?;
+                .ok_or_else(|| format!("Unexpected XML closing tag </{}>", tag.name))?;
             if tags[open_index].name != tag.name {
                 return Err(format!(
-                    "Estructura XML inválida: se esperaba </{}> y llegó </{}>",
+                    "Invalid XML structure: expected </{}> but found </{}>",
                     tags[open_index].name, tag.name
                 ));
             }
@@ -375,7 +374,7 @@ fn scan_xml_tags(source: &[u8]) -> Result<Vec<XmlTag>, String> {
     }
     if let Some(open_index) = stack.last() {
         return Err(format!(
-            "Etiqueta XML sin cierre: <{}>",
+            "Unclosed XML tag: <{}>",
             tags[*open_index].name
         ));
     }
@@ -384,10 +383,10 @@ fn scan_xml_tags(source: &[u8]) -> Result<Vec<XmlTag>, String> {
 
 fn decode_xml_value(source: &[u8], start: usize, end: usize) -> Result<String, String> {
     let raw = std::str::from_utf8(&source[start..end])
-        .map_err(|_| "Valor XML no UTF-8".to_string())?;
+        .map_err(|_| "XML value is not UTF-8".to_string())?;
     quick_xml::escape::unescape(raw)
         .map(|value| value.into_owned())
-        .map_err(|error| format!("Valor XML inválido: {}", error))
+        .map_err(|error| format!("Invalid XML value: {}", error))
 }
 
 /// Normalize separators and insignificant trailing separators for Windows
@@ -433,7 +432,7 @@ pub fn windows_paths_equal(left: &str, right: &str) -> bool {
 fn attr<'a>(tag: &'a XmlTag, name: &str) -> Result<Option<&'a XmlAttr>, String> {
     let matches: Vec<&XmlAttr> = tag.attrs.iter().filter(|item| item.name == name).collect();
     if matches.len() > 1 {
-        return Err(format!("Atributo XML duplicado: {}", name));
+        return Err(format!("Duplicate XML attribute: {}", name));
     }
     Ok(matches.into_iter().next())
 }
@@ -617,22 +616,22 @@ where
         return Ok(result(
             RemoveSongStatus::FailedValidation,
             None,
-            Some("La ruta original es obligatoria".to_string()),
+            Some("The original path is required".to_string()),
         ));
     }
 
     let patch_lock = database_patch_lock(path)?;
     let _patch_guard = patch_lock
         .lock()
-        .map_err(|_| "Writer de database.xml bloqueado".to_string())?;
-    let source = fs::read(path).map_err(|error| format!("No se pudo leer database.xml: {}", error))?;
+        .map_err(|_| "The database.xml writer is locked".to_string())?;
+    let source = fs::read(path).map_err(|error| format!("database.xml could not be read: {}", error))?;
     let tags = match scan_xml_tags(&source) {
         Ok(tags) => tags,
         Err(error) => {
             return Ok(result(
                 RemoveSongStatus::FailedValidation,
                 None,
-                Some(format!("XML inseguro para eliminar: {}", error)),
+                Some(format!("Unsafe XML for removal: {}", error)),
             ));
         }
     };
@@ -647,7 +646,7 @@ where
         return Ok(result(
             RemoveSongStatus::FailedValidation,
             None,
-            Some("La estructura de database.xml no permite una eliminación segura".to_string()),
+            Some("The database.xml structure does not allow safe removal".to_string()),
         ));
     }
 
@@ -657,7 +656,7 @@ where
             return Ok(result(
                 RemoveSongStatus::FailedValidation,
                 None,
-                Some(format!("No se pudo leer FilePath de Song: {}", error)),
+                Some(format!("The Song FilePath could not be read: {}", error)),
             ));
         }
     };
@@ -671,14 +670,14 @@ where
         return Ok(result(
             RemoveSongStatus::NotFound,
             None,
-            Some("No se encontró la entrada con la ruta original".to_string()),
+            Some("No entry was found for the original path".to_string()),
         ));
     }
     if matching_songs.len() != 1 {
         return Ok(result(
             RemoveSongStatus::Ambiguous,
             matching_songs.first().map(|(_, path)| path.clone()),
-            Some("La ruta original coincide con más de una entrada".to_string()),
+            Some("The original path matches more than one entry".to_string()),
         ));
     }
 
@@ -694,7 +693,7 @@ where
             return Ok(result(
                 RemoveSongStatus::FailedValidation,
                 Some(current_file_path),
-                Some("La entrada Song no tiene etiqueta de cierre".to_string()),
+                Some("The Song entry has no closing tag".to_string()),
             ));
         };
         tags[song_end_index].end
@@ -703,19 +702,19 @@ where
         return Ok(result(
             RemoveSongStatus::FailedValidation,
             Some(current_file_path),
-            Some("El rango XML de Song no es válido".to_string()),
+            Some("The Song XML range is invalid".to_string()),
         ));
     }
 
     let mut patched = source.clone();
     patched.splice(song.start..remove_end, Vec::<u8>::new());
     let patched = String::from_utf8(patched)
-        .map_err(|_| "La eliminación produciría XML no UTF-8".to_string())?;
+        .map_err(|_| "Removal would produce non-UTF-8 XML".to_string())?;
     let candidate = patched.trim_start_matches('\u{feff}');
     let reparsed = from_str::<VdjDatabase>(candidate)
-        .map_err(|error| format!("XML resultante inválido: {}", error))?;
+        .map_err(|error| format!("Invalid resulting XML: {}", error))?;
     validate_database_integrity(&reparsed)
-        .map_err(|error| format!("XML resultante inválido: {}", error))?;
+        .map_err(|error| format!("Invalid resulting XML: {}", error))?;
 
     if let Err(error) = before_commit(&current_file_path) {
         let (status, message) = match error {
@@ -736,7 +735,7 @@ where
                 RemoveSongStatus::ManualReviewRequired,
                 Some(current_file_path),
                 Some(format!(
-                    "El paso físico se completó, pero no se pudo releer database.xml: {error}"
+                    "The physical step completed, but database.xml could not be read again: {error}"
                 )),
             ));
         }
@@ -745,7 +744,7 @@ where
         return Ok(result(
             RemoveSongStatus::ManualReviewRequired,
             Some(current_file_path),
-            Some("database.xml cambió durante la eliminación".to_string()),
+            Some("database.xml changed during removal".to_string()),
         ));
     }
 
@@ -753,14 +752,14 @@ where
         return Ok(result(
             RemoveSongStatus::ManualReviewRequired,
             Some(current_file_path),
-            Some(format!("No se pudo crear backup después del paso físico: {}", error)),
+            Some(format!("A backup could not be created after the physical step: {}", error)),
         ));
     }
     if let Err(error) = safety::atomic_write_string(path, &patched) {
         return Ok(result(
             RemoveSongStatus::ManualReviewRequired,
             Some(current_file_path),
-            Some(format!("No se pudo actualizar database.xml después del paso físico: {}", error)),
+            Some(format!("database.xml could not be updated after the physical step: {}", error)),
         ));
     }
 
@@ -792,7 +791,7 @@ where
         return Ok(result(
             RelinkFileStatus::FailedValidation,
             None,
-            Some("La ruta original y la ruta destino son obligatorias".to_string()),
+            Some("The original and target paths are required".to_string()),
             None,
         ));
     }
@@ -800,8 +799,8 @@ where
     let patch_lock = database_patch_lock(path)?;
     let _patch_guard = patch_lock
         .lock()
-        .map_err(|_| "Writer de database.xml bloqueado".to_string())?;
-    let source = fs::read(path).map_err(|error| format!("No se pudo leer database.xml: {}", error))?;
+        .map_err(|_| "The database.xml writer is locked".to_string())?;
+    let source = fs::read(path).map_err(|error| format!("database.xml could not be read: {}", error))?;
     let tags = scan_xml_tags(&source).map_err(|error| format!("unsafe_to_patch: {}", error))?;
 
     let database_roots: Vec<&XmlTag> = tags
@@ -814,7 +813,7 @@ where
         return Ok(result(
             RelinkFileStatus::ManualReviewRequired,
             None,
-            Some("La estructura de database.xml no permite una reconciliación segura".to_string()),
+            Some("The database.xml structure does not allow safe reconciliation".to_string()),
             None,
         ));
     }
@@ -833,7 +832,7 @@ where
             return Ok(result(
                 RelinkFileStatus::FailedValidation,
                 None,
-                Some("La ruta destino no apunta a un archivo regular".to_string()),
+                Some("The target path does not point to a regular file".to_string()),
                 None,
             ));
         }
@@ -841,7 +840,7 @@ where
             return Ok(result(
                 RelinkFileStatus::FailedValidation,
                 None,
-                Some(format!("No se pudo leer metadata del destino: {}", error)),
+                Some(format!("Target metadata could not be read: {}", error)),
                 None,
             ));
         }
@@ -851,7 +850,7 @@ where
         return Ok(result(
             RelinkFileStatus::NotFound,
             Some(target_size),
-            Some("No se encontró la entrada con la ruta original".to_string()),
+            Some("No entry was found for the original path".to_string()),
             None,
         ));
     }
@@ -859,7 +858,7 @@ where
         return Ok(result(
             RelinkFileStatus::ManualReviewRequired,
             Some(target_size),
-            Some("La ruta original coincide con más de una entrada".to_string()),
+            Some("The original path matches more than one entry".to_string()),
             Some(matching_songs[0].1.clone()),
         ));
     }
@@ -869,7 +868,7 @@ where
 
     let target_collision = direct_songs.iter().find_map(|(_, file_path)| {
         if !windows_paths_equal(file_path, original_file_path)
-            && windows_paths_equal(&file_path, new_file_path)
+            && windows_paths_equal(file_path, new_file_path)
         {
             Some(file_path.clone())
         } else {
@@ -880,7 +879,7 @@ where
         return Ok(result(
             RelinkFileStatus::ReferenceCollision,
             Some(target_size),
-            Some("La ruta destino ya pertenece a otra entrada catalogada".to_string()),
+            Some("The target path already belongs to another cataloged entry".to_string()),
             Some(collision_path),
         ));
     }
@@ -906,16 +905,16 @@ where
         patched.splice(edit.start..edit.end, edit.replacement.into_bytes());
     }
     let patched = String::from_utf8(patched)
-        .map_err(|_| "El parche produciría XML no UTF-8".to_string())?;
+        .map_err(|_| "The patch would produce non-UTF-8 XML".to_string())?;
     let candidate = patched.trim_start_matches('\u{feff}');
     let reparsed = from_str::<VdjDatabase>(candidate)
-        .map_err(|error| format!("unsafe_to_patch: XML resultante inválido: {}", error))?;
+        .map_err(|error| format!("unsafe_to_patch: invalid resulting XML: {}", error))?;
     validate_database_integrity(&reparsed)
         .map_err(|error| format!("unsafe_to_patch: {}", error))?;
 
     before_commit()?;
     let current_source = fs::read(path)
-        .map_err(|error| format!("No se pudo releer database.xml antes del commit: {}", error))?;
+        .map_err(|error| format!("database.xml could not be read again before commit: {}", error))?;
     let current_tags = scan_xml_tags(&current_source)
         .map_err(|error| format!("unsafe_to_patch: {}", error))?;
     let current_database_roots: Vec<&XmlTag> = current_tags
@@ -928,7 +927,7 @@ where
         return Ok(result(
             RelinkFileStatus::ManualReviewRequired,
             Some(target_size),
-            Some("La estructura de database.xml cambió durante la reconciliación".to_string()),
+            Some("The database.xml structure changed during reconciliation".to_string()),
             None,
         ));
     }
@@ -947,7 +946,7 @@ where
         return Ok(result(
             RelinkFileStatus::NotFound,
             Some(target_size),
-            Some("La entrada original ya no existe en database.xml".to_string()),
+            Some("The original entry no longer exists in database.xml".to_string()),
             None,
         ));
     }
@@ -955,13 +954,13 @@ where
         return Ok(result(
             RelinkFileStatus::ManualReviewRequired,
             Some(target_size),
-            Some("La ruta original coincide con más de una entrada".to_string()),
+            Some("The original path matches more than one entry".to_string()),
             Some(current_matching_songs[0].clone()),
         ));
     }
     let current_collision = current_direct_songs.iter().find_map(|(_, file_path)| {
         if !windows_paths_equal(file_path, original_file_path)
-            && windows_paths_equal(&file_path, new_file_path)
+            && windows_paths_equal(file_path, new_file_path)
         {
             Some(file_path.clone())
         } else {
@@ -972,7 +971,7 @@ where
         return Ok(result(
             RelinkFileStatus::ReferenceCollision,
             Some(target_size),
-            Some("La ruta destino ya pertenece a otra entrada catalogada".to_string()),
+            Some("The target path already belongs to another cataloged entry".to_string()),
             Some(collision_path),
         ));
     }
@@ -980,7 +979,7 @@ where
         return Ok(result(
             RelinkFileStatus::ManualReviewRequired,
             Some(target_size),
-            Some("database.xml cambió durante la reconciliación".to_string()),
+            Some("database.xml changed during reconciliation".to_string()),
             None,
         ));
     }
@@ -991,7 +990,7 @@ where
             return Ok(result(
                 RelinkFileStatus::FailedValidation,
                 None,
-                Some("La ruta destino dejó de ser un archivo regular".to_string()),
+                Some("The target path is no longer a regular file".to_string()),
                 None,
             ));
         }
@@ -999,7 +998,7 @@ where
             return Ok(result(
                 RelinkFileStatus::FailedValidation,
                 None,
-                Some(format!("No se pudo releer metadata del destino: {}", error)),
+                Some(format!("Target metadata could not be read again: {}", error)),
                 None,
             ));
         }
@@ -1008,7 +1007,7 @@ where
         return Ok(result(
             RelinkFileStatus::FailedValidation,
             Some(final_target_size),
-            Some("El tamaño del destino cambió durante la reconciliación".to_string()),
+            Some("The target size changed during reconciliation".to_string()),
             None,
         ));
     }
@@ -1045,8 +1044,8 @@ where
     let patch_lock = database_patch_lock(path)?;
     let _patch_guard = patch_lock
         .lock()
-        .map_err(|_| "Writer de database.xml bloqueado".to_string())?;
-    let source = fs::read(path).map_err(|error| format!("No se pudo leer database.xml: {}", error))?;
+        .map_err(|_| "The database.xml writer is locked".to_string())?;
+    let source = fs::read(path).map_err(|error| format!("database.xml could not be read: {}", error))?;
     let tags = scan_xml_tags(&source).map_err(|error| format!("unsafe_to_patch: {}", error))?;
 
     let database_roots: Vec<&XmlTag> = tags
@@ -1231,16 +1230,16 @@ where
         patched.splice(edit.start..edit.end, edit.replacement.into_bytes());
     }
     let patched = String::from_utf8(patched)
-        .map_err(|_| "El parche produciría XML no UTF-8".to_string())?;
+        .map_err(|_| "The patch would produce non-UTF-8 XML".to_string())?;
     let candidate = patched.trim_start_matches('\u{feff}');
     let reparsed = from_str::<VdjDatabase>(candidate)
-        .map_err(|error| format!("unsafe_to_patch: XML resultante inválido: {}", error))?;
+        .map_err(|error| format!("unsafe_to_patch: invalid resulting XML: {}", error))?;
     validate_database_integrity(&reparsed)
         .map_err(|error| format!("unsafe_to_patch: {}", error))?;
 
     before_commit()?;
     let current_source = fs::read(path)
-        .map_err(|error| format!("No se pudo releer database.xml antes del commit: {}", error))?;
+        .map_err(|error| format!("database.xml could not be read again before commit: {}", error))?;
     if current_source != source {
         return Ok(UpdateSongTagsResult {
             status: UpdateSongTagsStatus::UnsafeToPatch,
@@ -1312,10 +1311,10 @@ pub fn compute_stats(db: &VdjDatabase) -> DatabaseStats {
     }
 
     let mut genres_vec: Vec<(String, usize)> = genres.into_iter().collect();
-    genres_vec.sort_by(|a, b| b.1.cmp(&a.1));
+    genres_vec.sort_by_key(|item| std::cmp::Reverse(item.1));
 
     let mut artists_vec: Vec<(String, usize)> = artists.into_iter().collect();
-    artists_vec.sort_by(|a, b| b.1.cmp(&a.1));
+    artists_vec.sort_by_key(|item| std::cmp::Reverse(item.1));
 
     let mut years_vec: Vec<(String, usize)> = years.into_iter().collect();
     years_vec.sort_by(|a, b| a.0.cmp(&b.0));
@@ -1393,9 +1392,7 @@ mod tests {
         fs::create_dir_all(&dir).expect("temp dir should exist");
         let db_path = dir.join("database.xml");
         let target = dir.join("target.mp3");
-        let xml = format!(
-            r#"<VirtualDJ_Database><Song FilePath="D:\Music\Missing.mp3" FileSize="1" Future="keep"/></VirtualDJ_Database>"#
-        );
+        let xml = r#"<VirtualDJ_Database><Song FilePath="D:\Music\Missing.mp3" FileSize="1" Future="keep"/></VirtualDJ_Database>"#.to_string();
         fs::write(&db_path, xml).expect("database fixture should write");
         fs::write(&target, b"old").expect("target fixture should write");
         let before = fs::read(&db_path).expect("database should be readable");
@@ -1430,9 +1427,7 @@ mod tests {
         let db_path = dir.join("database.xml");
         let target = dir.join("target.mp3");
         fs::write(&target, b"target").expect("target fixture should write");
-        let initial = format!(
-            r#"<VirtualDJ_Database><Song FilePath="D:\Music\Missing.mp3" FileSize="1"/></VirtualDJ_Database>"#
-        );
+        let initial = r#"<VirtualDJ_Database><Song FilePath="D:\Music\Missing.mp3" FileSize="1"/></VirtualDJ_Database>"#.to_string();
         let collision = format!(
             r#"<VirtualDJ_Database><Song FilePath="D:\Music\Missing.mp3" FileSize="1"/><Song FilePath="{}" FileSize="6"/></VirtualDJ_Database>"#,
             target.to_string_lossy()

@@ -40,7 +40,7 @@ describe("mutation recovery gate", () => {
   });
 
   test("uses explicit user-facing action labels", () => {
-    expect(recoveryActionLabel("resume")).toBe("Reanudar y completar");
-    expect(recoveryActionLabel("manual_review_acknowledged")).toBe("Confirmar revisión manual");
+    expect(recoveryActionLabel("resume")).toBe("Resume and complete");
+    expect(recoveryActionLabel("manual_review_acknowledged")).toBe("Confirm manual review");
   });
 });

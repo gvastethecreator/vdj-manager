@@ -146,7 +146,7 @@ export function Dialog({
             className="icon-button"
             onClick={onClose}
             disabled={busy}
-            aria-label="Cerrar diálogo"
+            aria-label="Close dialog"
           >
             <X aria-hidden="true" className="h-4 w-4" />
           </button>
@@ -229,7 +229,7 @@ export function ConfirmDialog({
           onClick={onCancel}
           disabled={locked}
         >
-          Cancelar
+          Cancel
         </button>
         <button
           type="button"
@@ -238,7 +238,7 @@ export function ConfirmDialog({
           disabled={locked}
         >
           {destructive ? <AlertTriangle aria-hidden="true" className="h-4 w-4" /> : null}
-          {locked ? "Procesando…" : confirmLabel}
+          {locked ? "Processing…" : confirmLabel}
         </button>
       </div>
     </Dialog>

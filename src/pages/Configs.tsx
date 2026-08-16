@@ -38,7 +38,7 @@ export function Configs() {
             setSettings(result);
             setDraft(Object.fromEntries(result.map((entry) => [entry.key, entry.value ?? ""])));
         } catch (err) {
-            reportUiError("No se pudo cargar settings.xml.", err);
+            reportUiError("settings.xml could not be loaded.", err);
         } finally {
             setLoading(false);
         }
@@ -95,7 +95,7 @@ export function Configs() {
             await loadSettings();
             clearUiError();
         } catch (err) {
-            reportUiError("No se pudieron guardar los cambios de settings.xml.", err);
+            reportUiError("Changes to settings.xml could not be saved.", err);
         } finally {
             setSaving(false);
         }
@@ -118,10 +118,10 @@ export function Configs() {
         <div className="space-y-4">
             <div>
                 <div>
-                    <h2 className="text-lg font-bold text-text">Configuración de VirtualDJ</h2>
+                    <h2 className="text-lg font-bold text-text">VirtualDJ settings</h2>
                     <p className="mt-1 max-w-3xl text-sm text-text-muted">
-                        Vista enfocada en <code>settings.xml</code> con opciones curadas a partir de la documentación oficial de VirtualDJ,
-                        especialmente biblioteca, playlists, waveforms, cues, seguridad y rendimiento.
+                        A focused <code>settings.xml</code> view with options curated from the official VirtualDJ documentation,
+                        especially for the library, playlists, waveforms, cues, safety, and performance.
                     </p>
                 </div>
             </div>
@@ -137,19 +137,19 @@ export function Configs() {
                     <input
                         type="text"
                         className="input md:max-w-md"
-                        placeholder="Buscar opción, categoría o descripción..."
+                        placeholder="Search by option, category, or description..."
                         value={search}
                         onChange={(e) => setSearch(e.target.value)}
                     />
                     <div className="text-xs text-text-muted">
-                        {loading ? "Cargando settings.xml..." : `${filteredSettings.length} opción(es) visibles`}
+                        {loading ? "Loading settings.xml..." : `${filteredSettings.length} visible option(s)`}
                     </div>
                 </div>
             </div>
 
             {!loading && groupedSettings.length === 0 && (
                 <div className="rounded border border-dashed border-border px-3 py-6 text-center text-sm text-text-muted">
-                    No se encontraron opciones para ese filtro.
+                    No options matched that filter.
                 </div>
             )}
 
@@ -159,7 +159,7 @@ export function Configs() {
                         <div className="mb-3 flex items-center justify-between gap-2">
                             <h3 className="text-sm font-semibold text-text">{category}</h3>
                             <span className="text-xs uppercase tracking-wider text-text-muted">
-                                {entries.length} opción(es)
+                                {entries.length} option(s)
                             </span>
                         </div>
 
@@ -208,11 +208,11 @@ export function Configs() {
 
                                         {entry.value !== null ? (
                                             <div className="mt-2 text-xs text-text-muted">
-                                                Valor actual cargado: <span className="font-mono text-text-secondary">{entry.value}</span>
+                                                Current loaded value: <span className="font-mono text-text-secondary">{entry.value}</span>
                                             </div>
                                         ) : (
                                             <div className="mt-2 text-xs text-text-muted">
-                                                Esta opción no aparece en el <span className="font-mono">settings.xml</span> actual.
+                                                This option is not present in the current <span className="font-mono">settings.xml</span>.
                                             </div>
                                         )}
                                     </div>

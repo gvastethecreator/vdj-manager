@@ -32,7 +32,7 @@ function createExternalSong(filePath: string, index: number): SongSummary {
         label: null,
         track_number: null,
         grouping: null,
-        comment: "Entrada proveniente de playlist",
+        comment: "Entry loaded from a playlist",
         user1: null,
         user2: null,
         color: null,
@@ -67,7 +67,7 @@ export function Playlists() {
                 setPlaylists(result);
                 setSelectedPlaylistPath((prev) => prev && result.some((item) => item.path === prev) ? prev : (result[0]?.path ?? null));
             })
-            .catch((err) => reportUiError("No se pudieron cargar las playlists.", err))
+            .catch((err) => reportUiError("Playlists could not be loaded.", err))
             .finally(() => setLoading(false));
     }, [reportUiError, services, vdjFolder]);
 
@@ -78,7 +78,7 @@ export function Playlists() {
         }
         services.readPlaylist(selectedPlaylistPath)
             .then(setEntries)
-            .catch((err) => reportUiError("No se pudo abrir la playlist seleccionada.", err));
+            .catch((err) => reportUiError("The selected playlist could not be opened.", err));
     }, [reportUiError, selectedPlaylistPath, services]);
 
     const treeItems = useMemo<TreeFileItem[]>(() => playlists.map((playlist) => ({
@@ -121,18 +121,18 @@ export function Playlists() {
                 <div className="border-b-2 border-border px-3 py-2">
                     <h2 className="text-sm font-semibold text-text">Playlists</h2>
                     <p className="mt-0.5 text-xs text-text-muted">
-                        Árbol estructurado de listas VirtualDJ, incluyendo historial y subcarpetas.
+                        Structured VirtualDJ playlist tree, including history and subfolders.
                     </p>
                 </div>
                 <div className="flex-1 overflow-auto p-1.5">
                     {loading ? (
-                        <div className="p-2 text-xs text-text-muted">Cargando playlists...</div>
+                        <div className="p-2 text-xs text-text-muted">Loading playlists…</div>
                     ) : (
                         <TreeFileNavigator
                             items={treeItems}
                             selectedId={selectedPlaylistPath}
                             onSelect={(item) => setSelectedPlaylistPath(item.path)}
-                            emptyLabel="No se encontraron playlists en la carpeta VirtualDJ."
+                            emptyLabel="No playlists were found in the VirtualDJ folder."
                         />
                     )}
                 </div>
@@ -141,7 +141,7 @@ export function Playlists() {
             <div className="min-w-0 flex-1 overflow-auto p-3">
                 {!selectedPlaylist ? (
                     <div className="rounded border border-dashed border-border px-3 py-6 text-center text-sm text-text-muted">
-                        Selecciona una playlist del árbol.
+                        Select a playlist from the tree.
                     </div>
                 ) : (
                     <div className="space-y-4">
@@ -149,13 +149,13 @@ export function Playlists() {
                             <div className="flex flex-wrap items-start justify-between gap-3">
                                 <div>
                                     <h3 className="text-lg font-bold text-text">{selectedPlaylist.name}</h3>
-                                    <p className="mt-1 text-sm text-text-muted">{selectedPlaylist.folder || "Raíz de Playlists"}</p>
+                                    <p className="mt-1 text-sm text-text-muted">{selectedPlaylist.folder || "Playlist root"}</p>
                                     <p className="mt-1 text-xs text-text-muted font-mono">{selectedPlaylist.path}</p>
                                 </div>
                                 <div className="flex gap-2">
                                     <span className="rounded bg-background px-2 py-1 text-xs text-text-secondary">{selectedPlaylist.format}</span>
                                     <span className="rounded bg-background px-2 py-1 text-xs text-text-secondary">{selectedPlaylist.count} entrada(s)</span>
-                                    {unmatchedCount > 0 ? <span className="rounded bg-warning/15 px-2 py-1 text-xs text-warning">{unmatchedCount} fuera de DB</span> : null}
+                                    {unmatchedCount > 0 ? <span className="rounded bg-warning/15 px-2 py-1 text-xs text-warning">{unmatchedCount} outside DB</span> : null}
                                 </div>
                             </div>
                         </div>

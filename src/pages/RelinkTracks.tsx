@@ -34,11 +34,11 @@ function pathKey(path: string): string {
 function resultMessage(result: RelinkFileResult): string {
   if (result.message) return result.message;
   switch (result.status) {
-    case "reference_collision": return "La ruta destino ya pertenece a otra entrada catalogada.";
-    case "not_found": return "No se encontró la entrada con la ruta original.";
-    case "failed_validation": return "La ruta destino no pasó la validación.";
-    case "manual_review_required": return "La reconciliación requiere revisión manual.";
-    default: return "No se pudo reconciliar la ruta.";
+    case "reference_collision": return "The target path already belongs to another cataloged entry.";
+    case "not_found": return "No entry was found for the original path.";
+    case "failed_validation": return "The target path failed validation.";
+    case "manual_review_required": return "Reconciliation requires manual review.";
+    default: return "The path could not be reconciled.";
   }
 }
 
@@ -130,7 +130,7 @@ export function RelinkTracks() {
       selectedPathRef.current = nextSelected;
       setCandidateMatch(null);
     } catch (error) {
-      reportUiError("No se pudo verificar la biblioteca antes de reconciliar.", error, { retry: runVerify });
+      reportUiError("The library could not be checked before reconciliation.", error, { retry: runVerify });
     } finally {
       setLoading(false);
     }
@@ -153,10 +153,10 @@ export function RelinkTracks() {
       if (!isRelinkMatchForPath(match, selectedPathRef.current)) return;
       setCandidateMatch(match);
       if (match.status !== "completed") {
-        reportUiError("No se encontraron candidatos seguros.", match.message ?? "La referencia requiere revisión manual.");
+        reportUiError("No safe candidates were found.", match.message ?? "The reference requires manual review.");
       }
     } catch (error) {
-      reportUiError("No se pudieron buscar candidatos de reconciliación.", error, {
+      reportUiError("Reconciliation candidates could not be searched.", error, {
         retry: () => searchCandidates(roots),
       });
     } finally {
@@ -187,7 +187,7 @@ export function RelinkTracks() {
     try {
       const result = await services.relocateFile(vdjFolder, pending.originalFilePath, pending.newFilePath);
       if (result.status !== "completed") {
-        reportUiError("No se pudo reconciliar la ruta.", resultMessage(result));
+        reportUiError("The path could not be reconciled.", resultMessage(result));
         setPending(null);
         return;
       }
@@ -195,7 +195,7 @@ export function RelinkTracks() {
       await reload();
       await runVerify();
     } catch (error) {
-      reportUiError("No se pudo guardar la ruta reconciliada.", error);
+      reportUiError("The reconciled path could not be saved.", error);
       setPending(null);
     } finally {
       await refreshRecovery();
@@ -206,7 +206,7 @@ export function RelinkTracks() {
   async function manualRelocate() {
     if (!selectedItem) return;
     const file = await services.selectFile({
-      title: `Elegir destino: ${getPathLeafName(selectedItem.verification.file_path)}`,
+      title: `Choose target: ${getPathLeafName(selectedItem.verification.file_path)}`,
       extensions: ["mp3", "wav", "flac", "aac", "ogg", "wma", "m4a", "aiff", "aif", "opus", "mp4", "avi", "mkv", "mov", "wmv", "flv", "webm"],
     });
     if (file) requestRelink(file);
@@ -232,39 +232,39 @@ export function RelinkTracks() {
         <div className="border-b-2 border-border px-4 py-3">
           <div className="flex items-center gap-2">
             <Link2 className="h-4 w-4 text-primary-light" />
-            <h2 className="text-sm font-bold text-text">Reconciliación de rutas</h2>
+            <h2 className="text-sm font-bold text-text">Path reconciliation</h2>
           </div>
           <p className="mt-1 text-xs text-text-muted">
-            Revisa una entrada faltante, elige un candidato y confirma el cambio de ruta y tamaño físico.
+            Review a missing entry, choose a candidate, and confirm its path and physical size.
           </p>
         </div>
 
         <div className="grid grid-cols-2 gap-2 border-b-2 border-border px-3 py-3">
           <div className="rounded-lg border border-border bg-background px-2.5 py-2 text-center">
             <div className="text-lg font-bold text-error">{counts.missing}</div>
-            <div className="text-xs text-text-muted">Pendientes</div>
+            <div className="text-xs text-text-muted">Pending</div>
           </div>
           <div className="rounded-lg border border-border bg-background px-2.5 py-2 text-center">
             <div className="text-lg font-bold text-warning">{counts.candidates}</div>
-            <div className="text-xs text-text-muted">Candidatos</div>
+            <div className="text-xs text-text-muted">Candidates</div>
           </div>
         </div>
 
         <div className="flex gap-2 border-b-2 border-border px-3 py-3">
           <button type="button" onClick={() => void runVerify()} disabled={loading || !vdjFolder} className="btn btn-primary btn-sm flex-1">
             <RefreshCw className={`h-3.5 w-3.5 ${loading ? "animate-spin" : ""}`} />
-            {loading ? "Verificando..." : "Verificar"}
+            {loading ? "Checking..." : "Check"}
           </button>
           <button type="button" onClick={() => void searchCandidates()} disabled={searching || !selectedItem} className="btn btn-warning btn-sm flex-1">
             <Search className="h-3.5 w-3.5" />
-            {searching ? "Buscando..." : "Buscar"}
+            {searching ? "Searching..." : "Search"}
           </button>
         </div>
 
         <div className="min-h-0 flex-1 overflow-auto p-2">
           {relinkItems.length === 0 ? (
             <div className="rounded-lg border border-dashed border-border px-3 py-8 text-center text-[12px] text-text-muted">
-              {results ? "No hay referencias faltantes." : "Verifica la Biblioteca VirtualDJ para comenzar."}
+              {results ? "No missing references." : "Check the VirtualDJ library to begin."}
             </div>
           ) : (
             <div className="space-y-1.5">
@@ -278,7 +278,7 @@ export function RelinkTracks() {
                     className={`w-full rounded-lg border p-2.5 text-left transition-colors ${isSelected ? "border-primary bg-primary/10" : "border-border bg-background hover:bg-surface-hover"}`}
                   >
                     <div className="truncate text-[12px] font-semibold text-text">{song?.title ?? verification.title ?? getPathLeafName(verification.file_path)}</div>
-                    <div className="truncate text-xs text-text-secondary">{song?.author ?? verification.author ?? "Artista desconocido"}</div>
+                    <div className="truncate text-xs text-text-secondary">{song?.author ?? verification.author ?? "Unknown artist"}</div>
                     <div className="mt-1 truncate text-xs text-text-muted" title={verification.file_path}>{verification.file_path}</div>
                   </button>
                 );
@@ -292,49 +292,49 @@ export function RelinkTracks() {
         <MutationBlockedNotice />
         {!selectedItem ? (
           <div className="flex h-full items-center justify-center rounded-xl border border-dashed border-border bg-surface/40 px-6 text-center text-text-muted">
-            Selecciona una entrada faltante para revisar candidatos.
+            Select a missing entry to review candidates.
           </div>
         ) : (
           <div className="mx-auto max-w-4xl space-y-4">
             <div className="card space-y-3 p-4">
               <div>
                 <h3 className="text-lg font-bold text-text">{selectedItem.song?.title ?? selectedItem.verification.title ?? getPathLeafName(selectedItem.verification.file_path)}</h3>
-                <p className="mt-1 text-sm text-text-secondary">{selectedItem.song?.author ?? selectedItem.verification.author ?? "Artista desconocido"}</p>
+                <p className="mt-1 text-sm text-text-secondary">{selectedItem.song?.author ?? selectedItem.verification.author ?? "Unknown artist"}</p>
               </div>
               <div className="rounded-lg border border-error/30 bg-error/6 px-3 py-2.5 text-[12px] text-text" title={selectedItem.verification.file_path}>
-                <div className="text-xs uppercase tracking-wide text-error">Ruta original faltante</div>
+                <div className="text-xs uppercase tracking-wide text-error">Missing original path</div>
                 <div className="mt-1 break-all">{selectedItem.verification.file_path}</div>
               </div>
               <div className="grid grid-cols-2 gap-2">
                 <div className="rounded-lg border border-border bg-background px-3 py-2">
-                  <div className="text-xs uppercase tracking-wide text-text-muted">Tamaño registrado</div>
+                  <div className="text-xs uppercase tracking-wide text-text-muted">Recorded size</div>
                   <div className="mt-1 text-[12px] font-medium text-text">{formatSize(selectedItem.verification.expected_size)}</div>
                 </div>
                 <div className="rounded-lg border border-border bg-background px-3 py-2">
-                  <div className="text-xs uppercase tracking-wide text-text-muted">Carpetas consultadas</div>
+                  <div className="text-xs uppercase tracking-wide text-text-muted">Folders searched</div>
                   <div className="mt-1 text-[12px] font-medium text-text">{configuredSearchFolders.length}</div>
                 </div>
               </div>
               <div className="flex flex-wrap gap-2">
                 <button type="button" onClick={() => void searchCandidates()} disabled={searching} className="btn btn-warning btn-sm">
                   <Search className="h-3.5 w-3.5" />
-                  {searching ? "Buscando candidatos..." : "Buscar candidatos"}
+                  {searching ? "Searching candidates..." : "Search candidates"}
                 </button>
                 <button type="button" onClick={() => void manualRelocate()} disabled={relocating || mutationsBlocked} className="btn btn-ghost btn-sm">
                   <FolderOpen className="h-3.5 w-3.5" />
-                  Elegir archivo manualmente
+                  Choose file manually
                 </button>
               </div>
             </div>
 
             <div className="card space-y-3 p-4">
               <div>
-                <h3 className="text-sm font-bold text-text">Candidatos del backend</h3>
-                <p className="mt-1 text-xs text-text-muted">Ordenados por señales de nombre, extensión, tamaño y metadata. La app no recalcula ni reordena el score.</p>
+                <h3 className="text-sm font-bold text-text">Backend candidates</h3>
+                <p className="mt-1 text-xs text-text-muted">Ordered by name, extension, size, and metadata signals. The app does not recalculate or reorder the score.</p>
               </div>
               {candidates.length === 0 ? (
                 <div className="rounded-lg border border-dashed border-border px-3 py-8 text-center text-[12px] text-text-muted">
-                  Todavía no hay candidatos. Busca en las carpetas configuradas o elige un archivo manualmente.
+                  No candidates yet. Search the configured folders or choose a file manually.
                 </div>
               ) : (
                 <div className="space-y-2">
@@ -350,7 +350,7 @@ export function RelinkTracks() {
                           </div>
                         </div>
                         <button type="button" onClick={() => requestRelink(candidate.path, candidate)} disabled={relocating || mutationsBlocked} className="btn btn-success btn-sm shrink-0">
-                          Confirmar ruta
+                          Confirm path
                         </button>
                       </div>
                     </div>
@@ -361,9 +361,9 @@ export function RelinkTracks() {
 
             <ConfirmDialog
               open={pending !== null}
-              title="Confirmar reconciliación"
-              description="Se actualizarán únicamente FilePath y FileSize de esta entrada. No se reinterpretará la metadata musical."
-              confirmLabel="Confirmar y guardar"
+              title="Confirm reconciliation"
+              description="Only this entry's FilePath and FileSize will be updated. Music metadata will not be reinterpreted."
+              confirmLabel="Confirm and save"
               busy={relocating}
               onCancel={() => setPending(null)}
               onConfirm={confirmRelink}
@@ -371,7 +371,7 @@ export function RelinkTracks() {
               {pending ? (
                 <div className="space-y-2 rounded-lg border border-border bg-background px-3 py-2 text-sm">
                   <div><span className="text-text-muted">Original: </span><span className="break-all text-text">{pending.originalFilePath}</span></div>
-                  <div><span className="text-text-muted">Destino: </span><span className="break-all text-text">{pending.newFilePath}</span></div>
+                  <div><span className="text-text-muted">Target: </span><span className="break-all text-text">{pending.newFilePath}</span></div>
                 </div>
               ) : null}
             </ConfirmDialog>

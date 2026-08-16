@@ -58,7 +58,7 @@ export function Mappers() {
                     || relative.endsWith(".vdjmap");
             }));
         } catch (err) {
-            reportUiError("No se pudieron cargar los mappers.", err);
+            reportUiError("Mappers could not be loaded.", err);
         } finally {
             setLoading(false);
         }
@@ -113,7 +113,7 @@ export function Mappers() {
                 setRawDirty(false);
             })
             .catch((err) => {
-                if (!cancelled) reportUiError("No se pudo abrir el XML del mapper.", err);
+                if (!cancelled) reportUiError("The mapper XML could not be opened.", err);
             });
 
         if (isMapperFile(selectedFile)) {
@@ -126,7 +126,7 @@ export function Mappers() {
                 .catch((err) => {
                     if (!cancelled) {
                         setMapper(null);
-                        reportUiError("No se pudo interpretar el mapper.", err);
+                        reportUiError("The mapper could not be parsed.", err);
                     }
                 });
         } else {
@@ -185,7 +185,7 @@ export function Mappers() {
             await loadFiles();
             clearUiError();
         } catch (err) {
-            reportUiError("No se pudo guardar el XML del mapper.", err);
+            reportUiError("The mapper XML could not be saved.", err);
         } finally {
             setSaving(false);
         }
@@ -204,7 +204,7 @@ export function Mappers() {
             await loadFiles();
             clearUiError();
         } catch (err) {
-            reportUiError("No se pudo guardar el mapper.", err);
+            reportUiError("The mapper could not be saved.", err);
         } finally {
             setSaving(false);
         }
@@ -226,7 +226,7 @@ export function Mappers() {
             setMapperDirty(false);
             clearUiError();
         } catch (err) {
-            reportUiError("No se pudo restaurar la última versión del mapper.", err);
+            reportUiError("The last mapper version could not be restored.", err);
             throw err;
         } finally {
             setSaving(false);
@@ -278,27 +278,27 @@ export function Mappers() {
                 <div className="border-b border-border px-3 py-3">
                     <h2 className="text-sm font-semibold text-text">Mappers</h2>
                     <p className="mt-0.5 text-xs text-text-muted">
-                        Editor de mappings y definiciones de controladores usando la estructura real de <code>Mappers/</code> y <code>Devices/</code>.
+                        Edit mappings and controller definitions using the real <code>Mappers/</code> and <code>Devices/</code> structure.
                     </p>
                 </div>
                 <div className="border-b border-border/70 p-2">
                     <input
                         type="text"
                         className="input w-full"
-                        placeholder="Buscar archivo..."
+                        placeholder="Search files..."
                         value={search}
                         onChange={(e) => setSearch(e.target.value)}
                     />
                 </div>
                 <div className="flex-1 overflow-auto p-1.5">
                     {loading ? (
-                        <div className="p-2 text-xs text-text-muted">Cargando archivos...</div>
+                        <div className="p-2 text-xs text-text-muted">Loading files...</div>
                     ) : (
                         <TreeFileNavigator
                             items={treeItems}
                             selectedId={selectedId}
                             onSelect={(item) => requestFileSelection(item.path)}
-                            emptyLabel="No se encontraron archivos de mapeo/definición en la carpeta VirtualDJ."
+                            emptyLabel="No mapping or definition files were found in the VirtualDJ folder."
                         />
                     )}
                 </div>
@@ -307,7 +307,7 @@ export function Mappers() {
             <div className="min-w-0 flex-1 overflow-auto p-3">
                 {!selectedFile ? (
                     <div className="rounded border border-dashed border-border px-3 py-6 text-center text-sm text-text-muted">
-                        Selecciona un archivo de mapping o device del árbol.
+                        Select a mapping or device file from the tree.
                     </div>
                 ) : (
                     <div className="space-y-4">
@@ -315,7 +315,7 @@ export function Mappers() {
                             <div>
                                 <h3 className="text-lg font-bold text-text">{selectedFile.name}</h3>
                                 <p className="mt-1 text-sm text-text-muted">{selectedFile.relative_path}</p>
-                                <p className="mt-1 text-xs text-text-muted">Tamaño: {formatSize(selectedFile.size_bytes)}</p>
+                                <p className="mt-1 text-xs text-text-muted">Size: {formatSize(selectedFile.size_bytes)}</p>
                             </div>
                         </div>
 
@@ -336,7 +336,7 @@ export function Mappers() {
                                             <FileCode2 className="mr-1 inline h-3.5 w-3.5" /> XML
                                         </button>
                                     </div>
-                                    <span className="text-xs text-text-muted">Edita controles y acciones; XML queda como respaldo.</span>
+                                    <span className="text-xs text-text-muted">Edit controls and actions; XML remains the fallback.</span>
                                 </div>
                                 {editorMode === "xml" ? (
                                     <CodeEditor
@@ -352,9 +352,9 @@ export function Mappers() {
                                     <>
                                 <div className="card p-4">
                                     <div className="mb-3">
-                                        <h4 className="text-sm font-semibold text-text">Metadatos del mapper</h4>
+                                        <h4 className="text-sm font-semibold text-text">Mapper metadata</h4>
                                         <p className="mt-1 text-[12px] text-text-muted">
-                                            VirtualDJ define los mappings como XML con raíz <code>{"<mapper>"}</code> y bindings <code>{"<map value=... action=... />"}</code>.
+                                            VirtualDJ defines mappings as XML with a <code>{"<mapper>"}</code> root and <code>{"<map value=... action=... />"}</code> bindings.
                                         </p>
                                     </div>
                                     <div className="grid gap-3 md:grid-cols-2 xl:grid-cols-3">
@@ -388,19 +388,19 @@ export function Mappers() {
                                 <div className="card p-4">
                                     <div className="mb-3 flex flex-col gap-2 md:flex-row md:items-center md:justify-between">
                                         <div>
-                                            <h4 className="text-sm font-semibold text-text">Bindings del mapping</h4>
-                                            <p className="mt-1 text-[12px] text-text-muted">Edita controles y acciones VDJScript sin tener que tocar el XML a mano.</p>
+                                            <h4 className="text-sm font-semibold text-text">Mapping bindings</h4>
+                                            <p className="mt-1 text-[12px] text-text-muted">Edit controls and VDJScript actions without changing XML by hand.</p>
                                         </div>
                                         <div className="flex items-center gap-2">
                                             <input
                                                 type="text"
                                                 className="input md:w-72"
-                                                placeholder="Buscar control o acción..."
+                                                placeholder="Search controls or actions..."
                                                 value={bindingSearch}
                                                 onChange={(e) => setBindingSearch(e.target.value)}
                                             />
                                             <button type="button" onClick={addBinding} className="btn btn-ghost btn-sm">
-                                                <Plus className="h-3.5 w-3.5" /> Añadir
+                                                <Plus className="h-3.5 w-3.5" /> Add
                                             </button>
                                         </div>
                                     </div>
@@ -429,7 +429,7 @@ export function Mappers() {
                                                             />
                                                         </label>
                                                         <div className="flex items-end xl:justify-end">
-                                                            <button type="button" onClick={() => removeBinding(index)} className="btn btn-ghost btn-sm text-danger" aria-label={`Eliminar binding ${binding.value || index + 1}`}>
+                                                            <button type="button" onClick={() => removeBinding(index)} className="btn btn-ghost btn-sm text-danger" aria-label={`Remove binding ${binding.value || index + 1}`}>
                                                                 <Trash2 className="h-3.5 w-3.5" />
                                                             </button>
                                                         </div>
@@ -446,7 +446,7 @@ export function Mappers() {
 
                                         {filteredBindings.length === 0 ? (
                                             <div className="rounded border border-dashed border-border px-3 py-6 text-center text-sm text-text-muted">
-                                                No hay bindings para ese filtro.
+                                                No bindings match that filter.
                                             </div>
                                         ) : null}
                                     </div>
@@ -457,7 +457,7 @@ export function Mappers() {
                         ) : (
                             <div className="space-y-3">
                                 <div className="rounded-lg border border-warning/25 bg-warning/8 p-4 text-sm text-text-muted">
-                                    Este archivo no es un <code>.vdjmap</code> estructurado. Se muestra en modo texto para mantener compatibilidad con definiciones u otros formatos.
+                                    This file is not a structured <code>.vdjmap</code>. It is shown as text to preserve compatibility with definitions and other formats.
                                 </div>
                                 <CodeEditor
                                     label={selectedFile.name}
@@ -475,11 +475,11 @@ export function Mappers() {
             </div>
             <ConfirmDialog
                 open={pendingChange !== null}
-                title="Cambios pendientes en este mapper"
+                title="Pending changes in this mapper"
                 description={pendingChange?.kind === "mode"
-                    ? "Antes de cambiar de editor se restaurará la última versión cargada del mapper."
-                    : "Antes de abrir otro archivo se restaurará la última versión cargada del mapper actual."}
-                confirmLabel="Descartar y continuar"
+                    ? "The last loaded mapper version will be restored before switching editors."
+                    : "The last loaded version of the current mapper will be restored before opening another file."}
+                confirmLabel="Discard and continue"
                 destructive
                 onCancel={() => setPendingChange(null)}
                 onConfirm={confirmPendingChange}

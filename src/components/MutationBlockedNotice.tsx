@@ -8,7 +8,7 @@ export function MutationBlockedNotice() {
     return (
         <div className="mb-3 flex items-center gap-2 rounded-lg border border-warning/30 bg-warning/8 px-3 py-2 text-xs text-warning">
             <LockKeyhole className="h-3.5 w-3.5 shrink-0" />
-            Operaciones de escritura pausadas hasta resolver o verificar el estado de recuperación del encabezado.
+            Write operations are paused until the recovery status in the header is resolved or verified.
         </div>
     );
 }

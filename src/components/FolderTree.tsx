@@ -152,7 +152,7 @@ export function FolderTree({
         >
             {nodes.length === 0 ? (
                 <div className="py-4 text-center text-xs text-text-muted">
-                    Selecciona una carpeta para navegar
+                    Select a folder to browse
                 </div>
             ) : (
                 renderNodes(nodes, 0)

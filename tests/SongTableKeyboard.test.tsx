@@ -23,7 +23,7 @@ test("selects a focused song row with Enter and Space", () => {
     </table>,
   );
 
-  const row = screen.getByRole("row", { name: `Seleccionar ${song.file_name}` });
+  const row = screen.getByRole("row", { name: `Select ${song.file_name}` });
   fireEvent.keyDown(row, { key: "Enter" });
   fireEvent.keyDown(row, { key: " " });
   expect(selected).toEqual([song.index, song.index]);
@@ -41,7 +41,7 @@ test("opens inline editing by keyboard and commits or cancels from the input", (
     <EditableCell song={song} columnKey="title" value={song.title} helpers={baseHelpers} />,
   );
 
-  const trigger = screen.getByRole("button", { name: `Editar title de ${song.file_name}` });
+  const trigger = screen.getByRole("button", { name: `Edit title for ${song.file_name}` });
   fireEvent.keyDown(trigger, { key: "Enter" });
   fireEvent.keyDown(trigger, { key: " " });
   fireEvent.keyDown(trigger, { key: "F2" });
@@ -60,7 +60,7 @@ test("opens inline editing by keyboard and commits or cancels from the input", (
       }}
     />,
   );
-  const input = screen.getByRole("textbox", { name: `Editar title de ${song.file_name}` });
+  const input = screen.getByRole("textbox", { name: `Edit title for ${song.file_name}` });
   fireEvent.keyDown(input, { key: "Enter" });
   fireEvent.keyDown(input, { key: "Escape" });
   expect(commits).toBe(1);

@@ -1,68 +1,56 @@
-# Estado de implementación
+# Implementation status
 
-Actualizado: 2026-07-15.
+Updated: 2026-08-14.
 
-## Rediseño de workspaces
+## Current product surface
 
-El rediseño **Centro operativo** está implementado sin feature flag:
+The operations-center workspace is active without a feature flag:
 
-- shell con rail de 72 px, header mínimo y estado de seguridad separado de integridad;
-- Dashboard con cola de atención y `Sin verificar` para scans ausentes;
-- Browser unificado Canciones/Playlists con tres paneles, drawer y `vdj-layout-v2`;
-- Integridad agrupada con resultados compartidos y salto Faltantes → candidatos;
-- Operaciones full-bleed con preview firmado obligatorio y reporte por ítem;
-- Estudio de recursos con Configuración, Pads y Mappers, dirty/save/revert y guards de descarte;
-- temas oscuro/claro, errores contextualizados, diálogos accesibles y demo en memoria.
+- compact shell with separate write-safety and library-integrity status;
+- dashboard with a prioritized attention queue and `Not checked` for missing scans;
+- unified songs and playlists browser with three panels, detail drawer, and persisted layout;
+- shared integrity results with a missing-file to reconciliation handoff;
+- full-width batch operations with a required current preview and per-item report;
+- settings, pads, and mappers studio with dirty/save/revert protection;
+- dark and light themes, scoped errors, accessible dialogs, and an in-memory demo.
 
-La autopsia y revisión independiente terminaron con **0 blockers y 0 P1**. Los P1 descubiertos durante la revisión —carreras asíncronas, retry falso, teclado de tabla/splitters, clamping, pérdida de resultados y ErrorBoundary técnico— fueron reparados antes del cierre.
+The review completed with no known blocker or P1 issue. Earlier race, retry, keyboard, layout-clamping, result-loss, and technical error-boundary defects were repaired before that closeout.
 
-## Mutaciones críticas preservadas
+## Preserved mutation contracts
 
-Los seis slices de seguridad siguen implementados y sus contratos Rust/IPC no cambiaron:
+1. Patch-in-place tag changes use `originalFilePath` and preserve unknown XML.
+2. Path reconciliation uses typed candidates and collision detection.
+3. Literal rename uses a journal, no-clobber behavior, and rollback.
+4. Batch move uses a planner and per-item results, including cross-drive copy/delete.
+5. Removal is explicit: `db_only` or `trash_then_unindex`.
+6. Recovery remains visible; reads stay available while mutations pause.
 
-1. Tags patch-in-place por `originalFilePath`, preservando XML desconocido.
-2. Reconciliación de rutas con candidatos tipados y detección de colisiones.
-3. Rename literal con journal, no-clobber y rollback.
-4. Batch move con planner y resultado por ítem, incluido cross-drive copy/delete.
-5. Remoción explícita `db_only` o `trash_then_unindex`.
-6. Recovery visible con lectura habilitada y mutaciones pausadas.
+## Verification snapshot
 
-## Evidencia frontend y browser
-
-- `bun test`: 49 pruebas pasaron, 0 fallaron.
-- `bun run check`: 0 errores y 0 warnings.
-- `bun run build`: build Vite de producción correcto.
-- Browser real: 1180×720, 1200×800, 1280×800 y 1440×900; dark/light; reduced motion; sin overflow de documento en la matriz final.
-- Accesibilidad: Dialog con foco/trap/Escape/inert/restore/busy; tabla y edición inline por teclado; splitters con flechas/Home/End/Enter; controles auditados con nombre accesible.
-- Contraste medido: mínimo 7.76:1 en oscuro y 5.65:1 en claro para tokens normales sobre superficie.
-- Evidencia local: `.scratch/evidence/radical-ui/phase6-final/`.
-
-## Gates nativos
-
-- `cargo test`: 85 pruebas pasaron, 0 fallaron (54 unitarias + 17 database write + 11 mutation journal + 3 resource write).
-- `cargo check`: correcto; sólo warnings `dead_code` del target histórico de tests.
-- `bun run tauri build`: correcto en 7m14s, incluyendo build frontend y perfil Rust release.
-- Binario: `src-tauri/target/release/vdj-manager.exe`.
-- MSI: `src-tauri/target/release/bundle/msi/VDJ Database Manager_0.1.0_x64_en-US.msi`.
-- NSIS: `src-tauri/target/release/bundle/nsis/VDJ Database Manager_0.1.0_x64-setup.exe`.
-
-## Invariantes
-
-- Demo nunca invoca Tauri ni toca archivos.
-- No existe un comando frontend que serialice `database.xml` completo.
-- Los writers abortan si no pueden conservar estructura, validar XML o comprobar que la fuente no cambió.
-- Rename/move no reemplazan destinos y mantienen lease por biblioteca.
-- El journal vive en app-data, fuera de VirtualDJ y de la música.
-- Tests Rust de escritura usan fixtures y directorios temporales.
-
-## Reproducción
+This maintenance pass verifies the current checkout with the commands below. Historical evidence from previous release builds is not treated as proof of the current tree.
 
 ```powershell
-bun test
-bun run check
-bun run build
-
-& $env:ComSpec /d /c 'call "C:\Program Files (x86)\Microsoft Visual Studio\2022\BuildTools\Common7\Tools\VsDevCmd.bat" -arch=x64 -host_arch=x64 >nul && cargo test && cargo check'
+bun run verify
+cargo test --manifest-path src-tauri/Cargo.toml
+cargo check --manifest-path src-tauri/Cargo.toml
+cargo clippy --manifest-path src-tauri/Cargo.toml --all-targets --all-features -- -D warnings
 ```
 
-Para estados visuales: `http://127.0.0.1:3000/?demo&page=dashboard&state=problem`.
+The deterministic demo supports real-browser review at 1180×720, 1280×800, and 1440×900. GitHub Pages uses the same in-memory adapter and never accesses local files.
+
+## Invariants
+
+- The demo never invokes Tauri or touches local files.
+- The frontend cannot serialize the complete `database.xml` document.
+- Writers stop if structure cannot be preserved, XML cannot be validated, or the source changed concurrently.
+- Rename and move do not replace destinations and hold a per-library lease.
+- The journal lives outside the VirtualDJ and music folders.
+- Rust write tests use fixtures and temporary directories.
+
+Visual states can be opened with URLs such as:
+
+```text
+http://127.0.0.1:3000/?demo&page=dashboard&state=problem
+http://127.0.0.1:3000/?demo&page=songs&state=dense
+http://127.0.0.1:3000/?demo&page=dashboard&recovery=manual
+```

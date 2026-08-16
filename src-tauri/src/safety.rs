@@ -32,11 +32,11 @@ fn sanitized_label(label: &str) -> String {
 fn temp_write_path(target: &Path) -> Result<PathBuf, String> {
     let parent = target
         .parent()
-        .ok_or_else(|| format!("Ruta sin directorio padre: {}", target.display()))?;
+        .ok_or_else(|| format!("Path has no parent directory: {}", target.display()))?;
     let file_name = target
         .file_name()
         .and_then(|name| name.to_str())
-        .ok_or_else(|| format!("Ruta sin nombre de archivo valido: {}", target.display()))?;
+        .ok_or_else(|| format!("Path has no valid file name: {}", target.display()))?;
 
     Ok(parent.join(format!(
         ".{file_name}.{}.tmp",
@@ -64,11 +64,11 @@ pub fn create_timestamped_backup(target: &Path, label: &str) -> Result<Option<Pa
 
     let parent = target
         .parent()
-        .ok_or_else(|| format!("Ruta sin directorio padre: {}", target.display()))?;
+        .ok_or_else(|| format!("Path has no parent directory: {}", target.display()))?;
     let backup = parent.join(backup_file_name(target, label));
     fs::copy(target, &backup).map_err(|err| {
         format!(
-            "No se pudo crear backup {} -> {}: {}",
+            "Could not create backup {} -> {}: {}",
             target.display(),
             backup.display(),
             err
@@ -85,10 +85,10 @@ pub fn atomic_write_string(target: &Path, payload: &str) -> Result<(), String> {
 pub fn atomic_write_bytes(target: &Path, payload: &[u8]) -> Result<(), String> {
     let parent = target
         .parent()
-        .ok_or_else(|| format!("Ruta sin directorio padre: {}", target.display()))?;
+        .ok_or_else(|| format!("Path has no parent directory: {}", target.display()))?;
     fs::create_dir_all(parent).map_err(|err| {
         format!(
-            "No se pudo crear directorio {} antes de escribir {}: {}",
+            "Could not create directory {} before writing {}: {}",
             parent.display(),
             target.display(),
             err
@@ -99,7 +99,7 @@ pub fn atomic_write_bytes(target: &Path, payload: &[u8]) -> Result<(), String> {
     {
         let mut temp_file = File::create(&temp_path).map_err(|err| {
             format!(
-                "No se pudo crear archivo temporal {}: {}",
+                "Could not create temporary file {}: {}",
                 temp_path.display(),
                 err
             )
@@ -107,7 +107,7 @@ pub fn atomic_write_bytes(target: &Path, payload: &[u8]) -> Result<(), String> {
         temp_file.write_all(payload).map_err(|err| {
             let _ = fs::remove_file(&temp_path);
             format!(
-                "No se pudo escribir archivo temporal {}: {}",
+                "Could not write temporary file {}: {}",
                 temp_path.display(),
                 err
             )
@@ -115,7 +115,7 @@ pub fn atomic_write_bytes(target: &Path, payload: &[u8]) -> Result<(), String> {
         temp_file.sync_all().map_err(|err| {
             let _ = fs::remove_file(&temp_path);
             format!(
-                "No se pudo sincronizar archivo temporal {}: {}",
+                "Could not sync temporary file {}: {}",
                 temp_path.display(),
                 err
             )
@@ -128,7 +128,7 @@ pub fn atomic_write_bytes(target: &Path, payload: &[u8]) -> Result<(), String> {
         Err(rename_err) => {
             let _ = fs::remove_file(&temp_path);
             Err(format!(
-                "No se pudo reemplazar {} con {}: {}",
+                "Could not replace {} with {}: {}",
                 target.display(),
                 temp_path.display(),
                 rename_err
@@ -154,7 +154,7 @@ fn replace_existing_target(
     fs::rename(target, &rollback_path).map_err(|rollback_err| {
         let _ = fs::remove_file(temp_path);
         format!(
-            "No se pudo preparar reemplazo de {} despues de error inicial '{}': {}",
+            "Could not prepare replacement of {} after initial error '{}': {}",
             target.display(),
             original_error,
             rollback_err
@@ -171,13 +171,13 @@ fn replace_existing_target(
             let _ = fs::remove_file(temp_path);
             match restore_result {
                 Ok(()) => Err(format!(
-                    "No se pudo reemplazar {} con {}: {}. El archivo original fue restaurado.",
+                    "Could not replace {} with {}: {}. The original file was restored.",
                     target.display(),
                     temp_path.display(),
                     replace_err
                 )),
                 Err(restore_err) => Err(format!(
-                    "No se pudo reemplazar {} con {}: {}. Ademas fallo restaurar {}: {}",
+                    "Could not replace {} with {}: {}. Restoring {} also failed: {}",
                     target.display(),
                     temp_path.display(),
                     replace_err,

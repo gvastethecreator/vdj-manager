@@ -20,10 +20,10 @@ export function summarizeRemoval(results: LibraryRemovalResult[]): {
 
 export function removalStatusLabel(status: LibraryRemovalStatus): string {
   return {
-    completed: "Completado",
-    failed_validation: "Validación rechazada",
-    trash_failed: "No se envió a papelera",
-    manual_review_required: "Revisión manual requerida",
-    not_found: "No encontrado",
+    completed: "Completed",
+    failed_validation: "Validation rejected",
+    trash_failed: "Not sent to Recycle Bin",
+    manual_review_required: "Manual review required",
+    not_found: "Not found",
   }[status];
 }

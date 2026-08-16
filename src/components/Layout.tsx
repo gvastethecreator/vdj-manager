@@ -7,15 +7,15 @@ import { UiErrorNotice } from "./UiErrorNotice";
 
 const WORKSPACE_LABELS = {
   dashboard: "Dashboard",
-  library: "Biblioteca",
-  integrity: "Resolver problemas",
-  operations: "Operaciones",
-  resources: "Recursos",
-  home: "Inicio",
+  library: "Library",
+  integrity: "Resolve issues",
+  operations: "Operations",
+  resources: "Resources",
+  home: "Home",
 } as const;
 
 function libraryName(folder: string | null): string {
-  if (!folder) return "Sin biblioteca";
+  if (!folder) return "No library";
   const parts = folder.replace(/[\\/]+$/, "").split(/[\\/]/);
   return parts[parts.length - 1] || "VirtualDJ";
 }
@@ -52,10 +52,10 @@ export function Layout({ children }: { children: ReactNode }) {
                 <span className="truncate text-sm font-semibold text-text">{libraryName(vdjFolder)}</span>
                 <span className="text-xs text-text-muted">/ {WORKSPACE_LABELS[navigation.workspace]}</span>
               </div>
-              <p className="truncate text-xs text-text-muted" title={vdjFolder ?? ""}>{vdjFolder ?? "Selecciona una carpeta de VirtualDJ"}</p>
+              <p className="truncate text-xs text-text-muted" title={vdjFolder ?? ""}>{vdjFolder ?? "Select a VirtualDJ folder"}</p>
             </div>
             <span className="badge hidden border border-border bg-surface text-text-secondary sm:inline-flex">
-              {stats ? `${stats.total_songs.toLocaleString()} tracks` : "Sin cargar"}
+              {stats ? `${stats.total_songs.toLocaleString()} tracks` : "Not loaded"}
             </span>
           </div>
 
@@ -63,22 +63,22 @@ export function Layout({ children }: { children: ReactNode }) {
             <details className="group relative">
               <summary className={`flex min-h-8 cursor-pointer list-none items-center gap-2 rounded-full border px-3 text-xs font-semibold [&::-webkit-details-marker]:hidden ${mutationsBlocked ? "border-warning/45 bg-warning/10 text-warning" : "border-success/35 bg-success/10 text-success"}`}>
                 {mutationsBlocked ? <ShieldAlert className="h-3.5 w-3.5" /> : <ShieldCheck className="h-3.5 w-3.5" />}
-                {recoveryError ? "Estado no verificado" : mutationsBlocked ? "Mutaciones pausadas" : "Mutaciones protegidas"}
+                {recoveryError ? "Status not verified" : mutationsBlocked ? "Mutations paused" : "Protected mutations"}
                 <ChevronDown className="h-3.5 w-3.5 group-open:rotate-180" aria-hidden="true" />
               </summary>
               <div className="absolute right-0 top-[calc(100%+8px)] w-80 rounded-lg border border-border-strong bg-surface p-4 shadow-2xl">
-                <h2 className="text-sm font-semibold text-text">Seguridad de escritura</h2>
+                <h2 className="text-sm font-semibold text-text">Write safety</h2>
                 <p className="mt-1 text-sm leading-relaxed text-text-secondary">
                   {mutationsBlocked
-                    ? "Las escrituras están bloqueadas hasta resolver o verificar la recuperación pendiente."
-                    : "Las mutaciones crean backup previo, usan escritura atómica y registran recuperación."}
+                    ? "Writes are blocked until pending recovery is resolved or verified."
+                    : "Mutations create a backup first, use atomic writes, and record recovery state."}
                 </p>
                 <p className="mt-3 border-t border-border pt-3 text-xs leading-relaxed text-text-muted">
-                  Este estado no confirma la integridad de rutas, duplicados ni archivos huérfanos; esos análisis se ejecutan por separado.
+                  This status does not confirm path, duplicate, or orphan-file integrity; run those scans separately.
                 </p>
               </div>
             </details>
-            <button type="button" onClick={() => void reload()} disabled={loading || !vdjFolder} className="icon-button" aria-label="Recargar biblioteca" title="Recargar biblioteca">
+            <button type="button" onClick={() => void reload()} disabled={loading || !vdjFolder} className="icon-button" aria-label="Reload library" title="Reload library">
               <RotateCw className={`h-4 w-4 ${loading ? "animate-spin" : ""}`} />
             </button>
           </div>

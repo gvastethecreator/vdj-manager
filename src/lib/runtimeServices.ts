@@ -93,11 +93,11 @@ const DEMO_CONFIG_FILES: VdjConfigFileInfo[] = [
 ];
 
 const DEMO_SETTINGS: VdjSettingEntry[] = [
-  { key: "autoBPMMatch", label: "Sincronización automática de BPM", description: "Ajusta el tempo al cargar una pista.", category: "Mezcla", value: "yes" },
-  { key: "browserColumns", label: "Columnas del browser", description: "Conserva la configuración de columnas de VirtualDJ.", category: "Biblioteca", value: "title,artist,bpm,key" },
-  { key: "saveHistory", label: "Guardar History", description: "Registra las sesiones reproducidas.", category: "Biblioteca", value: "yes" },
-  { key: "waveformQuality", label: "Calidad de waveform", description: "Nivel de detalle de las formas de onda.", category: "Rendimiento", value: "high" },
-  { key: "sandboxPlugins", label: "Aislar plugins", description: "Ejecuta plugins compatibles dentro del sandbox.", category: "Seguridad", value: "yes" },
+  { key: "autoBPMMatch", label: "Automatic BPM matching", description: "Adjusts tempo when a track loads.", category: "Mixing", value: "yes" },
+  { key: "browserColumns", label: "Browser columns", description: "Preserves VirtualDJ's column configuration.", category: "Library", value: "title,artist,bpm,key" },
+  { key: "saveHistory", label: "Save history", description: "Records played sessions.", category: "Library", value: "yes" },
+  { key: "waveformQuality", label: "Waveform quality", description: "Controls waveform detail.", category: "Performance", value: "high" },
+  { key: "sandboxPlugins", label: "Sandbox plugins", description: "Runs supported plugins inside the sandbox.", category: "Security", value: "yes" },
 ];
 
 const DEMO_MAPPER: VdjMapperDocument = {
@@ -106,7 +106,7 @@ const DEMO_MAPPER: VdjMapperDocument = {
   version: "1.0",
   date: "2026-07-15",
   priority: "1",
-  info: "Fixture determinista; no representa un dispositivo físico.",
+  info: "Deterministic fixture; it does not represent a physical device.",
   other_attributes: {},
   mappings: [
     { value: "PLAY", action: "play_pause", other_attributes: {} },
@@ -173,7 +173,7 @@ async function demoScenarioGate(operation: string): Promise<void> {
     await new Promise((resolve) => setTimeout(resolve, 900));
   }
   if (scenario === "error") {
-    throw new Error(`Fixture demo: ${operation} no está disponible.`);
+    throw new Error(`Demo fixture: ${operation} is unavailable.`);
   }
 }
 
@@ -222,7 +222,7 @@ export function createTauriRuntimeServices(): RuntimeServices {
       const selected = await open({
         title,
         multiple: false,
-        filters: [{ name: "Archivos compatibles", extensions }],
+        filters: [{ name: "Supported files", extensions }],
       });
       return typeof selected === "string" ? selected : null;
     },
@@ -278,12 +278,12 @@ export function createDemoRuntimeServices(): RuntimeServices {
     async selectFile() { return `${DEMO_FOLDER}\\Playlists\\Warm up.m3u8`; },
     convertFileSrc: () => SILENT_WAV,
     async loadDatabase() {
-      await demoScenarioGate("abrir la biblioteca");
+      await demoScenarioGate("opening the library");
       return clone(scenarioSongs);
     },
     async getWaveformPreview(filePath, bucketCount = 64) { return buildSyntheticWaveformPreview(filePath, bucketCount); },
     async getDatabaseStats() {
-      await demoScenarioGate("leer las métricas de la biblioteca");
+      await demoScenarioGate("reading library metrics");
       return clone(demoStats);
     },
     async updateSongTags(_folder, originalFilePath, update): Promise<UpdateSongTagsResult> {
@@ -303,16 +303,16 @@ export function createDemoRuntimeServices(): RuntimeServices {
           originalFilePath: `${DEMO_MUSIC_ROOTS[0]}\\Incoming\\Demo Track.mp3`,
           targetFilePath: `${DEMO_MUSIC_ROOTS[0]}\\House\\Demo Track.mp3`,
           status: "resolved",
-          message: action === "rollback" ? "Rollback de demostración completado." : "Recuperación de demostración completada.",
+          message: action === "rollback" ? "Demo rollback completed." : "Demo recovery completed.",
         }],
       };
     },
     async verifyFiles() {
-      await demoScenarioGate("verificación de archivos");
+      await demoScenarioGate("checking files");
       return clone(demoVerification());
     },
     async scanMusicFolder(folderPath) {
-      await demoScenarioGate("escaneo de carpeta");
+      await demoScenarioGate("scanning a folder");
       return scenarioSongs.filter((song) => song.file_path.toLowerCase().startsWith(folderPath.toLowerCase())).map((song) => song.file_path);
     },
     async renameFileOp(_folder, originalFilePath, newFileName): Promise<RenameFileResult> {
@@ -322,7 +322,7 @@ export function createDemoRuntimeServices(): RuntimeServices {
     async moveFilesOp(_folder, paths, targetFolder) { return demoMoveReport(paths, targetFolder, true); },
     async findOrphanFiles() { return demoScenario() === "problem" ? [`${DEMO_MUSIC_ROOTS[2]}\\Uncatalogued Edit.wav`] : []; },
     async findDuplicates(): Promise<DuplicateResult> {
-      await demoScenarioGate("análisis de duplicados");
+      await demoScenarioGate("analyzing duplicates");
       if (demoScenario() !== "problem") return { by_name: [], by_size: [], by_hash: [] };
       const pair = [clone(demoSongs[0]), { ...clone(demoSongs[0]), index: 90, file_path: `${DEMO_MUSIC_ROOTS[2]}\\Disclosure - You & Me copy.flac`, file_name: "Disclosure - You & Me copy.flac" }];
       return { by_name: [{ key: "disclosure - you & me", songs: pair }], by_size: [], by_hash: [] };
@@ -331,13 +331,13 @@ export function createDemoRuntimeServices(): RuntimeServices {
       return Promise.all(missingPaths.map((path) => createDemoRuntimeServices().findRelinkCandidates(_folder, path, [scanFolder])));
     },
     async findRelinkCandidates(_folder, originalFilePath, scanFolders): Promise<SimilarFileMatch> {
-      await demoScenarioGate("búsqueda de candidatos");
+      await demoScenarioGate("searching candidates");
       const target = `${scanFolders[0] ?? DEMO_MUSIC_ROOTS[0]}\\Recovered\\${originalFilePath.split(/[\\/]/).pop() ?? "track.mp3"}`;
       return {
         status: "completed",
         originalFilePath,
         message: null,
-        candidates: [{ path: target, score: 0.94, reasons: ["mismo nombre", "misma extensión"], sameExtension: true, sameStem: true, sameName: true, sizeMatch: true }],
+        candidates: [{ path: target, score: 0.94, reasons: ["same name", "same extension"], sameExtension: true, sameStem: true, sameName: true, sizeMatch: true }],
       };
     },
     async relocateFile(_folder, originalFilePath, newFilePath): Promise<RelinkFileResult> {
@@ -355,11 +355,11 @@ export function createDemoRuntimeServices(): RuntimeServices {
       return [...directories];
     },
     async planMoveFiles(_folder, paths, targetFolder) {
-      await demoScenarioGate("preparar el movimiento");
+      await demoScenarioGate("preparing the move");
       return demoMoveReport(paths, targetFolder, false);
     },
     async dryRunRename(_folder, indices, pattern): Promise<DryRunResult> {
-      return { description: `Vista previa: ${pattern}`, affected_count: indices.length, details: indices.map((index) => `${demoSongs[index]?.file_name ?? index} → ${pattern}`) };
+      return { description: `Preview: ${pattern}`, affected_count: indices.length, details: indices.map((index) => `${demoSongs[index]?.file_name ?? index} → ${pattern}`) };
     },
     async listPlaylists() { return clone(DEMO_PLAYLISTS); },
     async readPlaylist(playlistPath): Promise<PlaylistEntry[]> {
@@ -368,11 +368,11 @@ export function createDemoRuntimeServices(): RuntimeServices {
       return demoSongs.slice(0, count).map((song) => ({ file_path: song.file_path }));
     },
     async listVdjConfigFiles() {
-      await demoScenarioGate("lectura de recursos");
+      await demoScenarioGate("reading resources");
       return clone(DEMO_CONFIG_FILES);
     },
     async readVdjConfigFile(_folder, filePath) {
-      await demoScenarioGate("lectura del recurso");
+      await demoScenarioGate("reading the resource");
       const saved = configContents.get(filePath);
       if (saved !== undefined) return saved;
       if (filePath.endsWith(".vdjmap")) return serializeDemoMapper(currentMapper);
@@ -384,7 +384,7 @@ export function createDemoRuntimeServices(): RuntimeServices {
       return `${filePath}.demo-backup`;
     },
     async getVdjSettings() {
-      await demoScenarioGate("lectura de settings.xml");
+      await demoScenarioGate("reading settings.xml");
       return clone(currentSettings);
     },
     async updateVdjSettings(_folder, updates) {
@@ -396,7 +396,7 @@ export function createDemoRuntimeServices(): RuntimeServices {
       return `${DEMO_FOLDER}\\Backups\\settings.demo.xml`;
     },
     async getVdjMapper() {
-      await demoScenarioGate("lectura del mapper");
+      await demoScenarioGate("reading the mapper");
       return clone(currentMapper);
     },
     async updateVdjMapper(_folder, filePath, mapper) {
@@ -405,7 +405,7 @@ export function createDemoRuntimeServices(): RuntimeServices {
       return `${filePath}.demo-backup`;
     },
     async getVdjPadDocument() {
-      await demoScenarioGate("lectura del pad");
+      await demoScenarioGate("reading the pad");
       return clone(currentPad);
     },
     async updateVdjPadDocument(_folder, filePath, document) {

@@ -85,7 +85,7 @@ export function BatchOperations() {
         && (action === "move" ? moveReport !== null : dryResult !== null);
 
     async function pickTarget() {
-        const folder = await services.selectDirectory({ purpose: "destination", title: "Seleccionar carpeta destino" });
+        const folder = await services.selectDirectory({ purpose: "destination", title: "Select target folder" });
         if (folder) {
             setTargetFolder(folder);
             invalidatePreview();
@@ -122,18 +122,18 @@ export function BatchOperations() {
                 const song = songs.find((item) => item.index === indices[0]);
                 if (!song) return;
                 result = {
-                    description: "Renombrar un archivo con el nombre literal indicado",
+                    description: "Rename one file to the exact name provided",
                     affected_count: 1,
                     details: [`${song.file_name} → ${renameFileName}`],
                 };
             } else {
                 const fieldList = running_tag_fields.map(([k, v]) => `${k}="${v}"`).join(", ");
                 result = {
-                    description: `Editar ${running_tag_fields.length} campo(s) en ${indices.length} cancion(es)`,
+                    description: `Edit ${running_tag_fields.length} field(s) across ${indices.length} song(s)`,
                     affected_count: indices.length,
                     details: indices.map((idx) => {
                         const s = songs.find((x) => x.index === idx);
-                        return s ? `${s.file_name}: ${fieldList}` : `Índice ${idx}: ${fieldList}`;
+                        return s ? `${s.file_name}: ${fieldList}` : `Index ${idx}: ${fieldList}`;
                     }),
                 };
             }
@@ -142,17 +142,17 @@ export function BatchOperations() {
             setValidatedPreviewKey(requestKey);
         } catch (err) {
             if (previewRequestVersion.current !== requestVersion) return;
-            reportUiError("No se pudo preparar la vista previa de la operación.", err, { retry: runDryRun });
+            reportUiError("The operation preview could not be prepared.", err, { retry: runDryRun });
         }
     }
 
     async function execute() {
         if (mutationsBlocked) {
-            reportUiError("Operación pausada por una recuperación pendiente.");
+            reportUiError("The operation is paused while recovery is pending.");
             return;
         }
         if (!hasFreshPreview) {
-            reportUiError("Prepara una vista previa actualizada antes de ejecutar la operación.");
+            reportUiError("Prepare an up-to-date preview before running the operation.");
             return;
         }
         if (!vdjFolder || selected.size === 0) return;
@@ -189,16 +189,16 @@ export function BatchOperations() {
                 for (const index of indices) {
                     const song = songs.find((item) => item.index === index);
                     if (!song?.in_database) {
-                        outcomes.push(`OMITIDO: ${song?.file_name ?? index} no pertenece a database.xml`);
+                        outcomes.push(`SKIPPED: ${song?.file_name ?? index} is not catalogued in database.xml`);
                         continue;
                     }
                     try {
                         const result = await services.updateSongTags(vdjFolder, song.file_path, patch);
-                        outcomes.push(`${result.status === "completed" ? "OK" : "ATENCIÓN"}: ${song.file_name} · ${result.status}`);
+                        outcomes.push(`${result.status === "completed" ? "OK" : "ATTENTION"}: ${song.file_name} · ${result.status}`);
                         if (result.status === "completed") completed += 1;
                     } catch (error) {
                         outcomes.push(`ERROR: ${song.file_name} · ${String(error)}`);
-                        reportUiError(`La edición batch se detuvo tras ${completed} cambio(s).`, error);
+                        reportUiError(`Batch editing stopped after ${completed} change(s).`, error);
                         setLog([...outcomes]);
                         break;
                     }
@@ -207,7 +207,7 @@ export function BatchOperations() {
                 if (completed > 0) await reload();
             }
         } catch (err) {
-            reportUiError("No se pudo completar la operación en lote.", err);
+            reportUiError("The batch operation could not be completed.", err);
         } finally {
             await refreshRecovery();
             setRunning(false);
@@ -218,17 +218,17 @@ export function BatchOperations() {
     return (
         <div className="flex h-full min-h-0 gap-0 bg-background">
             {/* ── Left side panel: folder tree ── */}
-            {treeOpen && <aside id="batch-destination-tree" className="flex w-64 shrink-0 flex-col overflow-hidden border-r border-border bg-surface" aria-label="Árbol de destinos">
+            {treeOpen && <aside id="batch-destination-tree" className="flex w-64 shrink-0 flex-col overflow-hidden border-r border-border bg-surface" aria-label="Target tree">
                 <div className="flex items-center justify-between border-b-2 border-border px-3 py-2">
-                    <span className="text-xs font-semibold text-text-muted">Carpetas</span>
+                    <span className="text-xs font-semibold text-text-muted">Folders</span>
                     <button type="button" onClick={pickTreeRoot}
                         className="inline-flex min-h-8 items-center rounded px-2 text-xs text-primary-light hover:bg-primary/10">
-                        + Agregar
+                        + Add
                     </button>
                 </div>
                 {targetFolder && (
                     <div className="border-b-2 border-border/50 px-3 py-1.5">
-                        <p className="text-xs text-text-muted">Destino seleccionado:</p>
+                        <p className="text-xs text-text-muted">Selected target:</p>
                         <p className="truncate text-xs text-primary-light" title={targetFolder}>
                             {targetFolder.split("\\").pop() ?? targetFolder}
                         </p>
@@ -248,13 +248,13 @@ export function BatchOperations() {
             <div className="min-w-0 flex-1 space-y-4 overflow-auto p-4">
                 <header className="flex items-start justify-between gap-4">
                     <div>
-                        <p className="text-xs font-semibold uppercase tracking-wide text-primary-light">Workspace de ejecución</p>
-                        <h1 className="mt-1 text-xl font-bold text-text">Operaciones en lote</h1>
-                        <p className="mt-1 text-sm text-text-muted">Selecciona pistas, prepara una vista previa y confirma una única operación protegida.</p>
+                        <p className="text-xs font-semibold uppercase tracking-wide text-primary-light">Execution workspace</p>
+                        <h1 className="mt-1 text-xl font-bold text-text">Batch operations</h1>
+                        <p className="mt-1 text-sm text-text-muted">Select tracks, prepare a preview, and confirm one protected operation.</p>
                     </div>
                     <button type="button" className="btn btn-ghost btn-sm" onClick={() => setTreeOpen((value) => !value)} aria-expanded={treeOpen} aria-controls="batch-destination-tree">
                         {treeOpen ? <PanelLeftClose className="h-4 w-4" /> : <PanelLeftOpen className="h-4 w-4" />}
-                        {treeOpen ? "Ocultar destinos" : "Mostrar destinos"}
+                        {treeOpen ? "Hide targets" : "Show targets"}
                     </button>
                 </header>
                 <MutationBlockedNotice />
@@ -262,9 +262,9 @@ export function BatchOperations() {
                 {/* Action tabs */}
                 <div className="tab-group">
                     {([
-                        { key: "move", label: "Mover Archivos" },
-                        { key: "rename", label: "Renombrar" },
-                        { key: "tag", label: "Editar Tag" },
+                        { key: "move", label: "Move files" },
+                        { key: "rename", label: "Rename" },
+                        { key: "tag", label: "Edit tags" },
                     ] as const).map(({ key, label }) => (
                         <button key={key} type="button"
                             onClick={() => { setAction(key); invalidatePreview(); }}
@@ -278,15 +278,15 @@ export function BatchOperations() {
                 <div className="card p-3">
                     {action === "move" && (
                         <div>
-                            <label className="mb-1 block text-xs text-text-muted">Carpeta destino</label>
+                            <label className="mb-1 block text-xs text-text-muted">Target folder</label>
                             <div className="flex gap-2">
                                 <input type="text" value={targetFolder}
                                     onChange={(e) => { setTargetFolder(e.target.value); invalidatePreview(); }}
-                                    aria-label="Carpeta destino"
-                                    placeholder="Selecciona en el árbol o escribe una ruta"
+                                    aria-label="Target folder"
+                                    placeholder="Select from the tree or enter a path"
                                     className="input flex-1" />
                                 <button type="button" onClick={pickTarget} className="btn btn-ghost">
-                                    Explorar...
+                                    Browse…
                                 </button>
                             </div>
                         </div>
@@ -295,15 +295,15 @@ export function BatchOperations() {
                     {action === "rename" && (
                         <div>
                             <label className="mb-1 block text-xs text-text-muted">
-                                Nombre de archivo destino (literal, con extensión)
+                                Target file name (exact, including extension)
                             </label>
                             <input type="text" value={renameFileName}
                                 onChange={(e) => { setRenameFileName(e.target.value); invalidatePreview(); }}
-                                aria-label="Nombre de archivo destino"
-                                placeholder="ejemplo.mp3"
+                                aria-label="Target file name"
+                                placeholder="example.mp3"
                                 className="input w-full" />
                             <p className="mt-1 text-xs text-text-muted">
-                                Selecciona exactamente una canción. El backend valida el nombre sin sanitizarlo.
+                                Select exactly one song. The backend validates the name without sanitizing it.
                             </p>
                         </div>
                     )}
@@ -311,16 +311,16 @@ export function BatchOperations() {
                     {action === "tag" && (
                         <div className="space-y-2">
                             <p className="text-xs text-text-muted">
-                                Deja en blanco los campos que <strong>no</strong> quieres modificar.
+                                Leave fields blank when you do <strong>not</strong> want to change them.
                             </p>
                             <div className="grid grid-cols-2 gap-2 sm:grid-cols-3">
                                 {([
-                                    ["title", "Título"], ["author", "Artista"], ["album", "Álbum"],
-                                    ["genre", "Género"], ["year", "Año"], ["remix", "Remix"],
-                                    ["remixer", "Remixer"], ["composer", "Compositor"], ["label", "Disquera"],
-                                    ["trackNumber", "Pista #"], ["grouping", "Agrupación"], ["bpm", "BPM"],
-                                    ["key", "Tono"], ["stars", "Puntuación"], ["gain", "Ganancia dB"],
-                                    ["user1", "Usuario 1"], ["user2", "Usuario 2"], ["commentText", "Comentario"],
+                                    ["title", "Title"], ["author", "Artist"], ["album", "Album"],
+                                    ["genre", "Genre"], ["year", "Year"], ["remix", "Remix"],
+                                    ["remixer", "Remixer"], ["composer", "Composer"], ["label", "Label"],
+                                    ["trackNumber", "Track #"], ["grouping", "Grouping"], ["bpm", "BPM"],
+                                    ["key", "Key"], ["stars", "Rating"], ["gain", "Gain dB"],
+                                    ["user1", "User 1"], ["user2", "User 2"], ["commentText", "Comment"],
                                 ] as [keyof typeof tagForm, string][]).map(([field, label]) => (
                                     <div key={field}>
                                         <label className="mb-0.5 block text-xs text-text-muted">{label}</label>
@@ -339,15 +339,15 @@ export function BatchOperations() {
                                             value={tagForm.color || "#ffffff"}
                                             onChange={(e) => setTag("color", e.target.value)}
                                             className="color-picker-input"
-                                            aria-label="Selector de color"
-                                            title="Elegir color"
+                                            aria-label="Color picker"
+                                            title="Choose color"
                                         />
                                         <input
                                             type="text"
                                             value={tagForm.color}
                                             onChange={(e) => setTag("color", e.target.value)}
                                             placeholder="—"
-                                            aria-label="Color en formato hexadecimal"
+                                            aria-label="Hex color"
                                             className="input flex-1 font-mono text-xs"
                                             maxLength={9}
                                         />
@@ -356,7 +356,7 @@ export function BatchOperations() {
                             </div>
                             {running_tag_fields.length > 0 && (
                                 <p className="text-xs text-success">
-                                    {running_tag_fields.length} campo(s) activo(s):{" "}
+                                    {running_tag_fields.length} active field(s):{" "}
                                     {running_tag_fields.map(([k]) => k).join(", ")}
                                 </p>
                             )}
@@ -364,15 +364,15 @@ export function BatchOperations() {
                     )}
 
                     <div className="mt-3 flex items-center justify-between">
-                        <span className="text-[13px] text-text-muted">{selected.size} canciones seleccionadas</span>
+                        <span className="text-[13px] text-text-muted">{selected.size} songs selected</span>
                         <div className="flex gap-2">
                             <button type="button" onClick={runDryRun}
                                 disabled={running || selected.size === 0 || (action === "move" && targetFolder.length === 0) || (action === "rename" && (selected.size !== 1 || renameFileName.length === 0)) || (action === "tag" && running_tag_fields.length === 0)}
-                                className="btn btn-ghost"><Eye className="h-4 w-4" /> Preparar vista previa</button>
+                                className="btn btn-ghost"><Eye className="h-4 w-4" /> Prepare preview</button>
                             <button type="button" onClick={() => setConfirmOpen(true)}
                                 disabled={mutationsBlocked || running || !hasFreshPreview || selected.size === 0 || (action === "move" && targetFolder.length === 0) || (action === "rename" && (selected.size !== 1 || renameFileName.length === 0)) || (action === "tag" && running_tag_fields.length === 0)}
                                 className="btn btn-primary">
-                                <Play className="h-4 w-4" /> {running ? "Ejecutando..." : "Ejecutar"}
+                                <Play className="h-4 w-4" /> {running ? "Running..." : "Run"}
                             </button>
                         </div>
                     </div>
@@ -382,9 +382,9 @@ export function BatchOperations() {
                 {dryResult && (
                     <div className="card space-y-1.5 border-warning/30 bg-warning/5 p-3">
                         <div className="flex items-center justify-between">
-                            <h4 className="text-xs font-bold text-warning">Vista Previa (Dry Run)</h4>
+                            <h4 className="text-xs font-bold text-warning">Preview (dry run)</h4>
                             <span className="text-xs text-text-muted">
-                                {dryResult.affected_count} de {dryResult.details.length} afectados
+                                {dryResult.affected_count} of {dryResult.details.length} affected
                             </span>
                         </div>
                         <p className="text-xs text-text-secondary">{dryResult.description}</p>
@@ -401,9 +401,9 @@ export function BatchOperations() {
                 {moveReport && (
                     <div className="card space-y-2 border-info/30 bg-info/5 p-3">
                         <div className="flex items-center justify-between gap-3">
-                            <h4 className="text-xs font-bold text-info">Reporte de movimiento</h4>
+                            <h4 className="text-xs font-bold text-info">Move report</h4>
                             <span className="text-xs text-text-muted">
-                                {moveReport.summary.completed} completados · {moveReport.summary.ready} listos · {moveReport.summary.blocked} bloqueados · {moveReport.summary.manualReview} revisión manual
+                                {moveReport.summary.completed} completed · {moveReport.summary.ready} ready · {moveReport.summary.blocked} blocked · {moveReport.summary.manualReview} manual review
                             </span>
                         </div>
                         <div className="max-h-52 overflow-auto rounded-[5px] border-2 border-border bg-surface p-2">
@@ -422,7 +422,7 @@ export function BatchOperations() {
                 {/* Log */}
                 {log.length > 0 && (
                     <div className="card max-h-48 overflow-auto p-2.5">
-                        <h4 className="mb-1.5 text-xs font-semibold text-text-muted">Resultados</h4>
+                        <h4 className="mb-1.5 text-xs font-semibold text-text-muted">Results</h4>
                         {log.map((line, i) => (
                             <div key={i} className={`text-xs ${line.startsWith("OK") ? "text-success" : line.startsWith("Error") ? "text-error" : "text-text-secondary"}`}>
                                 {line}
@@ -436,9 +436,9 @@ export function BatchOperations() {
                     storageKey="batch" />
                 <ConfirmDialog
                     open={confirmOpen}
-                    title="Confirmar operación en lote"
-                    description={`Se aplicará ${action === "move" ? "un movimiento" : action === "rename" ? "un renombrado" : "una edición de etiquetas"} a ${selected.size} pista(s). La operación quedará registrada y usará las protecciones de recuperación.`}
-                    confirmLabel="Ejecutar operación"
+                    title="Confirm batch operation"
+                    description={`${action === "move" ? "A move" : action === "rename" ? "A rename" : "A tag edit"} will be applied to ${selected.size} track(s). The operation will be journaled and use recovery safeguards.`}
+                    confirmLabel="Run operation"
                     destructive={action !== "tag"}
                     busy={running}
                     onCancel={() => setConfirmOpen(false)}

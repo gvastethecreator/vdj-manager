@@ -40,7 +40,7 @@ export function VdjResourceEditorPage({
             const result = await services.listVdjConfigFiles(vdjFolder);
             setFiles(result.filter(filter));
         } catch (err) {
-            reportUiError("No se pudo cargar el estudio de recursos.", err);
+            reportUiError("The resource studio could not be loaded.", err);
         } finally {
             setLoading(false);
         }
@@ -93,7 +93,7 @@ export function VdjResourceEditorPage({
                 setDirty(false);
             })
             .catch((err) => {
-                if (!cancelled) reportUiError("No se pudo abrir el recurso seleccionado.", err);
+                if (!cancelled) reportUiError("The selected resource could not be opened.", err);
             });
 
         return () => {
@@ -111,7 +111,7 @@ export function VdjResourceEditorPage({
             clearUiError();
             await loadFiles();
         } catch (err) {
-            reportUiError("No se pudo guardar el recurso.", err);
+            reportUiError("The resource could not be saved.", err);
         } finally {
             setSaving(false);
         }
@@ -128,14 +128,14 @@ export function VdjResourceEditorPage({
                     <input
                         type="text"
                         className="input w-full"
-                        placeholder="Buscar archivo..."
+                        placeholder="Search files..."
                         value={search}
                         onChange={(e) => setSearch(e.target.value)}
                     />
                 </div>
                 <div className="flex-1 overflow-auto p-1.5">
                     {loading ? (
-                        <div className="p-2 text-xs text-text-muted">Cargando archivos...</div>
+                        <div className="p-2 text-xs text-text-muted">Loading files...</div>
                     ) : (
                         <TreeFileNavigator
                             items={treeItems}
@@ -155,9 +155,9 @@ export function VdjResourceEditorPage({
                             <p className="mt-1 text-sm text-text-muted">{subtitle}</p>
                         </div>
                         <div className="flex items-center gap-2">
-                            {dirty ? <span className="rounded bg-warning/15 px-2 py-1 text-xs text-warning">Cambios pendientes</span> : null}
+                            {dirty ? <span className="rounded bg-warning/15 px-2 py-1 text-xs text-warning">Pending changes</span> : null}
                             <button type="button" onClick={save} disabled={!dirty || saving || !selectedFile} className="btn btn-primary btn-sm">
-                                {saving ? "Guardando..." : "Guardar"}
+                                {saving ? "Saving..." : "Save"}
                             </button>
                         </div>
                     </div>
@@ -179,7 +179,7 @@ export function VdjResourceEditorPage({
                             <div className="card p-3">
                                 <div className="text-sm font-semibold text-text">{selectedFile.name}</div>
                                 <div className="mt-1 text-xs text-text-muted">{selectedFile.relative_path}</div>
-                                <div className="mt-2 text-xs text-text-muted">Tamaño: {formatSize(selectedFile.size_bytes)}</div>
+                                <div className="mt-2 text-xs text-text-muted">Size: {formatSize(selectedFile.size_bytes)}</div>
                             </div>
                             <CodeEditor
                                 label={selectedFile.name}

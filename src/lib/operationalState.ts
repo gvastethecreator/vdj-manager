@@ -49,9 +49,9 @@ export function buildAttentionQueue(
     items.push({
       id: "recovery",
       tone: "critical",
-      title: "Recuperación pendiente",
-      detail: "Hay una mutación interrumpida. Resuélvela antes de volver a escribir en la biblioteca.",
-      actionLabel: "Revisar recuperación",
+      title: "Recovery pending",
+      detail: "A mutation was interrupted. Resolve it before writing to the library again.",
+      actionLabel: "Review recovery",
       navigation: { workspace: "dashboard" },
     });
   }
@@ -60,18 +60,18 @@ export function buildAttentionQueue(
     items.push({
       id: "verify",
       tone: "neutral",
-      title: "Integridad de archivos sin verificar",
-      detail: "Todavía no se comprobó si las rutas y tamaños registrados coinciden con el disco.",
-      actionLabel: "Verificar ahora",
+      title: "File integrity not checked",
+      detail: "Recorded paths and sizes have not yet been checked against disk.",
+      actionLabel: "Check now",
       navigation: { workspace: "integrity", section: "missing" },
     });
   } else if (integrity.missing > 0 || integrity.mismatched > 0) {
     items.push({
       id: "missing",
       tone: "critical",
-      title: `${integrity.missing} faltante${integrity.missing === 1 ? "" : "s"} · ${integrity.mismatched} con tamaño distinto`,
-      detail: "Revisa candidatos de ruta antes de editar o mover estas pistas.",
-      actionLabel: "Resolver rutas",
+      title: `${integrity.missing} missing · ${integrity.mismatched} size mismatch${integrity.mismatched === 1 ? "" : "es"}`,
+      detail: "Review path candidates before editing or moving these tracks.",
+      actionLabel: "Resolve paths",
       navigation: { workspace: "integrity", section: "relink" },
     });
   }
@@ -80,18 +80,18 @@ export function buildAttentionQueue(
     items.push({
       id: "duplicates-unverified",
       tone: "neutral",
-      title: "Duplicados sin analizar",
-      detail: "El conteo se mantiene como Sin verificar hasta ejecutar el análisis.",
-      actionLabel: "Analizar duplicados",
+      title: "Duplicates not analyzed",
+      detail: "The count remains Not checked until the analysis runs.",
+      actionLabel: "Analyze duplicates",
       navigation: { workspace: "integrity", section: "duplicates" },
     });
   } else if (integrity.duplicateGroups > 0) {
     items.push({
       id: "duplicates",
       tone: "warning",
-      title: `${integrity.duplicateGroups} grupo${integrity.duplicateGroups === 1 ? "" : "s"} de duplicados`,
-      detail: "Compara cues, stems y ubicación antes de elegir qué conservar.",
-      actionLabel: "Revisar duplicados",
+      title: `${integrity.duplicateGroups} duplicate group${integrity.duplicateGroups === 1 ? "" : "s"}`,
+      detail: "Compare cues, stems, and location before choosing what to keep.",
+      actionLabel: "Review duplicates",
       navigation: { workspace: "integrity", section: "duplicates" },
     });
   }
@@ -100,18 +100,18 @@ export function buildAttentionQueue(
     items.push({
       id: "orphans-unverified",
       tone: "neutral",
-      title: "Carpetas de música sin revisar",
-      detail: "No se buscaron archivos que estén en disco pero fuera de database.xml.",
-      actionLabel: "Buscar huérfanos",
+      title: "Music folders not scanned",
+      detail: "Files on disk but outside database.xml have not been searched.",
+      actionLabel: "Find orphans",
       navigation: { workspace: "integrity", section: "orphans" },
     });
   } else if (integrity.orphans > 0) {
     items.push({
       id: "orphans",
       tone: "warning",
-      title: `${integrity.orphans} archivo${integrity.orphans === 1 ? "" : "s"} fuera de la biblioteca`,
-      detail: "Decide si deben incorporarse o quedar fuera de VirtualDJ.",
-      actionLabel: "Revisar huérfanos",
+      title: `${integrity.orphans} file${integrity.orphans === 1 ? "" : "s"} outside the library`,
+      detail: "Decide whether to add them or keep them outside VirtualDJ.",
+      actionLabel: "Review orphans",
       navigation: { workspace: "integrity", section: "orphans" },
     });
   }
@@ -120,9 +120,9 @@ export function buildAttentionQueue(
     items.push({
       id: "healthy",
       tone: "success",
-      title: "Sin acciones urgentes",
-      detail: "Los últimos análisis no encontraron rutas rotas, duplicados ni huérfanos.",
-      actionLabel: "Abrir biblioteca",
+      title: "No urgent actions",
+      detail: "The latest scans found no broken paths, duplicates, or orphans.",
+      actionLabel: "Open library",
       navigation: { workspace: "library", section: "songs" },
     });
   }
@@ -132,5 +132,5 @@ export function buildAttentionQueue(
 }
 
 export function displayScanCount(value: number | null): string {
-  return value === null ? "Sin verificar" : value.toLocaleString();
+  return value === null ? "Not checked" : value.toLocaleString();
 }

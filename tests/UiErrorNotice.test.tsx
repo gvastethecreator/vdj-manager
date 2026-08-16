@@ -6,13 +6,12 @@ test("keeps technical detail opt-in and exposes recovery", () => {
   let retries = 0;
   render(
     <UiErrorNotice
-      error={{ scope: "resources:configs", summary: "No se pudo cargar settings.xml", detail: "invoke unavailable" }}
+      error={{ scope: "resources:configs", summary: "settings.xml could not be loaded", detail: "invoke unavailable" }}
       onRetry={() => { retries += 1; }}
     />,
   );
-  expect(screen.getByText("No se pudo cargar settings.xml")).toBeInTheDocument();
-  expect(screen.getByText("Detalle técnico")).toBeInTheDocument();
-  fireEvent.click(screen.getByRole("button", { name: "Reintentar" }));
+  expect(screen.getByText("settings.xml could not be loaded")).toBeInTheDocument();
+  expect(screen.getByText("Technical details")).toBeInTheDocument();
+  fireEvent.click(screen.getByRole("button", { name: "Retry" }));
   expect(retries).toBe(1);
 });
-
