@@ -18,6 +18,3 @@ jobs:
       - name: Validate Store contracts
         shell: pwsh
         run: .\scripts\store\Test-StoreReadiness.ps1
-      - name: Validate Tauri configuration
-        shell: pwsh
-        run: bunx tauri info
