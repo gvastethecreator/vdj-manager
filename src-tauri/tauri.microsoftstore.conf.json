@@ -9,9 +9,7 @@
     "windows": {
       "nsis": {
         "installMode": "currentUser",
-        "webviewInstallMode": { "type": "offlineInstaller" },
-        "installerArgs": ["/S"],
-        "minimumWebview2Version": ""
+        "webviewInstallMode": { "type": "offlineInstaller" }
       }
     }
   }
