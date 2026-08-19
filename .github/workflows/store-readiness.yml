@@ -1,0 +1,20 @@
+name: store-readiness
+
+on:
+  pull_request:
+    paths:
+      - 'src-tauri/**'
+      - 'docs/store/**'
+      - 'scripts/store/**'
+      - 'PRIVACY.md'
+      - '.github/workflows/store-readiness.yml'
+  workflow_dispatch:
+
+jobs:
+  validate:
+    runs-on: windows-latest
+    steps:
+      - uses: actions/checkout@v4
+      - name: Validate Store contracts
+        shell: pwsh
+        run: .\scripts\store\Test-StoreReadiness.ps1

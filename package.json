@@ -18,7 +18,8 @@
         "check": "tsc --noEmit && oxlint src/",
         "deps:check": "bun outdated",
         "audit": "bun audit",
-        "verify": "bun run check && bun run test && bun run build"
+        "verify": "bun run check && bun run test && bun run build",
+        "store:validate": "powershell -NoProfile -ExecutionPolicy Bypass -File scripts/store/Test-StoreReadiness.ps1"
     },
     "dependencies": {
         "@tanstack/react-virtual": "^3.14.9",
